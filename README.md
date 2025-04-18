@@ -162,6 +162,7 @@ app/
 | `CHECK_INTERVAL_HOURS`       | 可选，检查禁用 Key 是否恢复的时间间隔 (小时)                   | `1`                                                   |
 | `TIMEZONE`                   | 可选，应用程序使用的时区                                       | `Asia/Shanghai`                                       |
 | `TIME_OUT`                   | 可选，请求超时时间 (秒)                                        | `300`                                                 |
+| `LOG_LEVEL`                  | 可选，日志级别，例如 DEBUG, INFO, WARNING, ERROR, CRITICAL     | `INFO`                                                |
 | **图像生成相关**             |                                                          |                                                       |
 | `PAID_KEY`                   | 可选，付费版API Key，用于图片生成等高级功能                    | `your-paid-api-key`                                   |
 | `CREATE_IMAGE_MODEL`         | 可选，图片生成模型                                             | `imagen-3.0-generate-002`                             |
