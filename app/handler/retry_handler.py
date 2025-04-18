@@ -35,7 +35,7 @@ class RetryHandler:
                     key_manager = kwargs.get("key_manager")
                     if key_manager:
                         old_key = kwargs.get(self.key_arg)
-                        new_key = await key_manager.handle_api_failure(old_key)
+                        new_key = await key_manager.handle_api_failure(old_key, attempt)
                         kwargs[self.key_arg] = new_key
                         logger.info(f"Switched to new API key: {new_key}")
 
