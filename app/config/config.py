@@ -10,13 +10,14 @@ from pydantic_settings import BaseSettings
 from sqlalchemy import insert, update, select
 
 from app.core.constants import API_VERSION, DEFAULT_CREATE_IMAGE_MODEL, DEFAULT_FILTER_MODELS, DEFAULT_MODEL, DEFAULT_STREAM_CHUNK_SIZE, DEFAULT_STREAM_LONG_TEXT_THRESHOLD, DEFAULT_STREAM_MAX_DELAY, DEFAULT_STREAM_MIN_DELAY, DEFAULT_STREAM_SHORT_TEXT_THRESHOLD, DEFAULT_TIMEOUT, MAX_RETRIES
-from app.log.logger import get_config_logger
+from app.log.logger import Logger
+# from app.log.logger import get_config_logger # 移除顶层导入
 # 延迟导入以避免循环依赖，仅在 sync_initial_settings 中使用
 # from app.database.connection import database
 # from app.database.models import Settings as SettingsModel
 # from app.database.services import get_all_settings # get_all_settings 可能不适合启动时调用，直接查询
 
-logger = get_config_logger()
+# logger = get_config_logger() # 移除顶层初始化
 
 
 class Settings(BaseSettings):
@@ -67,6 +68,9 @@ class Settings(BaseSettings):
     CHECK_INTERVAL_HOURS: int = 1 # 默认检查间隔为1小时
     TIMEZONE: str = "Asia/Shanghai" # 默认时区
 
+    # 日志配置
+    LOG_LEVEL: str = "INFO" # 默认日志级别
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 设置默认AUTH_TOKEN（如果未提供）
@@ -78,6 +82,8 @@ settings = Settings()
 
 def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
     """尝试将数据库字符串值解析为目标 Python 类型"""
+    from app.log.logger import get_config_logger # 函数内导入
+    logger = get_config_logger() # 函数内初始化
     try:
         if target_type == List[str]:
             # 尝试解析 JSON 列表，如果失败则按逗号分割
@@ -110,6 +116,8 @@ async def sync_initial_settings():
     2. 将数据库设置合并到内存 settings (数据库优先)。
     3. 将最终的内存 settings 同步回数据库。
     """
+    from app.log.logger import get_config_logger # 函数内导入
+    logger = get_config_logger() # 函数内初始化
     # 延迟导入以避免循环依赖和确保数据库连接已初始化
     from app.database.connection import database
     from app.database.models import Settings as SettingsModel
@@ -258,6 +266,9 @@ async def sync_initial_settings():
         else:
             logger.info("No setting changes detected between memory and database during initial sync.")
 
+        # 刷新日志等级
+        Logger.update_log_levels(final_memory_settings.get("LOG_LEVEL"))
+        
     except Exception as e:
         logger.error(f"An unexpected error occurred during initial settings sync: {e}")
     finally:

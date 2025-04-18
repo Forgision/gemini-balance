@@ -290,7 +290,12 @@ function populateForm(config) {
                 element.checked = value;
             } else {
                 // 处理其他类型 (确保 value 不是 null 或 undefined)
-                element.value = value ?? ''; // 使用空字符串作为默认值
+                // 特别处理 LOG_LEVEL，确保大小写匹配 option 的 value
+                if (key === 'LOG_LEVEL' && typeof value === 'string') {
+                    element.value = value.toUpperCase();
+                } else {
+                    element.value = value ?? ''; // 使用空字符串作为默认值
+                }
             }
         }
         // 如果既不是数组，也找不到对应 ID 的元素，则忽略该配置项
@@ -531,6 +536,7 @@ function collectFormData() {
             if (input.type === 'number') {
                 formData[input.name] = parseFloat(input.value);
             } else {
+                // 确保 select 元素的值也被正确收集
                 formData[input.name] = input.value;
             }
         }

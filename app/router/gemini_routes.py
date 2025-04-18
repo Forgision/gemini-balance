@@ -99,7 +99,7 @@ async def generate_content(
     """非流式生成内容"""
     logger.info("-" * 50 + "gemini_generate_content" + "-" * 50)
     logger.info(f"Handling Gemini content generation request for model: {model_name}")
-    logger.info(f"Request: \n{request.model_dump_json(indent=2)}")
+    logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
     logger.info(f"Using API key: {api_key}")
     
     if not model_service.check_model_support(model_name):
@@ -130,7 +130,7 @@ async def stream_generate_content(
     """流式生成内容"""
     logger.info("-" * 50 + "gemini_stream_generate_content" + "-" * 50)
     logger.info(f"Handling Gemini streaming content generation for model: {model_name}")
-    logger.info(f"Request: \n{request.model_dump_json(indent=2)}")
+    logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
     logger.info(f"Using API key: {api_key}")
     
     if not model_service.check_model_support(model_name):
