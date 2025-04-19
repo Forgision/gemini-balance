@@ -702,21 +702,30 @@ function createAndAppendBudgetMapItem(mapKey, mapValue, modelId) {
    valueInput.value = isNaN(intValue) ? 0 : intValue;
    valueInput.placeholder = '预算 (整数)';
    valueInput.className = 'map-value-input w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50';
+   valueInput.min = 0; // 添加最小值
+   valueInput.max = 24576; // 添加最大值
    valueInput.addEventListener('input', function() {
-        this.value = this.value.replace(/[^0-9]/g, ''); // Remove non-digit characters
+        // 限制输入为0到24576之间的整数
+        let value = this.value.replace(/[^0-9]/g, '');
+        if (value !== '') {
+            value = parseInt(value, 10);
+            if (value < 0) value = 0;
+            if (value > 24576) value = 24576;
+        }
+        this.value = value;
    });
 
-   // Remove Button - Disabled
-   const removeBtn = document.createElement('button');
-   removeBtn.type = 'button';
-   removeBtn.className = 'remove-btn text-gray-300 cursor-not-allowed focus:outline-none';
-   removeBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-   removeBtn.title = '请从上方模型列表删除';
-   removeBtn.disabled = true;
+   // Remove Button - Removed for budget map items
+   // const removeBtn = document.createElement('button');
+   // removeBtn.type = 'button';
+   // removeBtn.className = 'remove-btn text-gray-300 cursor-not-allowed focus:outline-none'; // Kept original class for reference
+   // removeBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+   // removeBtn.title = '请从上方模型列表删除';
+   // removeBtn.disabled = true;
 
    mapItem.appendChild(keyInput);
    mapItem.appendChild(valueInput);
-   mapItem.appendChild(removeBtn);
+   // mapItem.appendChild(removeBtn); // Do not append the remove button
 
    container.appendChild(mapItem);
 }

@@ -21,7 +21,6 @@ from app.log.logger import Logger
 
 
 class Settings(BaseSettings):
-    """应用程序配置"""
     # 数据库配置
     MYSQL_HOST: str
     MYSQL_PORT: int
@@ -69,6 +68,10 @@ class Settings(BaseSettings):
     # 调度器配置
     CHECK_INTERVAL_HOURS: int = 1 # 默认检查间隔为1小时
     TIMEZONE: str = "Asia/Shanghai" # 默认时区
+    
+    # github 
+    GITHUB_REPO_OWNER: str = "snailyp"
+    GITHUB_REPO_NAME: str = "gemini-balance"
 
     # 日志配置
     LOG_LEVEL: str = "INFO" # 默认日志级别

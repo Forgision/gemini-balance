@@ -200,3 +200,7 @@ def get_log_routes_logger():
 
 def get_stats_logger():
     return Logger.setup_logger("stats")
+
+
+def get_update_logger():
+    return Logger.setup_logger("update_service")
