@@ -107,7 +107,9 @@ async def get_api_call_details(period: str) -> list[dict]:
         # Convert results to list of dicts and map status_code
         details = []
         for row in results:
-            status = 'success' if 200 <= row['status_code'] < 300 else 'failure'
+            status = 'failure' # 默认状态为 failure，如果 status_code 有效且在 200-299 范围内则更新为 success
+            if row['status_code'] is not None: # 检查 status_code 是否为空
+                status = 'success' if 200 <= row['status_code'] < 300 else 'failure'
             details.append({
                 "timestamp": row['timestamp'].isoformat(), # Use ISO format for JS compatibility
                 "key": row['key'],
