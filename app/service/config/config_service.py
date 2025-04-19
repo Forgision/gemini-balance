@@ -47,6 +47,8 @@ class ConfigService:
             # 处理不同类型的值
             if isinstance(value, list):
                 db_value = json.dumps(value)
+            elif isinstance(value, dict): # 新增对 dict 类型的处理
+                db_value = json.dumps(value)
             elif isinstance(value, bool):
                 db_value = str(value).lower()
             else:

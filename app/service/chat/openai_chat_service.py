@@ -130,6 +130,10 @@ def _build_payload(
         payload["generationConfig"]["maxOutputTokens"] = request.max_tokens
     if request.model.endswith("-image") or request.model.endswith("-image-generation"):
         payload["generationConfig"]["responseModalities"] = ["Text", "Image"]
+    if request.model.endswith("-non-thinking"):
+        payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0} 
+    if request.model in settings.THINKING_BUDGET_MAP:
+        payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": settings.THINKING_BUDGET_MAP.get(request.model,1000)}
 
     if (
         instruction
@@ -258,7 +262,7 @@ class OpenAIChatService:
                     async for line in self.api_client.stream_generate_content(
                         payload, model, current_attempt_key
                     ):
-                        # print(line)
+                        print(line)
                         if line.startswith("data:"):
                             chunk = json.loads(line[6:])
                             openai_chunk = self.response_handler.handle_response(

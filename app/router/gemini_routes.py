@@ -83,6 +83,21 @@ async def list_models(
             
             models_json["models"].append(item)
             
+    # 添加思考模型的非思考版本
+    if settings.THINKING_MODELS:
+        for name in settings.THINKING_MODELS:
+            model = model_mapping.get(name)
+            if not model:
+                continue
+                
+            item = deepcopy(model)
+            item["name"] = f"models/{name}-non-thinking"
+            display_name = f'{item.get("displayName")} Non Thinking'
+            item["displayName"] = display_name
+            item["description"] = display_name
+            
+            models_json["models"].append(item)
+            
     return models_json
 
 

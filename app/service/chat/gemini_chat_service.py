@@ -108,6 +108,12 @@ def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
     if model.endswith("-image") or model.endswith("-image-generation"):
         payload.pop("systemInstruction")
         payload["generationConfig"]["responseModalities"] = ["Text", "Image"]
+        
+    if model.endswith("-non-thinking"):
+        payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0} 
+    if model in settings.THINKING_BUDGET_MAP:
+        payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": settings.THINKING_BUDGET_MAP.get(request.model,1000)}
+
     return payload
 
 
