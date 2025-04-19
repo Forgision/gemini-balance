@@ -204,3 +204,7 @@ def get_stats_logger():
 
 def get_update_logger():
     return Logger.setup_logger("update_service")
+
+
+def get_scheduler_routes():
+    return Logger.setup_logger("scheduler_routes")
