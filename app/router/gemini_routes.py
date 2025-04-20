@@ -109,6 +109,7 @@ async def generate_content(
     request: GeminiRequest,
     _=Depends(security_service.verify_key_or_goog_api_key),
     api_key: str = Depends(get_next_working_key),
+    key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service)
 ):
     """非流式生成内容"""
@@ -140,6 +141,7 @@ async def stream_generate_content(
     request: GeminiRequest,
     _=Depends(security_service.verify_key_or_goog_api_key),
     api_key: str = Depends(get_next_working_key),
+    key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service)
 ):
     """流式生成内容"""

@@ -86,7 +86,7 @@ async def chat_completion(
     try:
         # 如果model是imagen3,使用paid_key
         if request.model == f"{settings.CREATE_IMAGE_MODEL}-chat":
-            response = await chat_service.create_image_chat_completion(request=request)
+            response = await chat_service.create_image_chat_completion(request, api_key)
         else:
             response = await chat_service.create_chat_completion(request, api_key)
         # 处理流式响应

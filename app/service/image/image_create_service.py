@@ -17,7 +17,6 @@ logger = get_image_create_logger()
 class ImageCreateService:
     def __init__(self, aspect_ratio="1:1"):
         self.image_model = settings.CREATE_IMAGE_MODEL
-        self.paid_key = settings.PAID_KEY
         self.aspect_ratio = aspect_ratio
 
     def parse_prompt_parameters(self, prompt: str) -> tuple:
@@ -53,7 +52,7 @@ class ImageCreateService:
         return prompt, n, aspect_ratio
 
     def generate_images(self, request: ImageGenerationRequest):
-        client = genai.Client(api_key=self.paid_key)
+        client = genai.Client(api_key=settings.PAID_KEY)
 
         if request.size == "1024x1024":
             self.aspect_ratio = "1:1"
