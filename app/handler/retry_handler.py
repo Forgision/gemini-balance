@@ -1,4 +1,3 @@
-# app/services/chat/retry_handler.py
 
 from functools import wraps
 from typing import Callable, TypeVar

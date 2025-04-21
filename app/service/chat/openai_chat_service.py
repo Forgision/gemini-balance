@@ -411,7 +411,6 @@ class OpenAIChatService:
             error_log_msg = f"Stream image completion failed for model {model}: {e}"
             logger.error(error_log_msg)
             status_code = 500 # Default error code
-            # Call add_error_log using the passed api_key
             await add_error_log(
                 gemini_key=api_key,
                 model_name=model,
@@ -427,7 +426,6 @@ class OpenAIChatService:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
             logger.info(f"Stream image completion for model {model} took {latency_ms} ms. Success: {is_success}")
-            # Call add_request_log using the passed api_key
             await add_request_log(
                 model_name=model,
                 api_key=api_key,
@@ -460,7 +458,6 @@ class OpenAIChatService:
             error_log_msg = f"Normal image completion failed for model {model}: {e}"
             logger.error(error_log_msg)
             status_code = 500 # Default error code
-            # Call add_error_log using the passed api_key
             await add_error_log(
                 gemini_key=api_key,
                 model_name=model,
@@ -475,7 +472,6 @@ class OpenAIChatService:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
             logger.info(f"Normal image completion for model {model} took {latency_ms} ms. Success: {is_success}")
-            # Call add_request_log using the passed api_key
             await add_request_log(
                 model_name=model,
                 api_key=api_key,

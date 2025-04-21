@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette import status
 from app.core.security import verify_auth_token
 from app.service.stats_service import StatsService
-from app.log.logger import get_stats_logger # 使用路由日志记录器
+from app.log.logger import get_stats_logger
 
 logger = get_stats_logger()
 
 
-# 认证检查的辅助函数
 async def verify_token(request: Request):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -21,7 +20,7 @@ async def verify_token(request: Request):
 router = APIRouter(
     prefix="/api",
     tags=["stats"],
-    dependencies=[Depends(verify_token)] # Assuming API routes need authentication
+    dependencies=[Depends(verify_token)]
 )
 
 stats_service = StatsService()
@@ -52,8 +51,7 @@ async def get_key_usage_details(key: str):
             return {}
         return usage_details
     except Exception as e:
-        # Log the exception details here if needed
-        print(f"Error fetching key usage details for key {key[:4]}...: {e}")
+        logger.error(f"Error fetching key usage details for key {key[:4]}...: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取密钥使用详情时出错: {e}"

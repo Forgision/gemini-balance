@@ -88,7 +88,6 @@ class ImageCreateService:
                 aspect_ratio=self.aspect_ratio,
                 safety_filter_level="BLOCK_LOW_AND_ABOVE",
                 person_generation="ALLOW_ADULT",
-                # language="auto"
             ),
         )
 

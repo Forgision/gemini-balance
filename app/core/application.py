@@ -1,6 +1,3 @@
-"""
-应用程序工厂模块，负责创建和配置FastAPI应用程序实例
-"""
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -15,8 +12,8 @@ from app.service.key.key_manager import get_key_manager_instance
 from app.core.initialization import initialize_app
 from app.database.connection import connect_to_db, disconnect_from_db
 from app.database.initialization import initialize_database
-from app.scheduler.key_checker import start_scheduler, stop_scheduler # 导入调度器函数
-from app.service.update.update_service import check_for_updates # 导入更新检查服务
+from app.scheduler.key_checker import start_scheduler, stop_scheduler
+from app.service.update.update_service import check_for_updates
 
 logger = get_application_logger()
 

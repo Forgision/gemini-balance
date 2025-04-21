@@ -11,13 +11,6 @@ from sqlalchemy import insert, update, select
 
 from app.core.constants import API_VERSION, DEFAULT_CREATE_IMAGE_MODEL, DEFAULT_FILTER_MODELS, DEFAULT_MODEL, DEFAULT_STREAM_CHUNK_SIZE, DEFAULT_STREAM_LONG_TEXT_THRESHOLD, DEFAULT_STREAM_MAX_DELAY, DEFAULT_STREAM_MIN_DELAY, DEFAULT_STREAM_SHORT_TEXT_THRESHOLD, DEFAULT_TIMEOUT, MAX_RETRIES
 from app.log.logger import Logger
-# from app.log.logger import get_config_logger # 移除顶层导入
-# 延迟导入以避免循环依赖，仅在 sync_initial_settings 中使用
-# from app.database.connection import database
-# from app.database.models import Settings as SettingsModel
-# from app.database.services import get_all_settings # get_all_settings 可能不适合启动时调用，直接查询
-
-# logger = get_config_logger() # 移除顶层初始化
 
 
 class Settings(BaseSettings):
@@ -308,10 +301,7 @@ async def sync_initial_settings():
     finally:
         if database.is_connected:
              try:
-                 # Don't disconnect if it's managed elsewhere (e.g., FastAPI lifespan)
-                 # await database.disconnect()
-                 # logger.info("Database connection closed after initial sync.")
-                 pass # Assume connection lifecycle is managed by the application lifespan
+                 pass
              except Exception as e:
                  logger.error(f"Error disconnecting database after initial sync: {e}")
 

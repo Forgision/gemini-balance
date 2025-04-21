@@ -31,7 +31,7 @@ class ConfigService:
         for key, value in config_data.items():
             if hasattr(settings, key):
                 setattr(settings, key, value)
-                logger.info(f"Updated setting in memory: {key}") 
+                logger.debug(f"Updated setting in memory: {key}") 
         
         # 获取现有设置
         existing_settings_raw: List[Dict[str, Any]] = await get_all_settings()
