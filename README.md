@@ -2,8 +2,8 @@
 
 > ⚠️ 本项目采用 CC BY-NC 4.0（署名-非商业性使用）协议，禁止任何形式的商业倒卖服务，详见 LICENSE 文件。
 
-> 倒卖狗死全家！
-
+> 本人从未在各个平台贩卖服务，如有贩卖服务的，那一定是倒卖狗，切记不要上当受骗。（倒卖狗死全家！
+）
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-green.svg)](https://fastapi.tiangolo.com/)
 [![Uvicorn](https://img.shields.io/badge/Uvicorn-running-purple.svg)](https://www.uvicorn.org/)
