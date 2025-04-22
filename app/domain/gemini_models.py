@@ -26,7 +26,7 @@ class GenerationConfig(BaseModel):
 
 class SystemInstruction(BaseModel):
     role: str = "system"
-    parts: List[Dict[str, Any]]
+    parts: List[Dict[str, Any]]|Dict[str, Any]
 
 
 class GeminiContent(BaseModel):
