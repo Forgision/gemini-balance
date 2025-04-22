@@ -55,14 +55,14 @@ class GeminiContent(BaseModel):
 class GeminiRequest(BaseModel):
     contents: List[GeminiContent] = []
     tools: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = []
-    safety_settings: Optional[List[SafetySetting]] = Field(
-        default=None, alias="safetySettings"
+    safetySettings: Optional[List[SafetySetting]] = Field(
+        default=None, alias="safety_settings"
     )
-    generation_config: Optional[GenerationConfig] = Field(
-        default=None, alias="generationConfig"
+    generationConfig: Optional[GenerationConfig] = Field(
+        default=None, alias="generation_config"
     )
-    system_instruction: Optional[SystemInstruction] = Field(
-        default=None, alias="systemInstruction"
+    systemInstruction: Optional[SystemInstruction] = Field(
+        default=None, alias="system_instruction"
     )
 
     class Config:
