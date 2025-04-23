@@ -38,6 +38,7 @@ async def get_error_logs_api(
     offset: int = Query(0, ge=0),
     key_search: Optional[str] = Query(None, description="Search term for Gemini key (partial match)"),
     error_search: Optional[str] = Query(None, description="Search term for error type or log message"), # 数据库查询需处理
+    error_code_search: Optional[str] = Query(None, description="Search term for error code"), # Added error code search parameter
     start_date: Optional[datetime] = Query(None, description="Start datetime for filtering"),
     end_date: Optional[datetime] = Query(None, description="End datetime for filtering")
 ):
@@ -50,6 +51,7 @@ async def get_error_logs_api(
         offset: 偏移量
         key_search: 密钥搜索
         error_search: 错误搜索 (可能搜索类型或日志内容，由DB层决定)
+        error_code_search: 错误码搜索
         start_date: 开始日期
         end_date: 结束日期
 
@@ -70,6 +72,7 @@ async def get_error_logs_api(
             offset=offset,
             key_search=key_search,
             error_search=error_search, # 数据库查询需要处理这个
+            error_code_search=error_code_search, # Pass error code search to DB function
             start_date=start_date,
             end_date=end_date,
         )
@@ -77,6 +80,7 @@ async def get_error_logs_api(
         total_count = await get_error_logs_count(
             key_search=key_search,
             error_search=error_search,
+            error_code_search=error_code_search, # Pass error code search to DB count function
             start_date=start_date,
             end_date=end_date
         )

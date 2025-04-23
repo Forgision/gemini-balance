@@ -157,6 +157,7 @@ async def get_error_logs(
     offset: int = 0,
     key_search: Optional[str] = None,
     error_search: Optional[str] = None,
+    error_code_search: Optional[str] = None, # Added error code search
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None
 ) -> List[Dict[str, Any]]:
@@ -168,6 +169,7 @@ async def get_error_logs(
         offset (int): 偏移量
         key_search (Optional[str]): Gemini密钥搜索词 (模糊匹配)
         error_search (Optional[str]): 错误类型或日志内容搜索词 (模糊匹配)
+        error_code_search (Optional[str]): 错误码搜索词 (精确匹配)
         start_date (Optional[datetime]): 开始日期时间
         end_date (Optional[datetime]): 结束日期时间
 
@@ -198,6 +200,17 @@ async def get_error_logs(
         if end_date:
             # Use the datetime object directly for comparison
             query = query.where(ErrorLog.request_time < end_date)
+        if error_code_search:
+            try:
+                # Attempt to convert search string to integer for exact match
+                error_code_int = int(error_code_search)
+                query = query.where(ErrorLog.error_code == error_code_int)
+            except ValueError:
+                # If conversion fails, log a warning and potentially skip this filter
+                # or handle as needed (e.g., return no results for invalid code format)
+                logger.warning(f"Invalid format for error_code_search: '{error_code_search}'. Expected an integer. Skipping error code filter.")
+                # Optionally, force no results if the format is invalid:
+                # query = query.where(False) # This ensures no rows are returned
 
         # Apply ordering, limit, and offset
         query = query.order_by(ErrorLog.id.desc()).limit(limit).offset(offset)
@@ -212,6 +225,7 @@ async def get_error_logs(
 async def get_error_logs_count(
     key_search: Optional[str] = None,
     error_search: Optional[str] = None,
+    error_code_search: Optional[str] = None, # Added error code search
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None
 ) -> int:
@@ -221,6 +235,7 @@ async def get_error_logs_count(
     Args:
         key_search (Optional[str]): Gemini密钥搜索词 (模糊匹配)
         error_search (Optional[str]): 错误类型或日志内容搜索词 (模糊匹配)
+        error_code_search (Optional[str]): 错误码搜索词 (精确匹配)
         start_date (Optional[datetime]): 开始日期时间
         end_date (Optional[datetime]): 结束日期时间
 
@@ -243,6 +258,16 @@ async def get_error_logs_count(
         if end_date:
             # Use the datetime object directly for comparison
             query = query.where(ErrorLog.request_time < end_date)
+        if error_code_search:
+            try:
+                # Attempt to convert search string to integer for exact match
+                error_code_int = int(error_code_search)
+                query = query.where(ErrorLog.error_code == error_code_int)
+            except ValueError:
+                # If conversion fails, log a warning and potentially skip this filter
+                logger.warning(f"Invalid format for error_code_search in count: '{error_code_search}'. Expected an integer. Skipping error code filter.")
+                # Optionally, force count to 0 if the format is invalid:
+                # return 0 # Or query = query.where(False) before fetching
 
         count_result = await database.fetch_one(query)
         return count_result[0] if count_result else 0

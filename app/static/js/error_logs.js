@@ -20,6 +20,7 @@ let errorLogs = []; // Store fetched logs for details view
 let currentSearch = { // Store current search parameters
     key: '',
     error: '',
+    errorCode: '', // Added error code search
     startDate: '',
     endDate: ''
 };
@@ -36,11 +37,15 @@ let logDetailModal;
 let modalCloseBtns; // Collection of close buttons for the modal
 let keySearchInput;
 let errorSearchInput;
+let errorCodeSearchInput; // Added error code input
 let startDateInput;
 let endDateInput;
 let searchBtn;
-let pageInput; // 新增：页码输入框
-let goToPageBtn; // 新增：跳转按钮
+let pageInput;
+let goToPageBtn;
+let selectAllCheckbox; // 新增：全选复选框
+let copySelectedKeysBtn; // 新增：复制选中按钮
+let selectedCountSpan; // 新增：选中计数显示
 
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
@@ -57,11 +62,15 @@ document.addEventListener('DOMContentLoaded', function() {
     modalCloseBtns = document.querySelectorAll('#closeLogDetailModalBtn, #closeModalFooterBtn');
     keySearchInput = document.getElementById('keySearch');
     errorSearchInput = document.getElementById('errorSearch');
+    errorCodeSearchInput = document.getElementById('errorCodeSearch'); // Get error code input
     startDateInput = document.getElementById('startDate');
     endDateInput = document.getElementById('endDate');
     searchBtn = document.getElementById('searchBtn');
-    pageInput = document.getElementById('pageInput'); // 新增
-    goToPageBtn = document.getElementById('goToPageBtn'); // 新增
+    pageInput = document.getElementById('pageInput');
+    goToPageBtn = document.getElementById('goToPageBtn');
+    selectAllCheckbox = document.getElementById('selectAllCheckbox'); // 新增
+    copySelectedKeysBtn = document.getElementById('copySelectedKeysBtn'); // 新增
+    selectedCountSpan = document.getElementById('selectedCount'); // 新增
 
     // Initialize page size selector
     if (pageSizeSelector) {
@@ -81,6 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update search parameters from input fields
             currentSearch.key = keySearchInput ? keySearchInput.value.trim() : '';
             currentSearch.error = errorSearchInput ? errorSearchInput.value.trim() : '';
+            currentSearch.errorCode = errorCodeSearchInput ? errorCodeSearchInput.value.trim() : ''; // Get error code value
             currentSearch.startDate = startDateInput ? startDateInput.value : '';
             currentSearch.endDate = endDateInput ? endDateInput.value : '';
             currentPage = 1; // Reset to first page on new search
@@ -104,8 +114,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial load of error logs
     loadErrorLogs();
 
-    // Add event listeners for copy buttons inside the modal
-    setupCopyButtons();
+    // Add event listeners for copy buttons inside the modal and table
+    setupCopyButtons(); // This will now also handle table copy buttons if called after render
+
+    // Add event listeners for bulk selection
+    setupBulkSelectionListeners(); // 新增：设置批量选择监听器
 
     // 新增：为页码跳转按钮添加事件监听器
     if (goToPageBtn && pageInput) {
@@ -174,44 +187,196 @@ function handleCopyResult(buttonElement, success) {
      setTimeout(() => { iconElement.className = originalIcon; }, success ? 2000 : 3000); // Restore original icon class
 }
 
-// Function to set up copy button listeners (using modern API with fallback)
-function setupCopyButtons() {
-    const copyButtons = document.querySelectorAll('.copy-btn');
+// Function to set up copy button listeners (using modern API with fallback) - Updated to handle table copy buttons
+function setupCopyButtons(containerSelector = 'body') {
+    // Find buttons within the specified container (defaults to body)
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+
+    const copyButtons = container.querySelectorAll('.copy-btn');
     copyButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const targetId = this.getAttribute('data-target');
-            const targetElement = document.getElementById(targetId);
-
-            if (targetElement) {
-                const textToCopy = targetElement.textContent;
-                let copySuccess = false;
-
-                // Try modern clipboard API first (requires HTTPS or localhost)
-                if (navigator.clipboard && window.isSecureContext) {
-                    navigator.clipboard.writeText(textToCopy).then(() => {
-                        handleCopyResult(this, true); // Use helper for feedback
-                    }).catch(err => {
-                        console.error('Clipboard API failed, attempting fallback:', err);
-                        // Attempt fallback if modern API fails
-                        copySuccess = fallbackCopyTextToClipboard(textToCopy);
-                        handleCopyResult(this, copySuccess); // Use helper for feedback
-                    });
-                } else {
-                    // Use fallback if modern API is not available or context is insecure
-                    console.warn("Clipboard API not available or context insecure. Using fallback copy method.");
-                    copySuccess = fallbackCopyTextToClipboard(textToCopy);
-                    handleCopyResult(this, copySuccess); // Use helper for feedback
-                }
-            } else {
-                console.error('Target element not found:', targetId);
-                showNotification('复制出错：找不到目标元素', 'error');
-            }
-        });
+        // Remove existing listener to prevent duplicates if called multiple times
+        button.removeEventListener('click', handleCopyButtonClick);
+        // Add the listener
+        button.addEventListener('click', handleCopyButtonClick);
     });
 }
 
+// Extracted click handler logic for reusability and removing listeners
+function handleCopyButtonClick() {
+    const button = this; // 'this' refers to the button clicked
+    const targetId = button.getAttribute('data-target');
+    const textToCopyDirect = button.getAttribute('data-copy-text'); // For direct text copy (e.g., table key)
+    let textToCopy = '';
+
+    if (textToCopyDirect) {
+        textToCopy = textToCopyDirect;
+    } else if (targetId) {
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+            textToCopy = targetElement.textContent;
+        } else {
+            console.error('Target element not found:', targetId);
+            showNotification('复制出错：找不到目标元素', 'error');
+            return; // Exit if target element not found
+        }
+    } else {
+        console.error('No data-target or data-copy-text attribute found on button:', button);
+        showNotification('复制出错：未指定复制内容', 'error');
+        return; // Exit if no source specified
+    }
+
+
+    if (textToCopy) {
+        let copySuccess = false;
+        // Try modern clipboard API first (requires HTTPS or localhost)
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                handleCopyResult(button, true); // Use helper for feedback
+            }).catch(err => {
+                console.error('Clipboard API failed, attempting fallback:', err);
+                // Attempt fallback if modern API fails
+                copySuccess = fallbackCopyTextToClipboard(textToCopy);
+                handleCopyResult(button, copySuccess); // Use helper for feedback
+            });
+        } else {
+            // Use fallback if modern API is not available or context is insecure
+            console.warn("Clipboard API not available or context insecure. Using fallback copy method.");
+            copySuccess = fallbackCopyTextToClipboard(textToCopy);
+            handleCopyResult(button, copySuccess); // Use helper for feedback
+        }
+    } else {
+        console.warn('No text found to copy for target:', targetId || 'direct text');
+        showNotification('没有内容可复制', 'warning');
+    }
+} // End of handleCopyButtonClick function
+
+// Function to set up copy button listeners (using modern API with fallback) - Updated to handle table copy buttons
+function setupCopyButtons(containerSelector = 'body') {
+    // Find buttons within the specified container (defaults to body)
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+
+    const copyButtons = container.querySelectorAll('.copy-btn');
+    copyButtons.forEach(button => {
+        // Remove existing listener to prevent duplicates if called multiple times
+        button.removeEventListener('click', handleCopyButtonClick);
+        // Add the listener
+        button.addEventListener('click', handleCopyButtonClick);
+    });
+}
+
+// 新增：设置批量选择相关的事件监听器
+function setupBulkSelectionListeners() {
+   if (selectAllCheckbox) {
+       selectAllCheckbox.addEventListener('change', handleSelectAllChange);
+   }
+
+   if (tableBody) {
+       // 使用事件委托处理行复选框的点击
+       tableBody.addEventListener('change', handleRowCheckboxChange);
+   }
+
+   if (copySelectedKeysBtn) {
+       copySelectedKeysBtn.addEventListener('click', handleCopySelectedKeys);
+   }
+}
+
+// 新增：处理“全选”复选框变化的函数
+function handleSelectAllChange() {
+   const isChecked = selectAllCheckbox.checked;
+   const rowCheckboxes = tableBody.querySelectorAll('.row-checkbox');
+   rowCheckboxes.forEach(checkbox => {
+       checkbox.checked = isChecked;
+   });
+   updateSelectedState();
+}
+
+// 新增：处理行复选框变化的函数 (事件委托)
+function handleRowCheckboxChange(event) {
+   if (event.target.classList.contains('row-checkbox')) {
+       updateSelectedState();
+   }
+}
+
+// 新增：更新选中状态（计数、按钮状态、全选框状态）
+function updateSelectedState() {
+   const rowCheckboxes = tableBody.querySelectorAll('.row-checkbox');
+   const selectedCheckboxes = tableBody.querySelectorAll('.row-checkbox:checked');
+   const selectedCount = selectedCheckboxes.length;
+
+   // 移除了数字显示，不再更新selectedCountSpan
+   // 仍然更新复制按钮的禁用状态
+   if (copySelectedKeysBtn) {
+       copySelectedKeysBtn.disabled = selectedCount === 0;
+       
+       // 可选：根据选中项数量更新按钮标题属性
+       copySelectedKeysBtn.setAttribute('title', `复制${selectedCount}项选中密钥`);
+   }
+
+   // 更新“全选”复选框的状态
+   if (selectAllCheckbox) {
+       if (rowCheckboxes.length > 0 && selectedCount === rowCheckboxes.length) {
+           selectAllCheckbox.checked = true;
+           selectAllCheckbox.indeterminate = false;
+       } else if (selectedCount > 0) {
+           selectAllCheckbox.checked = false;
+           selectAllCheckbox.indeterminate = true; // 部分选中状态
+       } else {
+           selectAllCheckbox.checked = false;
+           selectAllCheckbox.indeterminate = false;
+       }
+   }
+}
+
+// 新增：处理“复制选中密钥”按钮点击的函数
+function handleCopySelectedKeys() {
+   const selectedCheckboxes = tableBody.querySelectorAll('.row-checkbox:checked');
+   const keysToCopy = [];
+   selectedCheckboxes.forEach(checkbox => {
+       const key = checkbox.getAttribute('data-key');
+       if (key) {
+           keysToCopy.push(key);
+       }
+   });
+
+   if (keysToCopy.length > 0) {
+       const textToCopy = keysToCopy.join('\n'); // 每行一个密钥
+       copyTextToClipboard(textToCopy, copySelectedKeysBtn); // 使用通用复制函数
+   } else {
+       showNotification('没有选中的密钥可复制', 'warning');
+   }
+}
+
+// 新增：通用的文本复制函数（结合现有逻辑）
+function copyTextToClipboard(text, buttonElement = null) {
+   let copySuccess = false;
+   if (navigator.clipboard && window.isSecureContext) {
+       navigator.clipboard.writeText(text).then(() => {
+           if (buttonElement) handleCopyResult(buttonElement, true);
+           else showNotification('已复制到剪贴板', 'success');
+       }).catch(err => {
+           console.error('Clipboard API failed, attempting fallback:', err);
+           copySuccess = fallbackCopyTextToClipboard(text);
+           if (buttonElement) handleCopyResult(buttonElement, copySuccess);
+           else showNotification(copySuccess ? '已复制到剪贴板' : '复制失败', copySuccess ? 'success' : 'error');
+       });
+   } else {
+       console.warn("Clipboard API not available or context insecure. Using fallback copy method.");
+       copySuccess = fallbackCopyTextToClipboard(text);
+       if (buttonElement) handleCopyResult(buttonElement, copySuccess);
+       else showNotification(copySuccess ? '已复制到剪贴板' : '复制失败', copySuccess ? 'success' : 'error');
+   }
+}
+
+
 // 加载错误日志数据
 async function loadErrorLogs() {
+    // 重置选择状态
+    if (selectAllCheckbox) selectAllCheckbox.checked = false;
+    if (selectAllCheckbox) selectAllCheckbox.indeterminate = false;
+    updateSelectedState(); // 更新按钮状态和计数
+
     showLoading(true);
     showError(false);
     showNoData(false);
@@ -226,6 +391,9 @@ async function loadErrorLogs() {
         }
         if (currentSearch.error) {
             apiUrl += `&error_search=${encodeURIComponent(currentSearch.error)}`;
+        }
+        if (currentSearch.errorCode) { // Add error code to API request
+            apiUrl += `&error_code_search=${encodeURIComponent(currentSearch.errorCode)}`;
         }
         if (currentSearch.startDate) {
             apiUrl += `&start_date=${encodeURIComponent(currentSearch.startDate)}`;
@@ -274,6 +442,12 @@ function renderErrorLogs(logs) {
     if (!tableBody) return;
     tableBody.innerHTML = ''; // Clear previous entries
 
+    // 重置全选复选框状态（在清空表格后）
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    }
+
     if (!logs || logs.length === 0) {
         // Handled by showNoData
         return;
@@ -306,10 +480,20 @@ function renderErrorLogs(logs) {
             return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
         };
         const maskedKey = maskKey(log.gemini_key);
+        const fullKey = log.gemini_key || ''; // Store the full key
 
         row.innerHTML = `
+            <td class="text-center px-3 py-3"> <!-- Checkbox column -->
+                <input type="checkbox" class="row-checkbox form-checkbox h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500" data-key="${fullKey}">
+            </td>
             <td>${sequentialId}</td> <!-- Use sequential ID -->
-            <td title="${log.gemini_key || ''}">${maskedKey}</td>
+            <td class="relative group" title="${fullKey}"> <!-- Added relative/group for button positioning -->
+                ${maskedKey}
+                <!-- Added copy button for the key in the table row -->
+                <button class="copy-btn absolute top-1/2 right-2 transform -translate-y-1/2 bg-gray-200 hover:bg-gray-300 text-gray-600 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-xs" data-copy-text="${log.gemini_key || ''}" title="复制完整密钥">
+                    <i class="far fa-copy"></i>
+                </button>
+            </td>
             <td>${log.error_type || '未知'}</td>
             <td class="error-code-content" title="${log.error_code || ''}">${errorCodeContent}</td>
             <td>${log.model_name || '未知'}</td>
@@ -331,6 +515,11 @@ function renderErrorLogs(logs) {
             showLogDetails(logId);
         });
     });
+
+    // Re-initialize copy buttons specifically for the newly rendered table rows
+    setupCopyButtons('#errorLogsTable');
+    // Update selected state after rendering
+    updateSelectedState();
 }
 
 // 显示错误日志详情 (从 API 获取)
@@ -402,6 +591,9 @@ async function showLogDetails(logId) {
         document.getElementById('modalRequestMsg').textContent = formattedRequestMsg; // Full request message
         document.getElementById('modalModelName').textContent = logDetails.model_name || '未知';
         document.getElementById('modalRequestTime').textContent = formattedTime;
+
+        // Re-initialize copy buttons specifically for the modal after content is loaded
+        setupCopyButtons('#logDetailModal');
 
     } catch (error) {
         console.error('获取日志详情失败:', error);
@@ -547,10 +739,17 @@ function showError(show, message = '加载错误日志失败，请稍后重试�
 
 // Function to show temporary status notifications (like copy success)
 function showNotification(message, type = 'success', duration = 3000) {
-    const notificationElement = document.getElementById('copyStatus'); // Or a more generic ID if needed
-    if (!notificationElement) return;
+    const notificationElement = document.getElementById('notification'); // Use the correct ID from base.html
+    if (!notificationElement) {
+        console.error("Notification element with ID 'notification' not found.");
+        return;
+    }
 
+    // Set message and type class
     notificationElement.textContent = message;
+    // Remove previous type classes before adding the new one
+    notificationElement.classList.remove('success', 'error', 'warning', 'info');
+    notificationElement.classList.add(type); // Add the type class for styling
     notificationElement.className = `notification ${type} show`; // Add 'show' class
 
     // Hide after duration
