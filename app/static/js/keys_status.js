@@ -39,7 +39,7 @@ function initStatItemAnimations() {
                 icon.style.transform = 'scale(1.1) rotate(0deg)';
             }
         });
-        
+
         item.addEventListener('mouseleave', () => {
             item.style.transform = '';
             const icon = item.querySelector('.stat-icon');
@@ -158,27 +158,33 @@ async function verifyKey(key, button) {
                 // 验证失败，显示失败结果
                 const errorMsg = data.error || '密钥无效';
                 button.style.backgroundColor = '#e74c3c';
-                // 使用结果模态框显示失败消息，但不自动刷新页面
-                showResultModal(false, '密钥验证失败: ' + errorMsg, true); // 改为true以在关闭时刷新
+                // 使用结果模态框显示失败消息，改为true以在关闭时刷新
+                showResultModal(false, '密钥验证失败: ' + errorMsg, true);
             }
         } catch (fetchError) {
             console.error('API请求失败:', fetchError);
             showResultModal(false, '验证请求失败: ' + fetchError.message, true); // 改为true以在关闭时刷新
         } finally {
-            // 1秒后恢复按钮原始状态
+            // 1秒后恢复按钮原始状态 (如果页面不刷新)
+            // 由于现在成功和失败都会刷新，这部分逻辑可以简化或移除
+            // 但为了防止未来修改刷新逻辑，暂时保留，但可能不会执行
             setTimeout(() => {
-                button.innerHTML = originalHtml;
-                button.disabled = false;
-                button.style.backgroundColor = '';
+                if (!document.getElementById('resultModal') || document.getElementById('resultModal').classList.contains('hidden')) {
+                    button.innerHTML = originalHtml;
+                    button.disabled = false;
+                    button.style.backgroundColor = '';
+                }
             }, 1000);
         }
     } catch (error) {
         console.error('验证失败:', error);
-        button.disabled = false;
-        button.innerHTML = '<i class="fas fa-check-circle"></i> 验证';
+        // 确保在捕获到错误时恢复按钮状态 (如果页面不刷新)
+        // button.disabled = false; // 由 finally 处理或因刷新而无需处理
+        // button.innerHTML = '<i class="fas fa-check-circle"></i> 验证';
         showResultModal(false, '验证处理失败: ' + error.message, true); // 改为true以在关闭时刷新
     }
 }
+
 
 async function resetKeyFailCount(key, button) {
     try {
@@ -204,32 +210,26 @@ async function resetKeyFailCount(key, button) {
             showNotification('重置失败: ' + errorMsg, 'error');
             // 失败时保留红色背景一会儿
             button.style.backgroundColor = '#e74c3c';
-        }
-
-        // 立即恢复按钮状态，除非成功或失败时需要短暂显示颜色
-        if (!data.success) {
              // 如果失败，1秒后恢复按钮
              setTimeout(() => {
                  button.innerHTML = originalHtml;
                  button.disabled = false;
                  button.style.backgroundColor = '';
              }, 1000);
-        } else {
-             // 如果成功，在刷新前恢复按钮（虽然用户可能看不到）
-             button.innerHTML = originalHtml;
-             button.disabled = false;
-             // 背景色会在刷新时重置
         }
+
+        // 恢复按钮状态逻辑已移至成功/失败分支内
 
     } catch (error) {
         console.error('重置失败:', error);
         showNotification('重置请求失败: ' + error.message, 'error');
         // 确保在捕获到错误时恢复按钮状态
-        // button.innerHTML = originalHtml; // 需要确保 originalHtml 在此作用域可用 - 这行代码在原始逻辑中可能导致错误，暂时注释掉
         button.disabled = false;
-        button.innerHTML = '<i class="fas fa-redo-alt"></i> 重置';
+        button.innerHTML = '<i class="fas fa-redo-alt"></i> 重置'; // 恢复原始图标和文本
+        button.style.backgroundColor = ''; // 清除可能设置的背景色
     }
 }
+
 
 // 显示重置确认模态框 (基于选中的密钥)
 function showResetModal(type) {
@@ -269,12 +269,11 @@ function resetAllKeysFailCount(type, event) {
     if (event) {
         event.stopPropagation();
     }
-    
+
     // 显示模态确认框
     showResetModal(type);
 }
 
-// 执行批量重置
 // 关闭模态框并根据参数决定是否刷新页面
 function closeResultModal(reload = true) {
     document.getElementById('resultModal').classList.add('hidden');
@@ -423,7 +422,11 @@ function showVerificationResultModal(data) {
         failList.className = 'text-sm text-gray-600 max-h-32 overflow-y-auto bg-red-50 p-2 rounded border border-red-200 space-y-1'; // 增加最大高度和间距
         Object.entries(failedKeys).forEach(([key, error]) => {
             const li = document.createElement('li');
-            li.className = 'flex justify-between items-center'; // Restore original layout
+            // li.className = 'flex justify-between items-center'; // Restore original layout
+            li.className = 'flex flex-col items-start'; // Start with vertical layout
+
+            const keySpanContainer = document.createElement('div');
+            keySpanContainer.className = 'flex justify-between items-center w-full'; // Ensure key and button are on the same line initially
 
             const keySpan = document.createElement('span');
             keySpan.className = 'font-mono';
@@ -446,41 +449,38 @@ function showVerificationResultModal(data) {
                 if (errorDiv) {
                     // Collapse: Remove error div and reset li layout
                     errorDiv.remove();
-                    listItem.className = 'flex justify-between items-center'; // Restore original layout
+                    // listItem.className = 'flex justify-between items-center'; // Restore original layout
+                    listItem.className = 'flex flex-col items-start'; // Keep vertical layout
                     button.innerHTML = '<i class="fas fa-info-circle mr-1"></i>详情'; // Restore button text
                 } else {
                     // Expand: Create and append error div, change li layout
                     errorDiv = document.createElement('div');
                     errorDiv.id = errorDetailsId;
-                    errorDiv.className = 'w-full mt-1 pl-2 text-xs text-red-600 bg-red-50 p-1 rounded border border-red-100 whitespace-pre-wrap break-words'; // Added w-full
+                    errorDiv.className = 'w-full mt-1 pl-0 text-xs text-red-600 bg-red-50 p-1 rounded border border-red-100 whitespace-pre-wrap break-words'; // Adjusted padding
                     errorDiv.textContent = errorMsg;
                     listItem.appendChild(errorDiv);
                     listItem.className = 'flex flex-col items-start'; // Change layout to vertical
                     button.innerHTML = '<i class="fas fa-chevron-up mr-1"></i>收起'; // Change button text
-                    // Move button to be alongside the keySpan for vertical layout
-                    const keySpanContainer = document.createElement('div');
-                    keySpanContainer.className = 'flex justify-between items-center w-full'; // Ensure key and button are on the same line initially
-                    keySpanContainer.appendChild(listItem.querySelector('.font-mono')); // Move keySpan
-                    keySpanContainer.appendChild(button); // Move button
-                    listItem.insertBefore(keySpanContainer, errorDiv); // Insert container before errorDiv
+                    // Move button to be alongside the keySpan for vertical layout (already done)
                 }
             };
 
-            li.appendChild(keySpan);
-            li.appendChild(detailsButton); // Add button back
+            keySpanContainer.appendChild(keySpan); // Add keySpan to container
+            keySpanContainer.appendChild(detailsButton); // Add button to container
+            li.appendChild(keySpanContainer); // Add container to list item
             failList.appendChild(li);
         });
         failDiv.appendChild(failList);
         messageElement.appendChild(failDiv);
     }
 
-    // 设置确认按钮点击事件 - 仅当没有失败时自动刷新
-    const autoReload = invalidCount === 0;
-    confirmButton.onclick = () => closeResultModal(autoReload);
+    // 设置确认按钮点击事件 - 总是自动刷新
+    confirmButton.onclick = () => closeResultModal(true); // Always reload
 
     // 显示模态框
     modalElement.classList.remove('hidden');
 }
+
 
 async function executeResetAll(type) {
     try {
@@ -490,7 +490,7 @@ async function executeResetAll(type) {
         // 找到对应的重置按钮以显示加载状态
         const resetButton = document.querySelector(`button[data-reset-type="${type}"]`);
         if (!resetButton) {
-            showResultModal(false, `找不到${type === 'valid' ? '有效' : '无效'}密钥区域的批量重置按钮`);
+            showResultModal(false, `找不到${type === 'valid' ? '有效' : '无效'}密钥区域的批量重置按钮`, false); // Don't reload if button not found
             return;
         }
 
@@ -526,7 +526,7 @@ async function executeResetAll(type) {
                  } catch (e) {
                      // 如果解析失败，使用原始错误信息
                  }
-                 
+
                  throw new Error(errorMsg);
             }
 
@@ -547,15 +547,18 @@ async function executeResetAll(type) {
             console.error('API请求失败:', fetchError);
             showResultModal(false, '批量重置请求失败: ' + fetchError.message, false); // 失败后不自动刷新
         } finally {
-            // 恢复按钮状态
-             resetButton.innerHTML = originalHtml;
-             resetButton.disabled = false;
+            // 恢复按钮状态 (仅在不刷新的情况下)
+             if (!document.getElementById('resultModal') || document.getElementById('resultModal').classList.contains('hidden') || document.getElementById('resultModalTitle').textContent.includes('失败')) {
+                 resetButton.innerHTML = originalHtml;
+                 resetButton.disabled = false;
+             }
         }
     } catch (error) {
         console.error('批量重置处理失败:', error);
         showResultModal(false, '批量重置处理失败: ' + error.message, false); // 失败后不自动刷新
     }
 }
+
 
 function scrollToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -567,18 +570,22 @@ function scrollToBottom() {
 
 // 移除这个函数，因为它可能正在干扰按钮的显示
 // HTML中已经设置了滚动按钮为flex显示，不需要JavaScript额外控制
-function updateScrollButtons() {
-    // 不执行任何操作
-}
+// function updateScrollButtons() {
+//     // 不执行任何操作
+// }
 
 function refreshPage(button) {
-    button.classList.add('loading');
+    button.classList.add('loading'); // Maybe add a loading class for visual feedback
     button.disabled = true;
-    
+    const icon = button.querySelector('i');
+    if (icon) icon.classList.add('fa-spin'); // Add spin animation
+
     setTimeout(() => {
         window.location.reload();
+        // No need to remove loading/spin as page reloads
     }, 300);
 }
+
 
 // 恢复之前的 toggleSection 函数以修复展开/收缩动画
 function toggleSection(header, sectionId) {
@@ -587,6 +594,7 @@ function toggleSection(header, sectionId) {
     const card = header.closest('.stats-card');
     const content = card ? card.querySelector('.key-content') : null;
     const batchActions = card ? card.querySelector('[id$="BatchActions"]') : null; // 获取批量操作栏
+    const pagination = card ? card.querySelector('[id$="PaginationControls"]') : null; // 获取分页控件
 
     if (toggleIcon && content) {
         const isCollapsed = content.classList.contains('collapsed');
@@ -606,15 +614,22 @@ function toggleSection(header, sectionId) {
             requestAnimationFrame(() => {
                 // 计算内容的实际高度
                 const scrollHeight = content.scrollHeight;
-                content.style.maxHeight = scrollHeight + 'px';
-                content.style.opacity = '1';
-                content.style.padding = '1rem'; // 恢复 padding
+                let totalHeight = scrollHeight;
+
                  // 如果批量操作栏存在且可见，也计算其高度
                  if (batchActions && !batchActions.classList.contains('hidden')) {
-                     content.style.maxHeight = (scrollHeight + batchActions.offsetHeight) + 'px';
-                 } else {
-                     content.style.maxHeight = scrollHeight + 'px';
+                     totalHeight += batchActions.offsetHeight;
                  }
+                 // 如果分页控件存在且可见，也计算其高度和 margin-top
+                 if (pagination && pagination.offsetHeight > 0) {
+                     // Assuming mt-4 which is 1rem = 16px (adjust if needed)
+                     totalHeight += pagination.offsetHeight + 16;
+                 }
+
+                content.style.maxHeight = totalHeight + 'px';
+                content.style.opacity = '1';
+                content.style.padding = '1rem'; // 恢复 padding
+                content.style.overflow = 'hidden'; // Keep hidden during transition
 
                 // 动画结束后移除 max-height 以允许内容动态变化
                 content.addEventListener('transitionend', function handler() {
@@ -627,17 +642,21 @@ function toggleSection(header, sectionId) {
             });
         } else {
             // 收起内容
-            // 先设置一个明确的高度，然后过渡到 0
-            content.style.maxHeight = content.scrollHeight + 'px';
-             // 如果批量操作栏存在且可见，也计算其高度
+            // 先计算当前总高度
+            let currentHeight = content.scrollHeight;
              if (batchActions && !batchActions.classList.contains('hidden')) {
-                 content.style.maxHeight = (content.scrollHeight + batchActions.offsetHeight) + 'px';
+                 currentHeight += batchActions.offsetHeight;
              }
+             if (pagination && pagination.offsetHeight > 0) {
+                 currentHeight += pagination.offsetHeight + 16;
+             }
+            // 设置一个明确的高度，然后过渡到 0
+            content.style.maxHeight = currentHeight + 'px';
+            content.style.overflow = 'hidden'; // Ensure overflow is hidden before starting transition
             requestAnimationFrame(() => {
                 content.style.maxHeight = '0px';
                 content.style.opacity = '0';
                 content.style.padding = '0 1rem'; // 保持左右 padding，收起上下 padding
-                content.style.overflow = 'hidden';
                 content.classList.add('collapsed');
             });
         }
@@ -650,7 +669,10 @@ function toggleSection(header, sectionId) {
 // 筛选有效密钥（根据失败次数阈值）并更新批量操作状态
 function filterValidKeys() {
     const thresholdInput = document.getElementById('failCountThreshold');
-    const validKeyItems = document.querySelectorAll('#validKeys li[data-key]'); // 选择包含 data-key 的 li
+    const validKeysList = document.getElementById('validKeys'); // Get the UL element
+    if (!validKeysList) return; // Exit if the list doesn't exist
+
+    const validKeyItems = validKeysList.querySelectorAll('li[data-key]'); // Select li elements within the list
     // 读取阈值，如果输入无效或为空，则默认为0（不过滤）
     const threshold = parseInt(thresholdInput.value, 10);
     const filterThreshold = isNaN(threshold) || threshold < 0 ? 0 : threshold;
@@ -680,7 +702,6 @@ function filterValidKeys() {
 
     // 处理“暂无有效密钥”消息
     const noMatchMsgId = 'no-valid-keys-msg';
-    const validKeysList = document.getElementById('validKeys');
     let noMatchMsg = validKeysList.querySelector(`#${noMatchMsgId}`);
     const initialKeyCount = validKeysList.querySelectorAll('li[data-key]').length; // 获取初始密钥数量
 
@@ -703,7 +724,7 @@ function filterValidKeys() {
 document.addEventListener('DOMContentLoaded', () => {
     // 初始化统计区块动画
     initStatItemAnimations();
-    
+
     // 添加数字滚动动画效果
     const animateCounters = () => {
         const statValues = document.querySelectorAll('.stat-value');
@@ -714,12 +735,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!valueElement.dataset.originalValue) {
                     valueElement.dataset.originalValue = valueElement.textContent;
                 }
-                
+
                 // 数字滚动动画
                 let startValue = 0;
                 const duration = 1500;
                 const startTime = performance.now();
-                
+
                 const updateCounter = (currentTime) => {
                     const elapsedTime = currentTime - startTime;
                     if (elapsedTime < duration) {
@@ -733,37 +754,37 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 恢复为原始值，以确保准确性
                         valueElement.textContent = valueElement.dataset.originalValue;
                     }
-                    
-                    
+
+
                 };
                 requestAnimationFrame(updateCounter);
             }
         });
     };
-    
+
     // 在页面加载后启动数字动画
     setTimeout(animateCounters, 300);
-    
+
     // 添加卡片悬停效果
     document.querySelectorAll('.stats-card').forEach(card => {
         card.addEventListener('mouseenter', () => {
             card.classList.add('shadow-lg');
             card.style.transform = 'translateY(-2px)';
         });
-        
+
         card.addEventListener('mouseleave', () => {
             card.classList.remove('shadow-lg');
             card.style.transform = '';
         });
     });
-    
+
     // 监听展开/折叠事件 (确保使用正确的选择器和函数)
     document.querySelectorAll('.stats-card-header').forEach(header => {
          // 检查 header 是否包含 toggle-icon，避免为其他卡片（如统计卡片）添加监听器
          if (header.querySelector('.toggle-icon')) {
              header.addEventListener('click', (event) => {
-                 // 确保点击的不是内部交互元素（如输入框、复选框、标签）
-                 if (event.target.closest('input, label, button')) {
+                 // 确保点击的不是内部交互元素（如输入框、复选框、标签、按钮、选择框）
+                 if (event.target.closest('input, label, button, select')) {
                      return;
                  }
                  // 从 header 中提取 sectionId (例如从关联的 content div 的 id)
@@ -784,12 +805,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (thresholdInput) {
         // 使用 'input' 事件实时响应输入变化
         thresholdInput.addEventListener('input', filterValidKeys);
-        // 初始加载时应用一次筛选
-        filterValidKeys();
+        // 初始加载时应用一次筛选 (现在由 pagination/search 初始化处理)
+        // filterValidKeys();
     }
-    
+
     // --- 批量验证相关函数 (明确挂载到 window) ---
-    
+
     // 显示验证确认模态框 (基于选中的密钥)
     window.showVerifyModal = function(type, event) {
         // 阻止事件冒泡（如果从按钮点击触发）
@@ -822,32 +843,41 @@ document.addEventListener('DOMContentLoaded', () => {
         // 显示模态框
         modalElement.classList.remove('hidden');
     }
-    
+
     window.closeVerifyModal = function() {
         document.getElementById('verifyModal').classList.add('hidden');
     }
-    
+
     window.executeVerifyAll = async function(type) {
         try {
             // 关闭确认模态框
             closeVerifyModal();
-    
-            // 找到对应的验证按钮以显示加载状态 (需要给按钮添加 data-verify-type 属性)
-            // 或者，我们可以暂时禁用所有按钮或显示一个全局加载指示器
-            // 这里我们暂时只记录日志，实际UI反馈可以后续增强
-            console.log(`Starting bulk verification for ${type} keys...`);
-    
+
+            // 找到对应的验证按钮以显示加载状态
+            const verifyButton = document.querySelector(`#${type}BatchActions button:nth-child(1)`); // Assuming verify is the first button
+            let originalVerifyHtml = '';
+            if (verifyButton) {
+                originalVerifyHtml = verifyButton.innerHTML;
+                verifyButton.disabled = true;
+                verifyButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 验证中';
+            }
+
+
             // 获取选中的密钥
             const keysToVerify = getSelectedKeys(type);
 
             if (keysToVerify.length === 0) {
                 showNotification(`没有选中的${type === 'valid' ? '有效' : '无效'}密钥可验证`, 'warning');
+                 if (verifyButton) { // Restore button if no keys selected
+                     verifyButton.innerHTML = originalVerifyHtml;
+                     // Button disable state will be handled by updateBatchActions after reload or modal close
+                 }
                 return;
             }
-    
+
             // 显示一个通用的加载提示
             showNotification('开始批量验证，请稍候...', 'info');
-    
+
             // 调用新的后端 API 来验证选定的密钥
             const response = await fetch(`/gemini/v1beta/verify-selected-keys`, { // 假设的新 API 端点
                 method: 'POST',
@@ -856,7 +886,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({ keys: keysToVerify }) // 只发送密钥列表
             });
-    
+
             if (!response.ok) {
                  let errorMsg = `服务器返回错误: ${response.status}`;
                  try {
@@ -865,37 +895,44 @@ document.addEventListener('DOMContentLoaded', () => {
                  } catch (e) { /*忽略解析错误*/ }
                  throw new Error(errorMsg);
             }
-    
+
             const data = await response.json();
-    
+
             // 使用新的专用模态框显示结果
             showVerificationResultModal(data);
-            // 注意：autoReload 逻辑已移至 showVerificationResultModal 内部
-    
+            // 注意：autoReload 逻辑已移至 showVerificationResultModal 内部 (现在总是刷新)
+
         } catch (error) {
             console.error('批量验证处理失败:', error);
-            // 失败后不自动刷新
-            showResultModal(false, '批量验证处理失败: ' + error.message, false);
+            // 失败后也刷新页面，让用户看到可能更新的状态
+            showResultModal(false, '批量验证处理失败: ' + error.message, true);
         } finally {
              // 可以在这里移除加载指示器
              console.log("Bulk verification process finished.");
+             // Button state will be reset on page reload
         }
     }
 
     // --- 复选框事件监听 ---
-    document.querySelectorAll('.key-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', (event) => {
-            const type = event.target.dataset.keyType;
-            updateBatchActions(type);
-        });
+    // Attach listeners dynamically after pagination renders content, or use event delegation
+    document.getElementById('validKeys').addEventListener('change', (event) => {
+        if (event.target.classList.contains('key-checkbox')) {
+            updateBatchActions('valid');
+        }
+    });
+    document.getElementById('invalidKeys').addEventListener('change', (event) => {
+        if (event.target.classList.contains('key-checkbox')) {
+            updateBatchActions('invalid');
+        }
     });
 
-    // 初始化批量操作区域状态
-    updateBatchActions('valid');
-    updateBatchActions('invalid');
+
+    // 初始化批量操作区域状态 (在 pagination 初始化后进行)
+    // updateBatchActions('valid'); // Called by displayPage
+    // updateBatchActions('invalid'); // Called by displayPage
 
 
-    // --- 滚动和页面控制 ---
+    // --- 滚动和页面控制 --- (Scroll buttons handled by base.html)
     // --- 自动刷新控制 ---
     const autoRefreshToggle = document.getElementById('autoRefreshToggle');
     const autoRefreshIntervalTime = 60000; // 60秒
@@ -904,6 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function startAutoRefresh() {
         if (autoRefreshTimer) return; // 防止重复启动
         console.log('启动自动刷新...');
+        showNotification('自动刷新已启动', 'info', 2000);
         autoRefreshTimer = setInterval(() => {
             console.log('自动刷新 keys_status 页面...');
             location.reload();
@@ -913,6 +951,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function stopAutoRefresh() {
         if (autoRefreshTimer) {
             console.log('停止自动刷新...');
+            showNotification('自动刷新已停止', 'info', 2000);
             clearInterval(autoRefreshTimer);
             autoRefreshTimer = null;
         }
@@ -937,6 +976,60 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // --- Pagination and Search Initialization ---
+    // This part needs to be integrated with the pagination logic from the provided file content
+    // Assuming the pagination/search related code from the file_content is now part of this script
+
+    // --- Get DOM Elements for Pagination/Search ---
+    const validKeysListElement = document.getElementById('validKeys');
+    const invalidKeysListElement = document.getElementById('invalidKeys');
+    // const thresholdInput = document.getElementById('failCountThreshold'); // Already defined
+    const searchInput = document.getElementById('keySearchInput');
+    const itemsPerPageSelect = document.getElementById('itemsPerPageSelect');
+
+    // --- Store Initial Key Data ---
+    if (validKeysListElement) {
+        allValidKeys = Array.from(validKeysListElement.querySelectorAll('li[data-key]'));
+        allValidKeys.forEach(li => {
+            const keyTextSpan = li.querySelector('.key-text');
+            if (keyTextSpan && keyTextSpan.dataset.fullKey) {
+                li.dataset.key = keyTextSpan.dataset.fullKey; // Ensure li has full key for search
+            }
+        });
+        filteredValidKeys = [...allValidKeys]; // Start with all keys
+    }
+    if (invalidKeysListElement) {
+        allInvalidKeys = Array.from(invalidKeysListElement.querySelectorAll('li[data-key]'));
+         allInvalidKeys.forEach(li => {
+            const keyTextSpan = li.querySelector('.key-text');
+            if (keyTextSpan && keyTextSpan.dataset.fullKey) {
+                li.dataset.key = keyTextSpan.dataset.fullKey;
+            }
+        });
+    }
+
+    // --- Initial Display ---
+    if (itemsPerPageSelect) {
+        itemsPerPage = parseInt(itemsPerPageSelect.value, 10);
+    }
+    filterAndSearchValidKeys(); // This applies initial filter/search and calls displayPage('valid', 1, ...)
+    displayPage('invalid', 1, allInvalidKeys); // Display first page of invalid keys
+
+    // --- Event Listeners for Pagination/Search ---
+    if (thresholdInput) {
+        thresholdInput.addEventListener('input', filterAndSearchValidKeys);
+    }
+    if (searchInput) {
+        searchInput.addEventListener('input', filterAndSearchValidKeys);
+    }
+    if (itemsPerPageSelect) {
+        itemsPerPageSelect.addEventListener('change', () => {
+            itemsPerPage = parseInt(itemsPerPageSelect.value, 10);
+            filterAndSearchValidKeys(); // Re-filter and display page 1
+        });
+    }
+
 });
 
 // Service Worker registration
@@ -1007,7 +1100,12 @@ async function showApiCallDetails(period) {
         // 调用后端 API 获取数据
         const response = await fetch(`/api/stats/details?period=${period}`);
         if (!response.ok) {
-            throw new Error(`服务器错误: ${response.status}`);
+            let errorMsg = `服务器错误: ${response.status}`;
+             try {
+                 const errorData = await response.json();
+                 errorMsg = errorData.detail || errorMsg;
+             } catch (e) { /* 忽略解析错误 */ }
+            throw new Error(errorMsg);
         }
         const data = await response.json();
 
@@ -1189,4 +1287,196 @@ window.renderKeyUsageDetails = function(data, container) {
     `;
 
     container.innerHTML = tableHtml;
+}
+
+// --- Global Variables for Pagination ---
+let itemsPerPage = 10; // Default, will be updated from select
+let validCurrentPage = 1;
+let invalidCurrentPage = 1;
+let allValidKeys = []; // Stores all original valid key li elements
+let allInvalidKeys = []; // Stores all original invalid key li elements
+let filteredValidKeys = []; // Stores filtered and searched valid key li elements
+
+// --- Key List Display & Pagination ---
+
+/**
+ * Displays key list items for a specific type and page.
+ * @param {string} type 'valid' or 'invalid'
+ * @param {number} page Page number (1-based)
+ * @param {Array} keyItemsArray The array of li elements to paginate (e.g., filteredValidKeys, allInvalidKeys)
+ */
+function displayPage(type, page, keyItemsArray) {
+    const listElement = document.getElementById(`${type}Keys`);
+    const paginationControls = document.getElementById(`${type}PaginationControls`);
+    if (!listElement || !paginationControls) return;
+
+    // Update current page based on type
+    if (type === 'valid') {
+        validCurrentPage = page;
+        // Read itemsPerPage from the select specifically for valid keys
+        const itemsPerPageSelect = document.getElementById('itemsPerPageSelect');
+        itemsPerPage = itemsPerPageSelect ? parseInt(itemsPerPageSelect.value, 10) : 10;
+    } else {
+        invalidCurrentPage = page;
+        // For invalid keys, use a fixed itemsPerPage or the same global one
+        // itemsPerPage = 10; // Or read from a different select if needed
+    }
+
+    const totalItems = keyItemsArray.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    page = Math.max(1, Math.min(page, totalPages || 1)); // Ensure page is valid
+
+    // Update current page variable again after validation
+    if (type === 'valid') {
+        validCurrentPage = page;
+    } else {
+        invalidCurrentPage = page;
+    }
+
+
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+
+    listElement.innerHTML = ''; // Clear current list content
+
+    const pageItems = keyItemsArray.slice(startIndex, endIndex);
+
+    if (pageItems.length > 0) {
+        pageItems.forEach(item => listElement.appendChild(item.cloneNode(true))); // Clone node to avoid issues if original array is modified elsewhere
+    } else if (totalItems === 0 && type === 'valid' && (document.getElementById('failCountThreshold').value !== '0' || document.getElementById('keySearchInput').value !== '')) {
+        // Handle empty state after filtering/searching for valid keys
+        const noMatchMsgId = 'no-valid-keys-msg';
+        let noMatchMsg = listElement.querySelector(`#${noMatchMsgId}`);
+        if (!noMatchMsg) {
+            noMatchMsg = document.createElement('li');
+            noMatchMsg.id = noMatchMsgId;
+            noMatchMsg.className = 'text-center text-gray-500 py-4 col-span-full';
+            noMatchMsg.textContent = '没有符合条件的有效密钥';
+            listElement.appendChild(noMatchMsg);
+        }
+        noMatchMsg.style.display = '';
+    } else if (totalItems === 0) {
+        // Handle empty state for initially empty lists
+        const emptyMsg = document.createElement('li');
+        emptyMsg.className = 'text-center text-gray-500 py-4 col-span-full';
+        emptyMsg.textContent = `暂无${type === 'valid' ? '有效' : '无效'}密钥`;
+        listElement.appendChild(emptyMsg);
+    }
+
+    setupPaginationControls(type, page, totalPages, keyItemsArray);
+    updateBatchActions(type); // Update batch actions based on the currently displayed page
+    // Re-attach event listeners for buttons inside the newly added list items if needed (using event delegation is better)
+}
+
+/**
+ * Sets up pagination controls.
+ * @param {string} type 'valid' or 'invalid'
+ * @param {number} currentPage Current page number
+ * @param {number} totalPages Total number of pages
+ * @param {Array} keyItemsArray The array of li elements being paginated
+ */
+function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
+    const controlsContainer = document.getElementById(`${type}PaginationControls`);
+    if (!controlsContainer) return;
+
+    controlsContainer.innerHTML = '';
+
+    if (totalPages <= 1) {
+        return; // No controls needed for single/no page
+    }
+
+    // Previous Button
+    const prevButton = document.createElement('button');
+    prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prevButton.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm';
+    prevButton.disabled = currentPage === 1;
+    prevButton.onclick = () => displayPage(type, currentPage - 1, keyItemsArray);
+    controlsContainer.appendChild(prevButton);
+
+    // Page Number Buttons (Logic for ellipsis)
+    const maxPageButtons = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+    let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+
+    if (endPage - startPage + 1 < maxPageButtons) {
+        startPage = Math.max(1, endPage - maxPageButtons + 1);
+    }
+
+    // First Page Button & Ellipsis
+    if (startPage > 1) {
+        const firstPageButton = document.createElement('button');
+        firstPageButton.textContent = '1';
+        firstPageButton.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm';
+        firstPageButton.onclick = () => displayPage(type, 1, keyItemsArray);
+        controlsContainer.appendChild(firstPageButton);
+        if (startPage > 2) {
+            const ellipsis = document.createElement('span');
+            ellipsis.textContent = '...';
+            ellipsis.className = 'px-3 py-1 text-gray-500 text-sm';
+            controlsContainer.appendChild(ellipsis);
+        }
+    }
+
+    // Middle Page Buttons
+    for (let i = startPage; i <= endPage; i++) {
+        const pageButton = document.createElement('button');
+        pageButton.textContent = i;
+        pageButton.className = `px-3 py-1 rounded text-sm ${i === currentPage ? 'bg-primary-600 text-white font-semibold' : 'bg-gray-200 hover:bg-gray-300'}`;
+        pageButton.onclick = () => displayPage(type, i, keyItemsArray);
+        controlsContainer.appendChild(pageButton);
+    }
+
+    // Ellipsis & Last Page Button
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement('span');
+            ellipsis.textContent = '...';
+            ellipsis.className = 'px-3 py-1 text-gray-500 text-sm';
+            controlsContainer.appendChild(ellipsis);
+        }
+        const lastPageButton = document.createElement('button');
+        lastPageButton.textContent = totalPages;
+        lastPageButton.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm';
+        lastPageButton.onclick = () => displayPage(type, totalPages, keyItemsArray);
+        controlsContainer.appendChild(lastPageButton);
+    }
+
+    // Next Button
+    const nextButton = document.createElement('button');
+    nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    nextButton.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm';
+    nextButton.disabled = currentPage === totalPages;
+    nextButton.onclick = () => displayPage(type, currentPage + 1, keyItemsArray);
+    controlsContainer.appendChild(nextButton);
+}
+
+
+// --- Filtering & Searching (Valid Keys Only) ---
+
+/**
+ * Filters and searches the valid keys based on threshold and search term.
+ * Updates the `filteredValidKeys` array and redisplays the first page.
+ */
+function filterAndSearchValidKeys() {
+    const thresholdInput = document.getElementById('failCountThreshold');
+    const searchInput = document.getElementById('keySearchInput');
+
+    const threshold = parseInt(thresholdInput.value, 10);
+    const filterThreshold = isNaN(threshold) || threshold < 0 ? 0 : threshold;
+    const searchTerm = searchInput.value.trim().toLowerCase();
+
+    // Filter from the original full list (allValidKeys)
+    filteredValidKeys = allValidKeys.filter(item => {
+        const failCount = parseInt(item.dataset.failCount, 10);
+        const fullKey = item.dataset.key || ''; // Use data-key which should hold the full key
+
+        const failCountMatch = failCount >= filterThreshold;
+        const searchMatch = searchTerm === '' || fullKey.toLowerCase().includes(searchTerm);
+
+        return failCountMatch && searchMatch;
+    });
+
+    // Reset to the first page after filtering/searching
+    validCurrentPage = 1;
+    displayPage('valid', validCurrentPage, filteredValidKeys);
 }
