@@ -54,7 +54,6 @@ async def _setup_database_and_config(app_settings):
 async def _shutdown_database():
     """Disconnects from the database."""
     await disconnect_from_db()
-    logger.info("Disconnected from database.")
 
 def _start_scheduler():
     """Starts the background scheduler."""
@@ -67,7 +66,6 @@ def _start_scheduler():
 def _stop_scheduler():
     """Stops the background scheduler."""
     stop_scheduler()
-    logger.info("Scheduler stopped.")
 
 async def _perform_update_check(app: FastAPI):
     """Checks for updates and stores the info in app.state."""
