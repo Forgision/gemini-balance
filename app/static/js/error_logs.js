@@ -17,6 +17,10 @@ let currentPage = 1;
 let pageSize = 10;
 // let totalPages = 1; // totalPages will be calculated dynamically based on API response if available, or based on fetched data length
 let errorLogs = []; // Store fetched logs for details view
+let currentSort = { // 新增：存储当前排序状态
+    field: 'id', // 默认按 ID 排序
+    order: 'desc' // 默认降序
+};
 let currentSearch = { // Store current search parameters
     key: '',
     error: '',
@@ -45,7 +49,16 @@ let pageInput;
 let goToPageBtn;
 let selectAllCheckbox; // 新增：全选复选框
 let copySelectedKeysBtn; // 新增：复制选中按钮
+let deleteSelectedBtn; // 新增：批量删除按钮
+let sortByIdHeader; // 新增：ID 排序表头
+let sortIcon; // 新增：排序图标
 let selectedCountSpan; // 新增：选中计数显示
+let deleteConfirmModal; // 新增：删除确认模态框
+let closeDeleteConfirmModalBtn; // 新增：关闭删除模态框按钮
+let cancelDeleteBtn; // 新增：取消删除按钮
+let confirmDeleteBtn; // 新增：确认删除按钮
+let deleteConfirmMessage; // 新增：删除确认消息元素
+let idsToDeleteGlobally = []; // 新增：存储待删除的ID
 
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
@@ -70,7 +83,17 @@ document.addEventListener('DOMContentLoaded', function() {
     goToPageBtn = document.getElementById('goToPageBtn');
     selectAllCheckbox = document.getElementById('selectAllCheckbox'); // 新增
     copySelectedKeysBtn = document.getElementById('copySelectedKeysBtn'); // 新增
+    deleteSelectedBtn = document.getElementById('deleteSelectedBtn'); // 新增
+    sortByIdHeader = document.getElementById('sortById'); // 新增
+    if (sortByIdHeader) {
+        sortIcon = sortByIdHeader.querySelector('i'); // 新增
+    }
     selectedCountSpan = document.getElementById('selectedCount'); // 新增
+    deleteConfirmModal = document.getElementById('deleteConfirmModal'); // 新增
+    closeDeleteConfirmModalBtn = document.getElementById('closeDeleteConfirmModalBtn'); // 新增
+    cancelDeleteBtn = document.getElementById('cancelDeleteBtn'); // 新增
+    confirmDeleteBtn = document.getElementById('confirmDeleteBtn'); // 新增
+    deleteConfirmMessage = document.getElementById('deleteConfirmMessage'); // 新增
 
     // Initialize page size selector
     if (pageSizeSelector) {
@@ -145,7 +168,62 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // 新增：为批量删除按钮添加事件监听器
+    if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
+    }
+
+    // 新增：为 ID 排序表头添加事件监听器
+    if (sortByIdHeader) {
+        sortByIdHeader.addEventListener('click', handleSortById);
+    }
+
+    // 新增：为删除确认模态框按钮添加事件监听器
+    if (closeDeleteConfirmModalBtn) {
+        closeDeleteConfirmModalBtn.addEventListener('click', hideDeleteConfirmModal);
+    }
+    if (cancelDeleteBtn) {
+        cancelDeleteBtn.addEventListener('click', hideDeleteConfirmModal);
+    }
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', handleConfirmDelete);
+    }
+    // Optional: Close modal if clicking outside the content
+    if (deleteConfirmModal) {
+        deleteConfirmModal.addEventListener('click', function(event) {
+            if (event.target === deleteConfirmModal) {
+                hideDeleteConfirmModal();
+            }
+        });
+    }
 });
+
+// 新增：显示删除确认模态框
+function showDeleteConfirmModal(message) {
+    if (deleteConfirmModal && deleteConfirmMessage) {
+        deleteConfirmMessage.textContent = message;
+        deleteConfirmModal.classList.add('show');
+        document.body.style.overflow = 'hidden'; // Prevent body scrolling
+    }
+}
+
+// 新增：隐藏删除确认模态框
+function hideDeleteConfirmModal() {
+    if (deleteConfirmModal) {
+        deleteConfirmModal.classList.remove('show');
+        document.body.style.overflow = ''; // Restore body scrolling
+        idsToDeleteGlobally = []; // 清空待删除ID
+    }
+}
+
+// 新增：处理确认删除按钮点击
+function handleConfirmDelete() {
+    if (idsToDeleteGlobally.length > 0) {
+        performActualDelete(idsToDeleteGlobally);
+    }
+    hideDeleteConfirmModal(); // 关闭模态框
+}
 
 // Fallback copy function using document.execCommand
 function fallbackCopyTextToClipboard(text) {
@@ -280,6 +358,13 @@ function setupBulkSelectionListeners() {
    if (copySelectedKeysBtn) {
        copySelectedKeysBtn.addEventListener('click', handleCopySelectedKeys);
    }
+
+   // 新增：为批量删除按钮添加事件监听器 (如果尚未添加)
+   // 通常在 DOMContentLoaded 中添加一次即可
+   // if (deleteSelectedBtn && !deleteSelectedBtn.hasListener) {
+   //     deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
+   //     deleteSelectedBtn.hasListener = true; // 标记已添加
+   // }
 }
 
 // 新增：处理“全选”复选框变化的函数
@@ -312,6 +397,11 @@ function updateSelectedState() {
        
        // 可选：根据选中项数量更新按钮标题属性
        copySelectedKeysBtn.setAttribute('title', `复制${selectedCount}项选中密钥`);
+   }
+   // 新增：更新批量删除按钮的禁用状态
+   if (deleteSelectedBtn) {
+       deleteSelectedBtn.disabled = selectedCount === 0;
+       deleteSelectedBtn.setAttribute('title', `删除${selectedCount}项选中日志`);
    }
 
    // 更新“全选”复选框的状态
@@ -369,6 +459,113 @@ function copyTextToClipboard(text, buttonElement = null) {
    }
 }
 
+// 修改：处理批量删除按钮点击的函数 - 改为显示模态框
+function handleDeleteSelected() {
+    const selectedCheckboxes = tableBody.querySelectorAll('.row-checkbox:checked');
+    const logIdsToDelete = [];
+    selectedCheckboxes.forEach(checkbox => {
+        const logId = checkbox.getAttribute('data-log-id'); // 需要在渲染时添加 data-log-id
+        if (logId) {
+            logIdsToDelete.push(parseInt(logId));
+        }
+    });
+
+    if (logIdsToDelete.length === 0) {
+        showNotification('没有选中的日志可删除', 'warning');
+        return;
+    }
+
+    if (logIdsToDelete.length === 0) {
+        showNotification('没有选中的日志可删除', 'warning');
+        return;
+    }
+
+    // 存储待删除ID并显示模态框
+    idsToDeleteGlobally = logIdsToDelete;
+    const message = `确定要删除选中的 ${logIdsToDelete.length} 条日志吗？此操作不可恢复！`;
+    showDeleteConfirmModal(message);
+}
+
+// 新增：执行实际的删除操作（提取自原 handleDeleteSelected 和 handleDeleteLogRow）
+async function performActualDelete(logIds) {
+    if (!logIds || logIds.length === 0) return;
+
+    const isSingleDelete = logIds.length === 1;
+    const url = isSingleDelete ? `/api/logs/errors/${logIds[0]}` : '/api/logs/errors';
+    const method = 'DELETE';
+    const body = isSingleDelete ? null : JSON.stringify({ ids: logIds });
+    const headers = isSingleDelete ? {} : { 'Content-Type': 'application/json' };
+
+    try {
+        // Rename 'response' to 'deleteResponse' and remove duplicate fetch
+        const deleteResponse = await fetch(url, {
+            method: method,
+            headers: headers,
+            body: body,
+        });
+        // Removed duplicate fetch call below
+
+        if (!deleteResponse.ok) {
+            let errorData;
+            try { errorData = await deleteResponse.json(); } catch (e) { /* ignore */ }
+            const actionText = isSingleDelete ? `删除该条日志` : `批量删除 ${logIds.length} 条日志`;
+            throw new Error(errorData?.detail || `${actionText}失败: ${deleteResponse.statusText}`);
+        }
+
+        const successMessage = isSingleDelete ? `成功删除该日志` : `成功删除 ${logIds.length} 条日志`;
+        showNotification(successMessage, 'success');
+        // 取消全选
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        // 重新加载当前页数据
+        loadErrorLogs();
+    } catch (error) {
+        console.error('批量删除错误日志失败:', error);
+        showNotification(`批量删除失败: ${error.message}`, 'error', 5000);
+    }
+}
+
+// 修改：处理单行删除按钮点击的函数 - 改为显示模态框
+function handleDeleteLogRow(logId) {
+    if (!logId) return;
+
+    // 存储待删除ID并显示模态框
+    idsToDeleteGlobally = [parseInt(logId)]; // 存储为数组
+    // 使用通用确认消息，不显示具体ID
+    const message = `确定要删除这条日志吗？此操作不可恢复！`;
+    showDeleteConfirmModal(message);
+}
+
+// 新增：处理 ID 排序点击的函数
+function handleSortById() {
+    if (currentSort.field === 'id') {
+        // 如果当前是按 ID 排序，切换顺序
+        currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+    } else {
+        // 如果当前不是按 ID 排序，切换到按 ID 排序，默认为降序
+        currentSort.field = 'id';
+        currentSort.order = 'desc';
+    }
+    // 更新图标
+    updateSortIcon();
+    // 重新加载第一页数据
+    currentPage = 1;
+    loadErrorLogs();
+}
+
+// 新增：更新排序图标的函数
+function updateSortIcon() {
+    if (!sortIcon) return;
+    // 移除所有可能的排序类
+    sortIcon.classList.remove('fa-sort', 'fa-sort-up', 'fa-sort-down', 'text-gray-400', 'text-primary-600');
+
+    if (currentSort.field === 'id') {
+        sortIcon.classList.add(currentSort.order === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+        sortIcon.classList.add('text-primary-600'); // 高亮显示
+    } else {
+        // 如果不是按 ID 排序，显示默认图标
+        sortIcon.classList.add('fa-sort', 'text-gray-400');
+    }
+}
 
 // 加载错误日志数据
 async function loadErrorLogs() {
@@ -384,8 +581,12 @@ async function loadErrorLogs() {
     const offset = (currentPage - 1) * pageSize;
 
     try {
-        // Construct the API URL with search parameters
+        // Construct the API URL with search and sort parameters
         let apiUrl = `/api/logs/errors?limit=${pageSize}&offset=${offset}`;
+        // 添加排序参数
+        apiUrl += `&sort_by=${currentSort.field}&sort_order=${currentSort.order}`;
+
+        // 添加搜索参数
         if (currentSearch.key) {
             apiUrl += `&key_search=${encodeURIComponent(currentSearch.key)}`;
         }
@@ -484,9 +685,9 @@ function renderErrorLogs(logs) {
 
         row.innerHTML = `
             <td class="text-center px-3 py-3"> <!-- Checkbox column -->
-                <input type="checkbox" class="row-checkbox form-checkbox h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500" data-key="${fullKey}">
+                <input type="checkbox" class="row-checkbox form-checkbox h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500" data-key="${fullKey}" data-log-id="${log.id}"> <!-- 添加 data-log-id -->
             </td>
-            <td>${sequentialId}</td> <!-- Use sequential ID -->
+            <td>${sequentialId}</td> <!-- 显示从1开始的序号 -->
             <td class="relative group" title="${fullKey}"> <!-- Added relative/group for button positioning -->
                 ${maskedKey}
                 <!-- Added copy button for the key in the table row -->
@@ -499,8 +700,11 @@ function renderErrorLogs(logs) {
             <td>${log.model_name || '未知'}</td>
             <td>${formattedTime}</td>
             <td>
-                <button class="btn-view-details" data-log-id="${log.id}">
-                    查看详情
+                <button class="btn-view-details mr-2" data-log-id="${log.id}"> <!-- 添加 mr-2 -->
+                    <i class="fas fa-eye mr-1"></i>详情
+                </button>
+                <button class="btn-delete-row text-danger-600 hover:text-danger-800" data-log-id="${log.id}" title="删除此日志">
+                    <i class="fas fa-trash-alt"></i>
                 </button>
             </td>
         `;
@@ -513,6 +717,14 @@ function renderErrorLogs(logs) {
         button.addEventListener('click', function() {
             const logId = parseInt(this.getAttribute('data-log-id'));
             showLogDetails(logId);
+        });
+    });
+
+    // 新增：为新渲染的删除按钮添加事件监听器
+    document.querySelectorAll('.btn-delete-row').forEach(button => {
+        button.addEventListener('click', function() {
+            const logId = this.getAttribute('data-log-id');
+            handleDeleteLogRow(logId);
         });
     });
 
