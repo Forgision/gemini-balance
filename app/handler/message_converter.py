@@ -116,67 +116,6 @@ def _process_text_with_image(text: str) -> List[Dict[str, Any]]:
 class OpenAIMessageConverter(MessageConverter):
     """OpenAI消息格式转换器"""
 
-    def convert(self, messages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
-        converted_messages = []
-        system_instruction_parts = []
-
-        for idx, msg in enumerate(messages):
-            role = msg.get("role", "")
-            
-            parts = []
-            # 特别处理最后一个assistant的消息，按\n\n分割
-            if "content" in msg and isinstance(msg["content"], str) and msg["content"] and role == "assistant" and idx == len(messages) - 2:
-                # 按\n\n分割消息
-                content_parts = msg["content"].split("\n\n")
-                for part in content_parts:
-                    if not part.strip():  # 跳过空内容
-                        continue
-                    # 处理可能包含图片的文本
-                    parts.extend(_process_text_with_image(part))
-            elif "content" in msg and isinstance(msg["content"], str) and msg["content"]:
-                # 请求 gemini 接口时如果包含 content 字段但内容为空时会返回 400 错误，所以需要判断是否为空并移除
-                parts.extend(_process_text_with_image(msg["content"]))
-            elif "content" in msg and isinstance(msg["content"], list):
-                for content in msg["content"]:
-                    if isinstance(content, str) and content:
-                        parts.append({"text": content})
-                    elif isinstance(content, dict):
-                        if content["type"] == "text" and content["text"]:
-                            parts.append({"text": content["text"]})
-                        elif content["type"] == "image_url":
-                            parts.append(_convert_image(content["image_url"]["url"]))
-            elif "tool_calls" in msg and isinstance(msg["tool_calls"], list):
-                for tool_call in msg["tool_calls"]:
-                    function_call = tool_call.get("function",{})
-                    function_call["args"] = json.loads(function_call.get("arguments","{}"))
-                    del function_call["arguments"]
-                    parts.append({"functionCall": function_call})
-            
-            if role not in SUPPORTED_ROLES:
-                if role == "tool":
-                    role = "user"
-                else:
-                    # 如果是最后一条消息，则认为是用户消息
-                    if idx == len(messages) - 1:
-                        role = "user"
-                    else:
-                        role = "model"
-            if parts:
-                if role == "system":
-                    system_instruction_parts.extend(parts)
-                else:
-                    converted_messages.append({"role": role, "parts": parts})
-
-        system_instruction = (
-            None
-            if not system_instruction_parts
-            else {
-                "role": "system",
-                "parts": system_instruction_parts,
-            }
-        )
-        return converted_messages, system_instruction
-
     def _validate_media_data(self, format: str, data: str, supported_formats: List[str], max_size: int) -> tuple[Optional[str], Optional[str]]:
         """Validates format and size of Base64 media data."""
         if format.lower() not in supported_formats:
