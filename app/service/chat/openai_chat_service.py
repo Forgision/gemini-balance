@@ -21,13 +21,16 @@ from app.database.services import add_error_log, add_request_log # Import add_re
 logger = get_openai_logger()
 
 
-def _has_image_parts(contents: List[Dict[str, Any]]) -> bool:
-    """判断消息是否包含图片部分"""
+def _has_media_parts(contents: List[Dict[str, Any]]) -> bool:
+    """判断消息是否包含图片、音频或视频部分 (inlineData)"""
     for content in contents:
-        if "parts" in content:
+        if content and "parts" in content and isinstance(content["parts"], list):
             for part in content["parts"]:
-                if "image_url" in part or "inline_data" in part:
+                # Check if the part is a dictionary and contains 'inlineData'
+                if isinstance(part, dict) and "inlineData" in part:
+                    # Optionally, could check part["inlineData"].get("mimeType") prefix
                     return True
+                # Add checks here if Gemini uses other keys for media (e.g., 'fileData')
     return False
 
 
@@ -46,9 +49,13 @@ def _build_tools(
             or model.endswith("-image")
             or model.endswith("-image-generation")
         )
-        and not _has_image_parts(messages)
+        and not _has_media_parts(messages) # Use the updated check
     ):
         tool["codeExecution"] = {}
+        logger.debug("Code execution tool enabled.")
+    elif _has_media_parts(messages):
+         logger.debug("Code execution tool disabled due to media parts presence.")
+
     if model.endswith("-search"):
         tool["googleSearch"] = {}
 

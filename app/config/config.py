@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     # 日志配置
     LOG_LEVEL: str = "INFO" # 默认日志级别
 
+    # Audio/Video Settings
+    SUPPORTED_AUDIO_FORMATS: List[str] = ["wav", "mp3", "flac", "ogg"] # Add formats Gemini supports
+    SUPPORTED_VIDEO_FORMATS: List[str] = ["mp4", "mov", "avi", "webm"] # Add formats Gemini supports
+    MAX_AUDIO_SIZE_BYTES: int = 50 * 1024 * 1024  # Example: 50MB limit for Base64 payload
+    MAX_VIDEO_SIZE_BYTES: int = 200 * 1024 * 1024 # Example: 200MB limit
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # 设置默认AUTH_TOKEN（如果未提供）
@@ -77,6 +83,24 @@ class Settings(BaseSettings):
 
 # 创建全局配置实例
 settings = Settings()
+
+# Optional: Define MIME type mappings if needed, or handle directly in converter
+AUDIO_FORMAT_TO_MIMETYPE = {
+    "wav": "audio/wav",
+    "mp3": "audio/mpeg",
+    "flac": "audio/flac",
+    "ogg": "audio/ogg",
+    # Add other mappings supported by Gemini
+}
+
+VIDEO_FORMAT_TO_MIMETYPE = {
+    "mp4": "video/mp4",
+    "mov": "video/quicktime",
+    "avi": "video/x-msvideo",
+    "webm": "video/webm",
+     # Add other mappings supported by Gemini
+}
+
 
 def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
     """尝试将数据库字符串值解析为目标 Python 类型"""
