@@ -206,3 +206,6 @@ def get_update_logger():
 
 def get_scheduler_routes():
     return Logger.setup_logger("scheduler_routes")
+
+def get_message_converter_logger():
+    return Logger.setup_logger("message_converter")
