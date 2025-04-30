@@ -63,7 +63,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelBulkDeleteApiKeyBtn = document.getElementById('cancelBulkDeleteApiKeyBtn'); // 新增
     const confirmBulkDeleteApiKeyBtn = document.getElementById('confirmBulkDeleteApiKeyBtn'); // 新增
     const bulkDeleteApiKeyInput = document.getElementById('bulkDeleteApiKeyInput'); // 新增
-
+ 
+    // --- 新增：Proxy 模态框相关 ---
+    const proxyModal = document.getElementById('proxyModal');
+    const addProxyBtn = document.getElementById('addProxyBtn'); // Changed from bulkAddProxyBtn
+    const closeProxyModalBtn = document.getElementById('closeProxyModalBtn');
+    const cancelAddProxyBtn = document.getElementById('cancelAddProxyBtn');
+    const confirmAddProxyBtn = document.getElementById('confirmAddProxyBtn');
+    const proxyBulkInput = document.getElementById('proxyBulkInput');
+    // --- 结束：Proxy 模态框相关 ---
+ 
     // --- 新增：重置确认模态框相关 ---
     const resetConfirmModal = document.getElementById('resetConfirmModal');
     const closeResetModalBtn = document.getElementById('closeResetModalBtn');
@@ -111,8 +120,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (event.target == bulkDeleteApiKeyModal) { // 新增对批量删除模态框的处理
             bulkDeleteApiKeyModal.classList.remove('show');
         }
+         if (event.target == proxyModal) { // 新增对代理模态框的处理
+            proxyModal.classList.remove('show');
+        }
     });
-
+ 
     // 确认添加 API Key
     if (confirmAddApiKeyBtn) {
         confirmAddApiKeyBtn.addEventListener('click', handleBulkAddApiKeys);
@@ -158,7 +170,42 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // --- 结束：批量删除 API Key 相关 ---
     // --- 结束：API Key 相关 ---
-
+ 
+    // --- 新增：Proxy 模态框事件 ---
+    // 打开模态框 (Changed event listener to addProxyBtn)
+    if (addProxyBtn) {
+        addProxyBtn.addEventListener('click', () => {
+            if (proxyModal) {
+                proxyModal.classList.add('show');
+            }
+            if (proxyBulkInput) proxyBulkInput.value = ''; // 清空输入框
+        });
+    }
+ 
+    // 关闭模态框 (X 按钮)
+    if (closeProxyModalBtn) {
+        closeProxyModalBtn.addEventListener('click', () => {
+            if (proxyModal) {
+                proxyModal.classList.remove('show');
+            }
+        });
+    }
+ 
+    // 关闭模态框 (取消按钮)
+    if (cancelAddProxyBtn) {
+        cancelAddProxyBtn.addEventListener('click', () => {
+            if (proxyModal) {
+                proxyModal.classList.remove('show');
+            }
+        });
+    }
+ 
+    // 确认添加 Proxy
+    if (confirmAddProxyBtn) {
+        confirmAddProxyBtn.addEventListener('click', handleBulkAddProxies);
+    }
+    // --- 结束：Proxy 模态框事件 ---
+ 
     // --- 新增：重置确认模态框事件监听 (移到 DOMContentLoaded 内部) ---
     if (closeResetModalBtn) {
         closeResetModalBtn.addEventListener('click', () => {
@@ -265,6 +312,10 @@ async function initConfig() {
         if (!config.FILTERED_MODELS || !Array.isArray(config.FILTERED_MODELS) || config.FILTERED_MODELS.length === 0) {
             config.FILTERED_MODELS = ['gemini-1.0-pro-latest'];
         }
+        // --- 新增：处理 PROXIES 默认值 ---
+        if (!config.PROXIES || !Array.isArray(config.PROXIES)) {
+            config.PROXIES = []; // 默认为空数组
+        }
         // --- 新增：处理新字段的默认值 ---
         if (!config.THINKING_MODELS || !Array.isArray(config.THINKING_MODELS)) {
             config.THINKING_MODELS = []; // 默认为空数组
@@ -296,6 +347,7 @@ async function initConfig() {
             SEARCH_MODELS: ['gemini-1.5-flash-latest'],
             FILTERED_MODELS: ['gemini-1.0-pro-latest'],
             UPLOAD_PROVIDER: 'smms',
+            PROXIES: [], // 添加默认值
             THINKING_MODELS: [],
             THINKING_BUDGET_MAP: {}
         };
@@ -520,6 +572,42 @@ function handleBulkDeleteApiKeys() {
     // Clear the textarea after processing
     bulkDeleteTextarea.value = '';
 }
+
+// --- 新增：处理批量添加 Proxy 的逻辑 ---
+function handleBulkAddProxies() {
+    const proxyBulkInput = document.getElementById('proxyBulkInput');
+    const proxyContainer = document.getElementById('PROXIES_container');
+    const proxyModal = document.getElementById('proxyModal');
+
+    if (!proxyBulkInput || !proxyContainer || !proxyModal) return;
+
+    const bulkText = proxyBulkInput.value;
+    // 匹配 http(s):// 或 socks5:// 格式的代理，允许包含用户名密码
+    const proxyRegex = /(?:https?|socks5):\/\/(?:[^:@\/]+(?::[^@\/]+)?@)?(?:[^:\/\s]+)(?::\d+)?/g;
+    const extractedProxies = bulkText.match(proxyRegex) || [];
+
+    // 获取当前已有的 proxies
+    const currentProxyInputs = proxyContainer.querySelectorAll('.array-input');
+    const currentProxies = Array.from(currentProxyInputs).map(input => input.value).filter(proxy => proxy.trim() !== '');
+
+    // 合并并去重
+    const combinedProxies = new Set([...currentProxies, ...extractedProxies]);
+    const uniqueProxies = Array.from(combinedProxies);
+
+    // 清空现有列表显示
+    const existingItems = proxyContainer.querySelectorAll('.array-item');
+    existingItems.forEach(item => item.remove());
+
+    // 重新填充列表
+    uniqueProxies.forEach(proxy => {
+        addArrayItemWithValue('PROXIES', proxy);
+    });
+
+    // 关闭模态框
+    proxyModal.classList.remove('show');
+    showNotification(`添加/更新了 ${uniqueProxies.length} 个唯一代理`, 'success');
+}
+// --- 结束：处理批量添加 Proxy 的逻辑 ---
 
 // 切换标签
 function switchTab(tabId) {

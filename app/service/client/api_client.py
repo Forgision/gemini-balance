@@ -2,10 +2,13 @@
 
 from typing import Dict, Any, AsyncGenerator
 import httpx
+import random
 from abc import ABC, abstractmethod
-
+from app.config.config import settings
+from app.log.logger import get_api_client_logger
 from app.core.constants import DEFAULT_TIMEOUT
 
+logger = get_api_client_logger()
 
 class ApiClient(ABC):
     """API客户端基类"""
@@ -41,7 +44,12 @@ class GeminiApiClient(ApiClient):
         timeout = httpx.Timeout(self.timeout, read=self.timeout)
         model = self._get_real_model(model)
 
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        proxy_to_use = None
+        if settings.PROXIES:
+            proxy_to_use = random.choice(settings.PROXIES)
+            logger.info(f"using proxy: {proxy_to_use}")
+            
+        async with httpx.AsyncClient(timeout=timeout, proxy=proxy_to_use) as client: # 修改：直接传递代理字符串
             url = f"{self.base_url}/models/{model}:generateContent?key={api_key}"
             response = await client.post(url, json=payload)
             if response.status_code != 200:
@@ -53,7 +61,12 @@ class GeminiApiClient(ApiClient):
         timeout = httpx.Timeout(self.timeout, read=self.timeout)
         model = self._get_real_model(model)
         
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        proxy_to_use = None
+        if settings.PROXIES:
+            proxy_to_use = random.choice(settings.PROXIES)
+            logger.info(f"using proxy: {proxy_to_use}")
+
+        async with httpx.AsyncClient(timeout=timeout, proxy=proxy_to_use) as client: # 修改：直接传递代理字符串
             url = f"{self.base_url}/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
             async with client.stream(method="POST", url=url, json=payload) as response:
                 if response.status_code != 200:
