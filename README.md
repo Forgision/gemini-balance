@@ -195,12 +195,16 @@ app/
 * `POST /models/{model_name}:generateContent`: 使用指定的 Gemini 模型生成内容。
 * `POST /models/{model_name}:streamGenerateContent`: 使用指定的 Gemini 模型流式生成内容。
 
-### OpenAI API 相关 (`(/hf)/v1`)
+### OpenAI API 相关
 
-* `GET /v1/models`: 列出可用的 OpenAI 模型。
-* `POST /v1/chat/completions`: 通过 OpenAI API 进行聊天补全。
-* `POST /v1/images/generations`: 通过 OpenAI API 生成图像。
-* `POST /v1/embeddings`: 通过 OpenAI API 创建文本嵌入。
+* `GET (/hf)/v1/models`: 列出可用的模型 (底层用的gemini格式)。
+* `POST (/hf)/v1/chat/completions`: 进行聊天补全 (底层用的gemini格式, 支持流式传输)。
+* `POST (/hf)/v1/embeddings`: 创建文本嵌入 (底层用的gemini格式)。
+* `POST (/hf)/v1/images/generations`: 生成图像 (底层用的gemini格式)。
+* `GET /openai/v1/models`: 列出可用的模型 (底层用的openai格式)。
+* `POST /openai/v1/chat/completions`: 进行聊天补全 (底层用的openai格式, 支持流式传输, 可防止截断，速度也快)。
+* `POST /openai/v1/embeddings`: 创建文本嵌入 (底层用的openai格式)。
+* `POST /openai/v1/images/generations`: 生成图像 (底层用的openai格式)。
 
 ## 🤝 贡献
 

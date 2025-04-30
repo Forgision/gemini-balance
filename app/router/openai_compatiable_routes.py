@@ -95,6 +95,7 @@ async def generate_image(
 ):
     logger.info("-" * 50 + "generate_image" + "-" * 50)
     logger.info(f"Handling image generation request for prompt: {request.prompt}")
+    request.model = settings.CREATE_IMAGE_MODEL
 
     try:
         response = await openai_service.generate_images(request)
