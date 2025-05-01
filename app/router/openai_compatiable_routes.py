@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from app.config.config import settings
@@ -9,9 +9,10 @@ from app.domain.openai_models import (
     ImageGenerationRequest,
 )
 from app.handler.retry_handler import RetryHandler
+from app.handler.error_handler import handle_route_errors
 from app.log.logger import get_openai_compatible_logger
 from app.service.key.key_manager import KeyManager, get_key_manager_instance
-from app.service.openai_compatiable_service import OpenAICompatiableService
+from app.service.openai_compatiable.openai_compatiable_service import OpenAICompatiableService
 
 
 router = APIRouter()
@@ -41,17 +42,13 @@ async def list_models(
     key_manager: KeyManager = Depends(get_key_manager),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    logger.info("-" * 50 + "list_models" + "-" * 50)
-    logger.info("Handling models list request")
-    api_key = await key_manager.get_first_valid_key()
-    logger.info(f"Using API key: {api_key}")
-    try:
+    """获取可用模型列表。"""
+    operation_name = "list_models"
+    async with handle_route_errors(logger, operation_name):
+        logger.info("Handling models list request")
+        api_key = await key_manager.get_first_valid_key()
+        logger.info(f"Using API key: {api_key}")
         return await openai_service.get_models(api_key)
-    except Exception as e:
-        logger.error(f"Error getting models list: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail="Internal server error while fetching models list"
-        ) from e
 
 
 @router.post("/openai/v1/chat/completions")
@@ -63,28 +60,32 @@ async def chat_completion(
     key_manager: KeyManager = Depends(get_key_manager),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    # 如果model是imagen3,使用paid_key
-    if request.model == f"{settings.CREATE_IMAGE_MODEL}-chat":
-        api_key = await key_manager.get_paid_key()
-    logger.info("-" * 50 + "chat_completion" + "-" * 50)
-    logger.info(f"Handling chat completion request for model: {request.model}")
-    logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
-    logger.info(f"Using API key: {api_key}")
+    """处理聊天补全请求，支持流式响应和特定模型切换。"""
+    operation_name = "chat_completion"
+    # 检查是否为图像生成相关的聊天模型，如果是，则使用付费密钥
+    is_image_chat = request.model == f"{settings.CREATE_IMAGE_MODEL}-chat"
+    current_api_key = api_key # 保存原始key（可能是普通key）
+    if is_image_chat:
+        current_api_key = await key_manager.get_paid_key() # 获取付费密钥
 
-    try:
-        # 如果model是imagen3,使用paid_key
-        if request.model == f"{settings.CREATE_IMAGE_MODEL}-chat":
-            response = await openai_service.create_image_chat_completion(request, api_key)
+    async with handle_route_errors(logger, operation_name):
+        logger.info(f"Handling chat completion request for model: {request.model}")
+        logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
+        logger.info(f"Using API key: {current_api_key}") # 使用 current_api_key
+
+        if is_image_chat:
+            # 图像生成聊天，调用特定服务，不处理流式
+            response = await openai_service.create_image_chat_completion(request, current_api_key)
+            return response # 直接返回结果
         else:
-            response = await openai_service.create_chat_completion(request, api_key)
-        # 处理流式响应
-        if request.stream:
-            return StreamingResponse(response, media_type="text/event-stream")
-        logger.info("Chat completion request successful")
-        return response
-    except Exception as e:
-        logger.error(f"Chat completion failed after retries: {str(e)}")
-        raise HTTPException(status_code=500, detail="Chat completion failed") from e
+            # 普通聊天补全
+            response = await openai_service.create_chat_completion(request, current_api_key)
+            # 处理流式响应
+            if request.stream:
+                 # 假设 openai_service.create_chat_completion 在流式时返回异步生成器
+                return StreamingResponse(response, media_type="text/event-stream")
+            # 非流式直接返回结果
+            return response
 
 
 @router.post("/openai/v1/images/generations")
@@ -93,19 +94,13 @@ async def generate_image(
     _=Depends(security_service.verify_authorization),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    logger.info("-" * 50 + "generate_image" + "-" * 50)
-    logger.info(f"Handling image generation request for prompt: {request.prompt}")
-    request.model = settings.CREATE_IMAGE_MODEL
-
-    try:
-        response = await openai_service.generate_images(request)
-        logger.info("Image generation request successful")
-        return response
-    except Exception as e:
-        logger.error(f"Image generation request failed: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail="Image generation request failed"
-        ) from e
+    """处理图像生成请求。"""
+    operation_name = "generate_image"
+    async with handle_route_errors(logger, operation_name):
+        logger.info(f"Handling image generation request for prompt: {request.prompt}")
+        # 强制使用配置的模型，确保请求中包含正确的模型信息
+        request.model = settings.CREATE_IMAGE_MODEL
+        return await openai_service.generate_images(request)
 
 
 @router.post("/openai/v1/embeddings")
@@ -115,16 +110,12 @@ async def embedding(
     key_manager: KeyManager = Depends(get_key_manager),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    logger.info("-" * 50 + "embedding" + "-" * 50)
-    logger.info(f"Handling embedding request for model: {request.model}")
-    api_key = await key_manager.get_next_working_key()
-    logger.info(f"Using API key: {api_key}")
-    try:
-        response = await openai_service.create_embeddings(
+    """处理文本嵌入请求。"""
+    operation_name = "embedding"
+    async with handle_route_errors(logger, operation_name):
+        logger.info(f"Handling embedding request for model: {request.model}")
+        api_key = await key_manager.get_next_working_key()
+        logger.info(f"Using API key: {api_key}")
+        return await openai_service.create_embeddings(
             input_text=request.input, model=request.model, api_key=api_key
         )
-        logger.info("Embedding request successful")
-        return response
-    except Exception as e:
-        logger.error(f"Embedding request failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Embedding request failed") from e

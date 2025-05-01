@@ -172,7 +172,7 @@ def _extract_result(
                 text = _format_execution_result(parts[0]["executableCodeResult"])
             elif "codeExecutionResult" in parts[0]:
                 text = _format_execution_result(parts[0]["codeExecutionResult"])
-            elif "inline_data" in parts[0]:
+            elif "inlineData" in parts[0]:
                 text = _extract_image_data(parts[0])
             else:
                 text = ""
@@ -203,7 +203,7 @@ def _extract_result(
                     for part in candidate["content"]["parts"]:
                         if "text" in part:
                             text += part["text"]
-                        elif "inline_data" in part:
+                        elif "inlineData" in part:
                             text += _extract_image_data(part)
 
             text = _add_search_link_text(model, candidate, text)
@@ -233,7 +233,7 @@ def _extract_image_data(part: dict) -> str:
         )
     current_date = time.strftime("%Y/%m/%d")
     filename = f"{current_date}/{uuid.uuid4().hex[:8]}.png"
-    base64_data = part["inline_data"]["data"]
+    base64_data = part["inlineData"]["data"]
     # 将base64_data转成bytes数组
     bytes_data = base64.b64decode(base64_data)
     upload_response = image_uploader.upload(bytes_data, filename)
