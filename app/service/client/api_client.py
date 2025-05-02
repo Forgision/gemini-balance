@@ -1,6 +1,6 @@
 # app/services/chat/api_client.py
 
-from typing import Dict, Any, AsyncGenerator
+from typing import Dict, Any, AsyncGenerator, Optional
 import httpx
 import random
 from abc import ABC, abstractmethod
@@ -40,6 +40,31 @@ class GeminiApiClient(ApiClient):
             model = model[:-20]
         return model
 
+    async def get_models(self, api_key: str) -> Optional[Dict[str, Any]]:
+        """获取可用的 Gemini 模型列表"""
+        timeout = httpx.Timeout(timeout=5)
+        
+        proxy_to_use = None
+        if settings.PROXIES:
+            proxy_to_use = random.choice(settings.PROXIES)
+            logger.info(f"Using proxy for getting models: {proxy_to_use}")
+
+        async with httpx.AsyncClient(timeout=timeout, proxy=proxy_to_use) as client:
+            url = f"{self.base_url}/models?key={api_key}"
+            try:
+                response = await client.get(url)
+                response.raise_for_status()  # 如果状态码不是 2xx，则引发 HTTPStatusError
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error(f"获取模型列表失败: {e.response.status_code}")
+                logger.error(e.response.text)
+                # 返回 None 而不是抛出异常，以便上层处理
+                return None
+            except httpx.RequestError as e:
+                logger.error(f"请求模型列表失败: {e}")
+                # 返回 None 而不是抛出异常
+                return None
+            
     async def generate_content(self, payload: Dict[str, Any], model: str, api_key: str) -> Dict[str, Any]:
         timeout = httpx.Timeout(self.timeout, read=self.timeout)
         model = self._get_real_model(model)

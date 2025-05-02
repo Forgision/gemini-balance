@@ -54,9 +54,7 @@ async def list_models(
         logger.info("Handling models list request")
         api_key = await key_manager.get_first_valid_key()
         logger.info(f"Using API key: {api_key}")
-        # 注意：这里假设 model_service.get_gemini_openai_models 是同步函数
-        # 如果它是异步的，需要 await
-        return model_service.get_gemini_openai_models(api_key)
+        return await model_service.get_gemini_openai_models(api_key)
 
 
 @router.post("/v1/chat/completions")
@@ -83,7 +81,7 @@ async def chat_completion(
         logger.info(f"Using API key: {current_api_key}")
 
         # 检查模型支持性应在错误处理块内，以便捕获并记录错误
-        if not model_service.check_model_support(request.model):
+        if not await model_service.check_model_support(request.model):
             # 使用 HTTPException，会被 handle_route_errors 捕获并记录
             raise HTTPException(
                 status_code=400, detail=f"Model {request.model} is not supported"

@@ -46,10 +46,6 @@ async def list_models(
 ):
     """获取可用的 Gemini 模型列表，并根据配置添加衍生模型（搜索、图像、非思考）。"""
     operation_name = "list_gemini_models"
-    # 注意：此路由的错误处理相对复杂，涉及模型查找和修改，
-    # 使用通用错误处理可能隐藏部分逻辑错误。暂时保留原有结构，
-    # 但如果需要更统一的处理，可以将内部逻辑封装并应用 handle_route_errors。
-    # 这里仅添加日志分隔符。
     logger.info("-" * 50 + operation_name + "-" * 50)
     logger.info("Handling Gemini models list request")
 
@@ -59,8 +55,7 @@ async def list_models(
              raise HTTPException(status_code=503, detail="No valid API keys available to fetch models.")
         logger.info(f"Using API key: {api_key}")
 
-        # 假设 get_gemini_models 是同步的，如果不是需要 await
-        models_data = model_service.get_gemini_models(api_key)
+        models_data =await model_service.get_gemini_models(api_key)
         if not models_data or "models" not in models_data:
              raise HTTPException(status_code=500, detail="Failed to fetch base models list.")
 
@@ -76,7 +71,7 @@ async def list_models(
             item["name"] = f"models/{base_name}{suffix}"
             display_name = f'{item.get("displayName", base_name)}{display_suffix}'
             item["displayName"] = display_name
-            item["description"] = display_name # 使用 display_name 作为描述
+            item["description"] = display_name
             models_json["models"].append(item)
 
         # 添加衍生模型
@@ -120,7 +115,7 @@ async def generate_content(
         logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
         logger.info(f"Using API key: {api_key}")
 
-        if not model_service.check_model_support(model_name):
+        if not await model_service.check_model_support(model_name):
             raise HTTPException(status_code=400, detail=f"Model {model_name} is not supported")
 
         response = await chat_service.generate_content(
@@ -150,7 +145,7 @@ async def stream_generate_content(
         logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
         logger.info(f"Using API key: {api_key}")
 
-        if not model_service.check_model_support(model_name):
+        if not await model_service.check_model_support(model_name):
             raise HTTPException(status_code=400, detail=f"Model {model_name} is not supported")
 
         response_stream = chat_service.stream_generate_content(

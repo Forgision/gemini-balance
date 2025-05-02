@@ -1,3 +1,7 @@
+// 将需要在外部函数访问的 DOM 元素移到外部
+const safetySettingsContainer = document.getElementById('SAFETY_SETTINGS_container');
+const thinkingModelsContainer = document.getElementById('THINKING_MODELS_container');
+
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化配置
     initConfig();
@@ -85,6 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelResetBtn = document.getElementById('cancelResetBtn');
     const confirmResetBtn = document.getElementById('confirmResetBtn');
     // --- 结束：新增 ---
+    // const safetySettingsContainer = document.getElementById('SAFETY_SETTINGS_container'); // Moved outside
 
 
     // 打开模态框
@@ -297,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 结束：思考模型预算映射相关 ---
 
     // 添加事件委托，处理动态添加的 THINKING_MODELS 输入框的 input 事件
-    const thinkingModelsContainer = document.getElementById('THINKING_MODELS_container');
+    // const thinkingModelsContainer = document.getElementById('THINKING_MODELS_container'); // Moved outside
     if (thinkingModelsContainer) {
         thinkingModelsContainer.addEventListener('input', function(event) {
             if (event.target && event.target.classList.contains('array-input') && event.target.closest('.array-item[data-model-id]')) {
@@ -311,6 +316,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- 新增：安全设置相关 ---
+    const addSafetySettingBtn = document.getElementById('addSafetySettingBtn');
+    if (addSafetySettingBtn) {
+        addSafetySettingBtn.addEventListener('click', () => addSafetySettingItem());
+    }
+    // --- 结束：安全设置相关 ---
 
 }); // <-- DOMContentLoaded 结束括号
 
@@ -367,7 +378,11 @@ async function initConfig() {
         if (!config.THINKING_BUDGET_MAP || typeof config.THINKING_BUDGET_MAP !== 'object' || config.THINKING_BUDGET_MAP === null) {
             config.THINKING_BUDGET_MAP = {}; // 默认为空对象
         }
-        // --- 结束：处理新字段的默认值 ---
+        // --- 新增：处理 SAFETY_SETTINGS 默认值 ---
+        if (!config.SAFETY_SETTINGS || !Array.isArray(config.SAFETY_SETTINGS)) {
+            config.SAFETY_SETTINGS = []; // 默认为空数组
+        }
+        // --- 结束：处理 SAFETY_SETTINGS 默认值 ---
 
         populateForm(config);
 
@@ -506,6 +521,24 @@ function populateForm(config) {
     if (uploadProvider) {
         toggleProviderConfig(uploadProvider.value);
     }
+
+    // --- 新增：填充 SAFETY_SETTINGS ---
+    let safetyItemsAdded = false;
+    if (safetySettingsContainer && Array.isArray(config.SAFETY_SETTINGS)) {
+        config.SAFETY_SETTINGS.forEach(setting => {
+            if (setting && typeof setting === 'object' && setting.category && setting.threshold) {
+                addSafetySettingItem(setting.category, setting.threshold);
+                safetyItemsAdded = true;
+            } else {
+                console.warn("Invalid safety setting item found:", setting);
+            }
+        });
+    }
+    // 如果没有添加任何安全设置项，则显示占位符
+    if (safetySettingsContainer && !safetyItemsAdded) {
+         safetySettingsContainer.innerHTML = '<div class="text-gray-500 text-sm italic">定义模型的安全过滤阈值。</div>';
+    }
+    // --- 结束：填充 SAFETY_SETTINGS ---
 }
 
 // --- 新增：处理批量添加 API Key 的逻辑 ---
@@ -963,6 +996,23 @@ function collectFormData() {
     }
     // --- 结束：处理 THINKING_BUDGET_MAP ---
 
+    // --- 新增：处理 SAFETY_SETTINGS ---
+    if (safetySettingsContainer) {
+        formData['SAFETY_SETTINGS'] = [];
+        const settingItems = safetySettingsContainer.querySelectorAll('.safety-setting-item');
+        settingItems.forEach(item => {
+            const categorySelect = item.querySelector('.safety-category-select');
+            const thresholdSelect = item.querySelector('.safety-threshold-select');
+            if (categorySelect && thresholdSelect && categorySelect.value && thresholdSelect.value) {
+                formData['SAFETY_SETTINGS'].push({
+                    category: categorySelect.value,
+                    threshold: thresholdSelect.value
+                });
+            }
+        });
+    }
+    // --- 结束：处理 SAFETY_SETTINGS ---
+
     return formData;
 }
 
@@ -1166,3 +1216,86 @@ function addBudgetMapItemWithValue(mapKey, mapValue, modelId) {
     createAndAppendBudgetMapItem(mapKey, mapValue, modelId);
 }
 /* --- 结束：(addBudgetMapItemWithValue 已弃用) --- */
+
+
+// --- 新增：添加安全设置项的函数 ---
+function addSafetySettingItem(category = '', threshold = '') {
+    const container = document.getElementById('SAFETY_SETTINGS_container');
+    if (!container) {
+        console.error("Cannot add safety setting: SAFETY_SETTINGS_container not found!");
+        return;
+    }
+
+    // 如果容器当前只有占位符，则清除它
+    const placeholder = container.querySelector('.text-gray-500.italic');
+    if (placeholder && container.children.length === 1 && container.firstChild === placeholder) {
+        container.innerHTML = '';
+    }
+
+    const harmCategories = [
+        "HARM_CATEGORY_HARASSMENT",
+        "HARM_CATEGORY_HATE_SPEECH",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "HARM_CATEGORY_DANGEROUS_CONTENT",
+        "HARM_CATEGORY_CIVIC_INTEGRITY" // 根据需要添加或移除
+    ];
+    const harmThresholds = [
+        "BLOCK_NONE",
+        "BLOCK_LOW_AND_ABOVE",
+        "BLOCK_MEDIUM_AND_ABOVE",
+        "BLOCK_ONLY_HIGH",
+        "OFF" // 根据 Google API 文档添加或移除
+    ];
+
+    const settingItem = document.createElement('div');
+    settingItem.className = 'safety-setting-item flex items-center mb-2 gap-2';
+
+    // Category Select
+    const categorySelect = document.createElement('select');
+    categorySelect.className = 'safety-category-select flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50 bg-white';
+    harmCategories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat.replace('HARM_CATEGORY_', ''); // 显示更友好的名称
+        if (cat === category) {
+            option.selected = true;
+        }
+        categorySelect.appendChild(option);
+    });
+
+    // Threshold Select
+    const thresholdSelect = document.createElement('select');
+    thresholdSelect.className = 'safety-threshold-select w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50 bg-white';
+    harmThresholds.forEach(thr => {
+        const option = document.createElement('option');
+        option.value = thr;
+        option.textContent = thr.replace('BLOCK_', '').replace('_AND_ABOVE', '+'); // 简化显示
+        if (thr === threshold) {
+            option.selected = true;
+        }
+        thresholdSelect.appendChild(option);
+    });
+
+    // Remove Button
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'remove-btn text-gray-400 hover:text-red-500 focus:outline-none transition-colors duration-150';
+    removeBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+    removeBtn.title = '删除此设置';
+    removeBtn.addEventListener('click', function() {
+        const currentItem = this.closest('.safety-setting-item');
+        currentItem.remove();
+        // 检查容器是否为空，如果是，则添加回占位符
+        if (container.children.length === 0) {
+            container.innerHTML = '<div class="text-gray-500 text-sm italic">定义模型的安全过滤阈值。</div>';
+        }
+    });
+
+    settingItem.appendChild(categorySelect);
+    settingItem.appendChild(thresholdSelect);
+    settingItem.appendChild(removeBtn);
+
+    container.appendChild(settingItem);
+}
+// --- 结束：添加安全设置项的函数 ---
+

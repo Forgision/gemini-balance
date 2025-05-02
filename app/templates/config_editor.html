@@ -311,6 +311,20 @@
                         </div> -->
                         <small class="text-gray-500 mt-1 block">为每个思考模型设置预算（整数，最大值 24576），此项与上方模型列表自动关联。</small>
                     </div>
+<!-- 安全设置 -->
+                    <div class="mb-6">
+                        <label for="SAFETY_SETTINGS" class="block font-semibold mb-2 text-gray-700">安全设置 (Safety Settings)</label>
+                        <div class="bg-white rounded-lg border border-gray-200 p-4 mb-2 space-y-3" id="SAFETY_SETTINGS_container">
+                            <!-- 安全设置项将在这里动态添加 -->
+                            <div class="text-gray-500 text-sm italic">定义模型的安全过滤阈值。</div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="button" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2" id="addSafetySettingBtn">
+                                <i class="fas fa-plus"></i> 添加安全设置
+                            </button>
+                        </div>
+                        <small class="text-gray-500 mt-1 block">配置模型的安全过滤级别，例如 HARM_CATEGORY_HARASSMENT: BLOCK_NONE。</small>
+                    </div>
                 </div>
 
                 <!-- 图像生成相关配置 -->
