@@ -32,4 +32,4 @@ class ImageGenerationRequest(BaseModel):
     size: Optional[str] = "1024x1024"
     quality: Optional[str] = None
     style: Optional[str] = None
-    response_format: Optional[str] = "b64_json"
+    response_format: Optional[str] = "url"

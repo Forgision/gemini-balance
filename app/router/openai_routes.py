@@ -90,7 +90,11 @@ async def chat_completion(
         if is_image_chat:
             # 图像生成聊天
             response = await chat_service.create_image_chat_completion(request, current_api_key)
-            return response # 直接返回，不处理流式
+            # 处理流式响应
+            if request.stream:
+                return StreamingResponse(response, media_type="text/event-stream")
+            # 非流式直接返回结果
+            return response
         else:
             # 普通聊天补全
             response = await chat_service.create_chat_completion(request, current_api_key)
@@ -111,8 +115,6 @@ async def generate_image(
     operation_name = "generate_image"
     async with handle_route_errors(logger, operation_name):
         logger.info(f"Handling image generation request for prompt: {request.prompt}")
-        # 注意：这里假设 image_create_service.generate_images 是同步函数
-        # 如果它是异步的，需要 await
         response = image_create_service.generate_images(request)
         return response
 

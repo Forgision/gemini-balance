@@ -8,6 +8,7 @@ from copy import deepcopy
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
 from app.config.config import settings
+from app.core.constants import GEMINI_2_FLASH_EXP_SAFETY_SETTINGS
 from app.database.services import (
     add_error_log,
     add_request_log,
@@ -102,7 +103,7 @@ def _get_safety_settings(model: str) -> List[Dict[str, str]]:
     #     and "gemini-2.0-pro-exp" not in model
     # ):
     if model == "gemini-2.0-flash-exp":
-        return settings.GEMINI_2_FLASH_EXP_SAFETY_SETTINGS
+        return GEMINI_2_FLASH_EXP_SAFETY_SETTINGS
     return settings.SAFETY_SETTINGS
 
 
