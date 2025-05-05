@@ -144,6 +144,7 @@ app/
 | :--------------------------- | :------------------------------------------------------- | :---------------------------------------------------- |
 | **数据库配置**               |                                                          |                                                       |
 | `MYSQL_HOST`                 | 必填，MySQL 数据库主机地址                               | `localhost`                                           |
+| `MYSQL_SOCKET`               | 可选，MySQL 数据库 socket 地址                             | `/var/run/mysqld/mysqld.sock`                          |
 | `MYSQL_PORT`                 | 必填，MySQL 数据库端口                                   | `3306`                                                |
 | `MYSQL_USER`                 | 必填，MySQL 数据库用户名                                 | `your_db_user`                                        |
 | `MYSQL_PASSWORD`             | 必填，MySQL 数据库密码                                   | `your_db_password`                                    |
