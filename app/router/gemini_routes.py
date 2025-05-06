@@ -279,9 +279,10 @@ async def verify_key(api_key: str, chat_service: GeminiChatService = Depends(get
             contents=[
                 GeminiContent(
                     role="user",
-                    parts=[{"text": "hi"}]
+                    parts=[{"text": "hi"}],
                 )
-            ]
+            ],
+            generation_config={"temperature": 0.7, "top_p": 1.0, "max_output_tokens": 10}
         )
         
         response = await chat_service.generate_content(
