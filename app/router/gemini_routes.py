@@ -328,7 +328,8 @@ async def verify_selected_keys(
         try:
             # 重用单密钥验证逻辑的核心部分
             gemini_request = GeminiRequest(
-                contents=[GeminiContent(role="user", parts=[{"text": "hi"}])]
+                contents=[GeminiContent(role="user", parts=[{"text": "hi"}])],
+                generation_config={"temperature": 0.7, "top_p": 1.0, "max_output_tokens": 10}
             )
             # 注意：这里直接调用 chat_service.generate_content，不依赖于 key_manager 获取密钥
             await chat_service.generate_content(
