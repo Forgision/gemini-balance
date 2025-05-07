@@ -8,34 +8,29 @@ from fastapi import APIRouter, HTTPException, Request, Query, Path, Body, Respon
 
 from app.core.security import verify_auth_token
 from app.log.logger import get_log_routes_logger
-# 假设这些服务函数已更新或添加
 from app.database.services import (
     get_error_logs,
     get_error_logs_count,
     get_error_log_details,
-    delete_error_logs_by_ids, # 新增导入
-    delete_error_log_by_id    # 新增导入
+    delete_error_logs_by_ids,
+    delete_error_log_by_id
 )
-# Removed get_db import comment as it's fully removed now
 
-# 创建路由
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 
 logger = get_log_routes_logger()
 
 
-# Define a response model that includes the total count for pagination
-# 用于列表响应的模型，假设 get_error_logs 返回包含 error_code 的字典
 class ErrorLogListItem(BaseModel):
     id: int
     gemini_key: Optional[str] = None
     error_type: Optional[str] = None
-    error_code: Optional[int] = None # 列表显示错误码 (应为整数)
+    error_code: Optional[int] = None
     model_name: Optional[str] = None
     request_time: Optional[datetime] = None
 
 class ErrorLogListResponse(BaseModel):
-    logs: List[ErrorLogListItem] # 使用定义的模型列表
+    logs: List[ErrorLogListItem]
     total: int
 
 @router.get("/errors", response_model=ErrorLogListResponse)
@@ -44,12 +39,12 @@ async def get_error_logs_api(
     limit: int = Query(10, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     key_search: Optional[str] = Query(None, description="Search term for Gemini key (partial match)"),
-    error_search: Optional[str] = Query(None, description="Search term for error type or log message"), # 数据库查询需处理
-    error_code_search: Optional[str] = Query(None, description="Search term for error code"), # Added error code search parameter
+    error_search: Optional[str] = Query(None, description="Search term for error type or log message"),
+    error_code_search: Optional[str] = Query(None, description="Search term for error code"),
     start_date: Optional[datetime] = Query(None, description="Start datetime for filtering"),
     end_date: Optional[datetime] = Query(None, description="End datetime for filtering"),
-    sort_by: str = Query('id', description="Field to sort by (e.g., 'id', 'request_time')"), # 新增排序参数
-    sort_order: str = Query('desc', description="Sort order ('asc' or 'desc')") # 新增排序参数
+    sort_by: str = Query('id', description="Field to sort by (e.g., 'id', 'request_time')"),
+    sort_order: str = Query('desc', description="Sort order ('asc' or 'desc')")
 ):
     """
     获取错误日志列表 (返回错误码)，支持过滤和排序
@@ -72,32 +67,27 @@ async def get_error_logs_api(
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to error logs list")
-        # API 返回 401 更合适
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     try:
-        # 假设 get_error_logs 现在返回包含 error_code 的字典列表
-        # 并且可以接受 include_error_code 参数 (如果需要显式指定)
         logs_data = await get_error_logs(
             limit=limit,
             offset=offset,
             key_search=key_search,
-            error_search=error_search, # 数据库查询需要处理这个
-            error_code_search=error_code_search, # Pass error code search to DB function
+            error_search=error_search,
+            error_code_search=error_code_search,
             start_date=start_date,
             end_date=end_date,
-            sort_by=sort_by,       # 传递排序参数
-            sort_order=sort_order  # 传递排序参数
+            sort_by=sort_by,
+            sort_order=sort_order
         )
-        # Fetch total count with the same search parameters
         total_count = await get_error_logs_count(
             key_search=key_search,
             error_search=error_search,
-            error_code_search=error_code_search, # Pass error code search to DB count function
+            error_code_search=error_code_search,
             start_date=start_date,
             end_date=end_date
         )
-        # 验证并转换数据以匹配 Pydantic 模型
         validated_logs = [ErrorLogListItem(**log) for log in logs_data]
         return ErrorLogListResponse(logs=validated_logs, total=total_count)
     except Exception as e:
@@ -105,13 +95,12 @@ async def get_error_logs_api(
         raise HTTPException(status_code=500, detail=f"Failed to get error logs list: {str(e)}")
 
 
-# 新增：获取错误日志详情的路由
 class ErrorLogDetailResponse(BaseModel):
     id: int
     gemini_key: Optional[str] = None
     error_type: Optional[str] = None
-    error_log: Optional[str] = None # 详情接口返回完整的 error_log
-    request_msg: Optional[str] = None # 详情接口返回 request_msg
+    error_log: Optional[str] = None
+    request_msg: Optional[str] = None
     model_name: Optional[str] = None
     request_time: Optional[datetime] = None
 
@@ -126,27 +115,22 @@ async def get_error_log_detail_api(request: Request, log_id: int = Path(..., ge=
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        # 假设存在一个函数 get_error_log_details(log_id) 来获取完整信息
         log_details = await get_error_log_details(log_id=log_id)
         if not log_details:
             raise HTTPException(status_code=404, detail="Error log not found")
 
-        # 假设 get_error_log_details 返回一个字典或兼容 Pydantic 的对象
         return ErrorLogDetailResponse(**log_details)
     except HTTPException as http_exc:
-        # Re-raise HTTPException (like 404)
         raise http_exc
     except Exception as e:
         logger.exception(f"Failed to get error log details for ID {log_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get error log details: {str(e)}")
 
 
-# 新增：批量删除错误日志
 @router.delete("/errors", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_error_logs_bulk_api(
     request: Request,
-    payload: Dict[str, List[int]] = Body(...) # Expects {"ids": [1, 2, 3]}
-    # Ensure db dependency is fully removed
+    payload: Dict[str, List[int]] = Body(...)
 ):
     """
     批量删除错误日志 (异步)
@@ -161,7 +145,6 @@ async def delete_error_logs_bulk_api(
         raise HTTPException(status_code=400, detail="No log IDs provided for deletion.")
 
     try:
-        # 调用异步服务函数
         deleted_count = await delete_error_logs_by_ids(log_ids)
         # 注意：异步函数返回的是尝试删除的数量，可能不是精确值
         logger.info(f"Attempted bulk deletion for {deleted_count} error logs with IDs: {log_ids}")
@@ -171,12 +154,10 @@ async def delete_error_logs_bulk_api(
         raise HTTPException(status_code=500, detail="Internal server error during bulk deletion")
 
 
-# 新增：删除单个错误日志
 @router.delete("/errors/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_error_log_api(
     request: Request,
     log_id: int = Path(..., ge=1)
-    # Ensure db dependency is fully removed
 ):
     """
     删除单个错误日志 (异步)
@@ -187,7 +168,6 @@ async def delete_error_log_api(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        # 调用异步服务函数
         success = await delete_error_log_by_id(log_id)
         if not success:
             # 服务层现在在未找到时返回 False，我们在这里转换为 404
@@ -195,7 +175,7 @@ async def delete_error_log_api(
         logger.info(f"Successfully deleted error log with ID: {log_id}")
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except HTTPException as http_exc:
-        raise http_exc # Re-raise 404 or other HTTP exceptions
+        raise http_exc
     except Exception as e:
         logger.exception(f"Error deleting error log with ID {log_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error during deletion")
