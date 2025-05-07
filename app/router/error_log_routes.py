@@ -1,20 +1,25 @@
 """
 日志路由模块
 """
-from typing import List, Optional, Dict
+
 from datetime import datetime
+from typing import Dict, List, Optional
+
+from fastapi import (
+    APIRouter,
+    Body,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Request, Query, Path, Body, Response, status
 
 from app.core.security import verify_auth_token
 from app.log.logger import get_log_routes_logger
-from app.database.services import (
-    get_error_logs,
-    get_error_logs_count,
-    get_error_log_details,
-    delete_error_logs_by_ids,
-    delete_error_log_by_id
-)
+from app.service.error_log import error_log_service
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 
@@ -29,22 +34,36 @@ class ErrorLogListItem(BaseModel):
     model_name: Optional[str] = None
     request_time: Optional[datetime] = None
 
+
 class ErrorLogListResponse(BaseModel):
     logs: List[ErrorLogListItem]
     total: int
+
 
 @router.get("/errors", response_model=ErrorLogListResponse)
 async def get_error_logs_api(
     request: Request,
     limit: int = Query(10, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    key_search: Optional[str] = Query(None, description="Search term for Gemini key (partial match)"),
-    error_search: Optional[str] = Query(None, description="Search term for error type or log message"),
-    error_code_search: Optional[str] = Query(None, description="Search term for error code"),
-    start_date: Optional[datetime] = Query(None, description="Start datetime for filtering"),
-    end_date: Optional[datetime] = Query(None, description="End datetime for filtering"),
-    sort_by: str = Query('id', description="Field to sort by (e.g., 'id', 'request_time')"),
-    sort_order: str = Query('desc', description="Sort order ('asc' or 'desc')")
+    key_search: Optional[str] = Query(
+        None, description="Search term for Gemini key (partial match)"
+    ),
+    error_search: Optional[str] = Query(
+        None, description="Search term for error type or log message"
+    ),
+    error_code_search: Optional[str] = Query(
+        None, description="Search term for error code"
+    ),
+    start_date: Optional[datetime] = Query(
+        None, description="Start datetime for filtering"
+    ),
+    end_date: Optional[datetime] = Query(
+        None, description="End datetime for filtering"
+    ),
+    sort_by: str = Query(
+        "id", description="Field to sort by (e.g., 'id', 'request_time')"
+    ),
+    sort_order: str = Query("desc", description="Sort order ('asc' or 'desc')"),
 ):
     """
     获取错误日志列表 (返回错误码)，支持过滤和排序
@@ -68,9 +87,9 @@ async def get_error_logs_api(
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to error logs list")
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
+
     try:
-        logs_data = await get_error_logs(
+        result = await error_log_service.process_get_error_logs(
             limit=limit,
             offset=offset,
             key_search=key_search,
@@ -79,20 +98,18 @@ async def get_error_logs_api(
             start_date=start_date,
             end_date=end_date,
             sort_by=sort_by,
-            sort_order=sort_order
+            sort_order=sort_order,
         )
-        total_count = await get_error_logs_count(
-            key_search=key_search,
-            error_search=error_search,
-            error_code_search=error_code_search,
-            start_date=start_date,
-            end_date=end_date
-        )
+        logs_data = result["logs"]
+        total_count = result["total"]
+
         validated_logs = [ErrorLogListItem(**log) for log in logs_data]
         return ErrorLogListResponse(logs=validated_logs, total=total_count)
     except Exception as e:
         logger.exception(f"Failed to get error logs list: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get error logs list: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get error logs list: {str(e)}"
+        )
 
 
 class ErrorLogDetailResponse(BaseModel):
@@ -104,6 +121,7 @@ class ErrorLogDetailResponse(BaseModel):
     model_name: Optional[str] = None
     request_time: Optional[datetime] = None
 
+
 @router.get("/errors/{log_id}/details", response_model=ErrorLogDetailResponse)
 async def get_error_log_detail_api(request: Request, log_id: int = Path(..., ge=1)):
     """
@@ -111,11 +129,15 @@ async def get_error_log_detail_api(request: Request, log_id: int = Path(..., ge=
     """
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
-        logger.warning(f"Unauthorized access attempt to error log details for ID: {log_id}")
+        logger.warning(
+            f"Unauthorized access attempt to error log details for ID: {log_id}"
+        )
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        log_details = await get_error_log_details(log_id=log_id)
+        log_details = await error_log_service.process_get_error_log_details(
+            log_id=log_id
+        )
         if not log_details:
             raise HTTPException(status_code=404, detail="Error log not found")
 
@@ -124,13 +146,14 @@ async def get_error_log_detail_api(request: Request, log_id: int = Path(..., ge=
         raise http_exc
     except Exception as e:
         logger.exception(f"Failed to get error log details for ID {log_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get error log details: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get error log details: {str(e)}"
+        )
 
 
 @router.delete("/errors", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_error_logs_bulk_api(
-    request: Request,
-    payload: Dict[str, List[int]] = Body(...)
+    request: Request, payload: Dict[str, List[int]] = Body(...)
 ):
     """
     批量删除错误日志 (异步)
@@ -145,20 +168,23 @@ async def delete_error_logs_bulk_api(
         raise HTTPException(status_code=400, detail="No log IDs provided for deletion.")
 
     try:
-        deleted_count = await delete_error_logs_by_ids(log_ids)
+        deleted_count = await error_log_service.process_delete_error_logs_by_ids(
+            log_ids
+        )
         # 注意：异步函数返回的是尝试删除的数量，可能不是精确值
-        logger.info(f"Attempted bulk deletion for {deleted_count} error logs with IDs: {log_ids}")
+        logger.info(
+            f"Attempted bulk deletion for {deleted_count} error logs with IDs: {log_ids}"
+        )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
         logger.exception(f"Error bulk deleting error logs with IDs {log_ids}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error during bulk deletion")
+        raise HTTPException(
+            status_code=500, detail="Internal server error during bulk deletion"
+        )
 
 
 @router.delete("/errors/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_error_log_api(
-    request: Request,
-    log_id: int = Path(..., ge=1)
-):
+async def delete_error_log_api(request: Request, log_id: int = Path(..., ge=1)):
     """
     删除单个错误日志 (异步)
     """
@@ -168,14 +194,18 @@ async def delete_error_log_api(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        success = await delete_error_log_by_id(log_id)
+        success = await error_log_service.process_delete_error_log_by_id(log_id)
         if not success:
             # 服务层现在在未找到时返回 False，我们在这里转换为 404
-            raise HTTPException(status_code=404, detail=f"Error log with ID {log_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Error log with ID {log_id} not found"
+            )
         logger.info(f"Successfully deleted error log with ID: {log_id}")
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
         logger.exception(f"Error deleting error log with ID {log_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error during deletion")
+        raise HTTPException(
+            status_code=500, detail="Internal server error during deletion"
+        )

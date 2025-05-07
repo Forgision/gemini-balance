@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from app.core.security import verify_auth_token
-from app.scheduler.key_checker import start_scheduler, stop_scheduler
+from app.scheduler.scheduled_tasks import start_scheduler, stop_scheduler
 from app.log.logger import get_scheduler_routes
 
 logger = get_scheduler_routes()
