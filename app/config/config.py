@@ -5,7 +5,7 @@ import datetime
 import json
 from typing import List, Any, Dict, Type
 
-from pydantic import ValidationError
+from pydantic import ValidationError, validator
 from pydantic_settings import BaseSettings
 from sqlalchemy import insert, update, select
 
@@ -15,13 +15,23 @@ from app.log.logger import Logger
 
 class Settings(BaseSettings):
     # 数据库配置
-    MYSQL_HOST: str
-    MYSQL_PORT: int
-    MYSQL_USER: str
-    MYSQL_PASSWORD: str
-    MYSQL_DATABASE: str
+    DATABASE_TYPE: str = "mysql"  # sqlite 或 mysql
+    SQLITE_DATABASE: str = "default_db"
+    MYSQL_HOST: str = ""
+    MYSQL_PORT: int = 3306
+    MYSQL_USER: str = ""
+    MYSQL_PASSWORD: str = ""
+    MYSQL_DATABASE: str = ""
     MYSQL_SOCKET: str = ""
     
+    # 验证 MySQL 配置
+    @validator('MYSQL_HOST', 'MYSQL_PORT', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE')
+    def validate_mysql_config(cls, v, values):
+        if values.get('DATABASE_TYPE') == 'mysql':
+            if v is None or v == "":
+                raise ValueError(f"MySQL configuration is required when DATABASE_TYPE is 'mysql'")
+        return v
+
     # API相关配置
     API_KEYS: List[str]
     ALLOWED_TOKENS: List[str]
