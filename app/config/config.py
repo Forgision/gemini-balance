@@ -274,6 +274,12 @@ async def sync_initial_settings():
         updated_in_memory = False
 
         for key, db_value in db_settings_map.items():
+            if key == "DATABASE_TYPE":
+                logger.debug(
+                    f"Skipping update of '{key}' in memory from database. "
+                    "This setting is controlled by environment/dotenv."
+                )
+                continue
             if hasattr(settings, key):
                 target_type = Settings.__annotations__.get(key)
                 if target_type:
@@ -342,6 +348,13 @@ async def sync_initial_settings():
         existing_db_keys = set(db_settings_map.keys())
 
         for key, value in final_memory_settings.items():
+            if key == "DATABASE_TYPE":
+                logger.debug(
+                    f"Skipping synchronization of '{key}' to database. "
+                    "This setting is controlled by environment/dotenv."
+                )
+                continue
+
             # 序列化值为字符串或 JSON 字符串
             if isinstance(value, (list, dict)):  # 处理列表和字典
                 db_value = json.dumps(
