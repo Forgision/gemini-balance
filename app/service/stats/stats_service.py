@@ -41,7 +41,7 @@ class StatsService:
                             ),
                             1,
                         ),
-                        (RequestLog.status_code == None, 1),  # type: ignore
+                        (RequestLog.status_code is None, 1),  # type: ignore
                         else_=0,
                     )
                 ).label("failure"),
@@ -96,7 +96,7 @@ class StatsService:
                             ),
                             1,
                         ),
-                        (RequestLog.status_code == None, 1),  # type: ignore
+                        (RequestLog.status_code is None, 1),  # type: ignore
                         else_=0,
                     )
                 ).label("failure"),
