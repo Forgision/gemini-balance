@@ -630,6 +630,15 @@ async function initConfig() {
     }
     // --- 结束：处理自动删除请求日志配置的默认值 ---
 
+    // --- 新增：处理假流式配置的默认值 ---
+    if (typeof config.FAKE_STREAM_ENABLED === "undefined") {
+      config.FAKE_STREAM_ENABLED = false;
+    }
+    if (typeof config.FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS === "undefined") {
+      config.FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS = 5;
+    }
+    // --- 结束：处理假流式配置的默认值 ---
+
     populateForm(config);
     // After populateForm, initialize masking for all populated sensitive fields
     if (configForm) {
@@ -664,6 +673,10 @@ async function initConfig() {
       AUTO_DELETE_ERROR_LOGS_DAYS: 7, // 新增默认值
       AUTO_DELETE_REQUEST_LOGS_ENABLED: false, // 新增默认值
       AUTO_DELETE_REQUEST_LOGS_DAYS: 30, // 新增默认值
+      // --- 新增：处理假流式配置的默认值 ---
+      FAKE_STREAM_ENABLED: false,
+      FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS: 5,
+      // --- 结束：处理假流式配置的默认值 ---
     };
 
     populateForm(defaultConfig);
@@ -866,6 +879,26 @@ function populateForm(config) {
     });
   }
   // --- 结束：处理自动删除请求日志的字段 ---
+
+  // --- 新增：处理假流式配置的字段 ---
+  const fakeStreamEnabledCheckbox = document.getElementById(
+    "FAKE_STREAM_ENABLED"
+  );
+  const fakeStreamIntervalInput = document.getElementById(
+    "FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS"
+  );
+
+  if (fakeStreamEnabledCheckbox && fakeStreamIntervalInput) {
+    fakeStreamEnabledCheckbox.checked = !!config.FAKE_STREAM_ENABLED;
+    fakeStreamIntervalInput.value =
+      config.FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS || 5;
+    // 根据复选框状态设置输入框的禁用状态 (如果需要)
+    // fakeStreamIntervalInput.disabled = !fakeStreamEnabledCheckbox.checked;
+    // fakeStreamEnabledCheckbox.addEventListener("change", function () {
+    //   fakeStreamIntervalInput.disabled = !this.checked;
+    // });
+  }
+  // --- 结束：处理假流式配置的字段 ---
 }
 
 /**
@@ -1460,6 +1493,24 @@ function collectFormData() {
     );
   }
   // --- 结束：收集自动删除请求日志的配置 ---
+
+  // --- 新增：收集假流式配置 ---
+  const fakeStreamEnabledCheckbox = document.getElementById(
+    "FAKE_STREAM_ENABLED"
+  );
+  if (fakeStreamEnabledCheckbox) {
+    formData["FAKE_STREAM_ENABLED"] = fakeStreamEnabledCheckbox.checked;
+  }
+  const fakeStreamIntervalInput = document.getElementById(
+    "FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS"
+  );
+  if (fakeStreamIntervalInput) {
+    formData["FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS"] = parseInt(
+      fakeStreamIntervalInput.value,
+      10
+    );
+  }
+  // --- 结束：收集假流式配置 ---
 
   return formData;
 }

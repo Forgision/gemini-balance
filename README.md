@@ -128,7 +128,7 @@ app/
 1. **确保已完成准备工作**:
     * 克隆仓库到本地。
     * 安装 Python 3.9 或更高版本。
-    * 在项目根目录下创建并配置好 `.env` 文件 (参考前面的“配置环境变量”部分)。
+    * 在项目根目录下创建并配置好 `.env` 文件 (参考前面的"配置环境变量"部分)。
     * 安装项目依赖：
 
         ```bash
@@ -204,6 +204,9 @@ app/
 | `STREAM_SHORT_TEXT_THRESHOLD`| 可选，短文本阈值                                               | `10`                                                  |
 | `STREAM_LONG_TEXT_THRESHOLD` | 可选，长文本阈值                                               | `50`                                                  |
 | `STREAM_CHUNK_SIZE`          | 可选，流式输出块大小                                           | `5`                                                   |
+| **伪流式 (Fake Stream) 相关** |                                                          |                                                       |
+| `FAKE_STREAM_ENABLED`        | 可选，是否启用伪流式传输，用于不支持流式的模型或场景           | `false`                                               |
+| `FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS` | 可选，伪流式传输时发送心跳空数据的间隔秒数                   | `5`                                                   |
 
 ## ⚙️ API 端点
 
