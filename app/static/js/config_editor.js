@@ -1070,7 +1070,7 @@ function createArrayInput(key, value, isSensitive, modelId = null) {
   input.type = "text";
   input.name = `${key}[]`; // Used for form submission if not handled by JS
   input.value = value;
-  let inputClasses = `${ARRAY_INPUT_CLASS} flex-grow px-3 py-2 border-none rounded-l-md focus:outline-none`;
+  let inputClasses = `${ARRAY_INPUT_CLASS} flex-grow px-3 py-2 border-none rounded-l-md focus:outline-none form-input-themed`;
   if (isSensitive) {
     inputClasses += ` ${SENSITIVE_INPUT_CLASS}`;
   }
@@ -1153,7 +1153,10 @@ function addArrayItemWithValue(key, value) {
 
   const inputWrapper = document.createElement("div");
   inputWrapper.className =
-    "flex items-center flex-grow border border-gray-300 rounded-md focus-within:border-primary-500 focus-within:ring focus-within:ring-primary-200 focus-within:ring-opacity-50";
+    "flex items-center flex-grow rounded-md focus-within:border-violet-400 focus-within:ring focus-within:ring-violet-400 focus-within:ring-opacity-50";
+  // Apply themed border directly via style, and ensure it has a border
+  inputWrapper.style.border = "1px solid rgba(120, 100, 200, 0.5)";
+  inputWrapper.style.backgroundColor = "transparent"; // Ensure wrapper is transparent
 
   const input = createArrayInput(
     key,
@@ -1682,7 +1685,7 @@ function addSafetySettingItem(category = "", threshold = "") {
 
   const categorySelect = document.createElement("select");
   categorySelect.className =
-    "safety-category-select flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50 bg-white";
+    "safety-category-select flex-grow px-3 py-2 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50 form-select-themed";
   harmCategories.forEach((cat) => {
     const option = document.createElement("option");
     option.value = cat;
@@ -1693,7 +1696,7 @@ function addSafetySettingItem(category = "", threshold = "") {
 
   const thresholdSelect = document.createElement("select");
   thresholdSelect.className =
-    "safety-threshold-select w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50 bg-white";
+    "safety-threshold-select w-48 px-3 py-2 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50 form-select-themed";
   harmThresholds.forEach((thr) => {
     const option = document.createElement("option");
     option.value = thr;

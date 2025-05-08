@@ -172,6 +172,10 @@ app/
 | `TIME_OUT`                   | 可选，请求超时时间 (秒)                                        | `300`                                                 |
 | `PROXIES`                    | 可选，代理服务器列表 (例如 `http://user:pass@host:port`, `socks5://host:port`) | `[]`                                                  |
 | `LOG_LEVEL`                  | 可选，日志级别，例如 DEBUG, INFO, WARNING, ERROR, CRITICAL     | `INFO`                                                |
+| `AUTO_DELETE_ERROR_LOGS_ENABLED` | 可选，是否开启自动删除错误日志                                 | `true`                                                |
+| `AUTO_DELETE_ERROR_LOGS_DAYS`  | 可选，自动删除多少天前的错误日志 (例如 1, 7, 30)             | `7`                                                   |
+| `AUTO_DELETE_REQUEST_LOGS_ENABLED`| 可选，是否开启自动删除请求日志                               | `false`                                               |
+| `AUTO_DELETE_REQUEST_LOGS_DAYS` | 可选，自动删除多少天前的请求日志 (例如 1, 7, 30)           | `30`                                                  |
 | `SAFETY_SETTINGS`            | 可选，安全设置 (JSON 字符串格式)，用于配置内容安全阈值。示例值可能需要根据实际模型支持情况调整。 | `[{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "OFF"}, {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "OFF"}, {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "OFF"}, {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "OFF"}, {"category": "HARM_CATEGORY_CIVIC_INTEGRITY", "threshold": "BLOCK_NONE"}]` |
 | **图像生成相关**             |                                                          |                                                       |
 | `PAID_KEY`                   | 可选，付费版API Key，用于图片生成等高级功能                    | `your-paid-api-key`                                   |
