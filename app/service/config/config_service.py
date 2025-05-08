@@ -126,6 +126,78 @@ class ConfigService:
         return await ConfigService.get_config()
 
     @staticmethod
+    async def delete_key(key_to_delete: str) -> Dict[str, Any]:
+        """删除单个API密钥"""
+        # 确保 settings.API_KEYS 是一个列表
+        if not isinstance(settings.API_KEYS, list):
+            settings.API_KEYS = []
+
+        original_keys_count = len(settings.API_KEYS)
+        # 创建一个不包含待删除密钥的新列表
+        updated_api_keys = [k for k in settings.API_KEYS if k != key_to_delete]
+
+        if len(updated_api_keys) < original_keys_count:
+            # 密钥已找到并从列表中移除
+            settings.API_KEYS = updated_api_keys  # 首先更新内存中的 settings
+            # 使用 update_config 持久化更改，它同时处理数据库和 KeyManager
+            await ConfigService.update_config({"API_KEYS": settings.API_KEYS})
+            logger.info(f"密钥 '{key_to_delete}' 已成功删除。")
+            return {"success": True, "message": f"密钥 '{key_to_delete}' 已成功删除。"}
+        else:
+            # 未找到密钥
+            logger.warning(f"尝试删除密钥 '{key_to_delete}'，但未找到该密钥。")
+            return {"success": False, "message": f"未找到密钥 '{key_to_delete}'。"}
+
+    @staticmethod
+    async def delete_selected_keys(keys_to_delete: List[str]) -> Dict[str, Any]:
+        """批量删除选定的API密钥"""
+        if not isinstance(settings.API_KEYS, list):
+            settings.API_KEYS = []
+
+        deleted_count = 0
+        not_found_keys: List[str] = []
+
+        current_api_keys = list(settings.API_KEYS)  # 创建副本以进行修改
+        keys_actually_removed: List[str] = []
+
+        for key_to_del in keys_to_delete:
+            if key_to_del in current_api_keys:
+                current_api_keys.remove(key_to_del)
+                keys_actually_removed.append(key_to_del)
+                deleted_count += 1
+            else:
+                not_found_keys.append(key_to_del)
+
+        if deleted_count > 0:
+            settings.API_KEYS = current_api_keys  # 更新内存中的 settings
+            await ConfigService.update_config({"API_KEYS": settings.API_KEYS})
+            logger.info(
+                f"成功删除 {deleted_count} 个密钥。密钥: {keys_actually_removed}"
+            )
+            message = f"成功删除 {deleted_count} 个密钥。"
+            if not_found_keys:
+                message += f" {len(not_found_keys)} 个密钥未找到: {not_found_keys}。"
+            return {
+                "success": True,
+                "message": message,
+                "deleted_count": deleted_count,
+                "not_found_keys": not_found_keys,
+            }
+        else:
+            message = "没有密钥被删除。"
+            if not_found_keys:  # 如果提供了密钥但都未找到
+                message = f"所有 {len(not_found_keys)} 个指定的密钥均未找到: {not_found_keys}。"
+            elif not keys_to_delete:  # 如果 keys_to_delete 列表为空
+                message = "未指定要删除的密钥。"
+            logger.warning(message)
+            return {
+                "success": False,
+                "message": message,
+                "deleted_count": 0,
+                "not_found_keys": not_found_keys,
+            }
+
+    @staticmethod
     async def reset_config() -> Dict[str, Any]:
         """
         重置配置：优先从系统环境变量加载，然后从 .env 文件加载，

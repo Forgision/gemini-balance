@@ -802,6 +802,13 @@ endblock %} {% block head_extra_styles %}
         >
           <i class="fas fa-copy"></i> 批量复制
         </button>
+        <button
+          class="flex items-center gap-2 bg-red-800 hover:bg-red-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          onclick="event.stopPropagation(); showDeleteConfirmationModal('valid', event)"
+          disabled
+        >
+          <i class="fas fa-trash-alt"></i> 批量删除
+        </button>
       </div>
 
       <div class="key-content p-4 bg-white bg-opacity-40">
@@ -881,6 +888,13 @@ endblock %} {% block head_extra_styles %}
                   >
                     <i class="fas fa-chart-pie"></i>
                     详情
+                  </button>
+                  <button
+                    class="flex items-center gap-1 bg-red-800 hover:bg-red-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200"
+                    onclick="showSingleKeyDeleteConfirmModal('{{ key }}', this)"
+                  >
+                    <i class="fas fa-trash-alt"></i>
+                    删除
                   </button>
                 </div>
               </div>
@@ -972,6 +986,13 @@ endblock %} {% block head_extra_styles %}
         >
           <i class="fas fa-copy"></i> 批量复制
         </button>
+        <button
+          class="flex items-center gap-2 bg-red-800 hover:bg-red-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          onclick="event.stopPropagation(); showDeleteConfirmationModal('invalid', event)"
+          disabled
+        >
+          <i class="fas fa-trash-alt"></i> 批量删除
+        </button>
       </div>
 
       <div class="key-content p-4 bg-white bg-opacity-40">
@@ -1049,6 +1070,13 @@ endblock %} {% block head_extra_styles %}
                   >
                     <i class="fas fa-chart-pie"></i>
                     详情
+                  </button>
+                  <button
+                    class="flex items-center gap-1 bg-red-800 hover:bg-red-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200"
+                    onclick="showSingleKeyDeleteConfirmModal('{{ key }}', this)"
+                  >
+                    <i class="fas fa-trash-alt"></i>
+                    删除
                   </button>
                 </div>
               </div>
@@ -1131,33 +1159,150 @@ endblock %} {% block head_extra_styles %}
 >
   <div
     class="bg-white rounded-lg p-6 shadow-xl max-w-md w-full animate-fade-in"
+    style="
+      background-color: rgba(70, 50, 150, 0.95);
+      color: #ffffff;
+      border-color: rgba(120, 100, 200, 0.4);
+    "
   >
     <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-semibold text-gray-800" id="verifyModalTitle">
+      <h3
+        class="text-lg font-semibold"
+        id="verifyModalTitle"
+        style="
+          color: #ffffff;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          font-weight: 600;
+        "
+      >
         批量验证密钥
       </h3>
       <button
         onclick="closeVerifyModal()"
-        class="text-gray-500 hover:text-gray-700 focus:outline-none"
+        class="text-gray-300 hover:text-white focus:outline-none"
       >
         <i class="fas fa-times"></i>
       </button>
     </div>
     <div class="mb-6">
-      <p class="text-gray-600" id="verifyModalMessage"></p>
+      <p style="color: #f8fafc" id="verifyModalMessage"></p>
     </div>
     <div class="flex justify-end gap-3">
       <button
         onclick="closeVerifyModal()"
-        class="px-3 py-1.5 text-xs font-medium bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-colors"
+        class="px-3 py-1.5 text-xs font-medium bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors"
       >
         取消
       </button>
       <button
         id="confirmVerifyBtn"
-        class="px-3 py-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors"
+        class="px-3 py-1.5 text-xs font-medium bg-teal-700 hover:bg-teal-800 text-white rounded-lg transition-colors"
       >
         确认验证
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认模态框 -->
+<div
+  id="deleteConfirmModal"
+  class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"
+>
+  <div
+    class="bg-white rounded-lg p-6 shadow-xl max-w-md w-full animate-fade-in"
+    style="
+      background-color: rgba(70, 50, 150, 0.95);
+      color: #ffffff;
+      border-color: rgba(120, 100, 200, 0.4);
+    "
+  >
+    <div class="flex items-center justify-between mb-4">
+      <h3
+        class="text-lg font-semibold"
+        id="deleteConfirmModalTitle"
+        style="
+          color: #ffffff;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          font-weight: 600;
+        "
+      >
+        确认删除
+      </h3>
+      <button
+        onclick="closeDeleteConfirmationModal()"
+        class="text-gray-300 hover:text-white focus:outline-none"
+      >
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="mb-6">
+      <p style="color: #f8fafc" id="deleteConfirmModalMessage"></p>
+    </div>
+    <div class="flex justify-end gap-3">
+      <button
+        onclick="closeDeleteConfirmationModal()"
+        class="px-3 py-1.5 text-xs font-medium bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors"
+      >
+        取消
+      </button>
+      <button
+        id="confirmDeleteBtn"
+        class="px-3 py-1.5 text-xs font-medium bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors"
+      >
+        确认删除
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 新增：单个密钥删除确认模态框 -->
+<div
+  id="singleKeyDeleteConfirmModal"
+  class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"
+>
+  <div
+    class="rounded-lg p-6 shadow-xl max-w-md w-full animate-fade-in"
+    style="
+      background-color: rgba(70, 50, 150, 0.95);
+      color: #ffffff;
+      border-color: rgba(120, 100, 200, 0.4);
+    "
+  >
+    <div class="flex items-center justify-between mb-4">
+      <h3
+        class="text-lg font-semibold"
+        id="singleKeyDeleteConfirmModalTitle"
+        style="
+          color: #ffffff;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          font-weight: 600;
+        "
+      >
+        确认删除密钥
+      </h3>
+      <button
+        onclick="closeSingleKeyDeleteConfirmModal()"
+        class="text-gray-300 hover:text-white focus:outline-none"
+      >
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="mb-6">
+      <p style="color: #f8fafc" id="singleKeyDeleteConfirmModalMessage"></p>
+    </div>
+    <div class="flex justify-end gap-3">
+      <button
+        onclick="closeSingleKeyDeleteConfirmModal()"
+        class="px-3 py-1.5 text-xs font-medium bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors"
+      >
+        取消
+      </button>
+      <button
+        id="confirmSingleKeyDeleteBtn"
+        class="px-3 py-1.5 text-xs font-medium bg-red-700 hover:bg-red-800 text-white rounded-lg transition-colors"
+      >
+        确认删除
       </button>
     </div>
   </div>

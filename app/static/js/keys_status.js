@@ -1235,6 +1235,162 @@ document.addEventListener("DOMContentLoaded", () => {
   // updateBatchActions('valid');
   // updateBatchActions('invalid');
 });
+
+// --- 新增：删除密钥相关功能 ---
+
+// 新版：显示单个密钥删除确认模态框
+function showSingleKeyDeleteConfirmModal(key, button) {
+  const modalElement = document.getElementById("singleKeyDeleteConfirmModal");
+  const titleElement = document.getElementById(
+    "singleKeyDeleteConfirmModalTitle"
+  );
+  const messageElement = document.getElementById(
+    "singleKeyDeleteConfirmModalMessage"
+  );
+  const confirmButton = document.getElementById("confirmSingleKeyDeleteBtn");
+
+  const keyDisplay =
+    key.substring(0, 4) + "..." + key.substring(key.length - 4);
+  titleElement.textContent = "确认删除密钥";
+  messageElement.innerHTML = `确定要删除密钥 <span class="font-mono text-amber-300 font-semibold">${keyDisplay}</span> 吗？<br>此操作无法撤销。`;
+
+  // 移除旧的监听器并重新附加，以确保 key 和 button 参数是最新的
+  const newConfirmButton = confirmButton.cloneNode(true);
+  confirmButton.parentNode.replaceChild(newConfirmButton, confirmButton);
+
+  newConfirmButton.onclick = () => executeSingleKeyDelete(key, button);
+
+  modalElement.classList.remove("hidden");
+}
+
+// 新版：关闭单个密钥删除确认模态框
+function closeSingleKeyDeleteConfirmModal() {
+  document
+    .getElementById("singleKeyDeleteConfirmModal")
+    .classList.add("hidden");
+}
+
+// 新版：执行单个密钥删除
+async function executeSingleKeyDelete(key, button) {
+  closeSingleKeyDeleteConfirmModal();
+
+  button.disabled = true;
+  const originalHtml = button.innerHTML;
+  // 使用字体图标，确保一致性
+  button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>删除中';
+
+  try {
+    const response = await fetchAPI(`/api/config/keys/${key}`, {
+      method: "DELETE",
+    });
+
+    if (response.success) {
+      // 使用 resultModal 并确保刷新
+      showResultModal(true, response.message || "密钥删除成功", true);
+    } else {
+      // 使用 resultModal，失败时不刷新，以便用户看到错误信息
+      showResultModal(false, response.message || "密钥删除失败", false);
+      button.innerHTML = originalHtml;
+      button.disabled = false;
+    }
+  } catch (error) {
+    console.error("删除密钥 API 请求失败:", error);
+    showResultModal(false, `删除密钥请求失败: ${error.message}`, false);
+    button.innerHTML = originalHtml;
+    button.disabled = false;
+  }
+}
+
+// 显示批量删除确认模态框
+function showDeleteConfirmationModal(type, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const modalElement = document.getElementById("deleteConfirmModal");
+  const titleElement = document.getElementById("deleteConfirmModalTitle");
+  const messageElement = document.getElementById("deleteConfirmModalMessage");
+  const confirmButton = document.getElementById("confirmDeleteBtn");
+
+  const selectedKeys = getSelectedKeys(type);
+  const count = selectedKeys.length;
+
+  titleElement.textContent = "确认批量删除";
+  if (count > 0) {
+    messageElement.textContent = `确定要批量删除选中的 ${count} 个${
+      type === "valid" ? "有效" : "无效"
+    }密钥吗？此操作无法撤销。`;
+    confirmButton.disabled = false;
+  } else {
+    // 此情况理论上不应发生，因为批量删除按钮在未选中时是禁用的
+    messageElement.textContent = `请先选择要删除的${
+      type === "valid" ? "有效" : "无效"
+    }密钥。`;
+    confirmButton.disabled = true;
+  }
+
+  confirmButton.onclick = () => executeDeleteSelectedKeys(type);
+  modalElement.classList.remove("hidden");
+}
+
+// 关闭批量删除确认模态框
+function closeDeleteConfirmationModal() {
+  document.getElementById("deleteConfirmModal").classList.add("hidden");
+}
+
+// 执行批量删除
+async function executeDeleteSelectedKeys(type) {
+  closeDeleteConfirmationModal();
+
+  const selectedKeys = getSelectedKeys(type);
+  if (selectedKeys.length === 0) {
+    showNotification("没有选中的密钥可删除", "warning");
+    return;
+  }
+
+  // 找到批量删除按钮并显示加载状态 (假设它在对应类型的 batchActions 中是最后一个按钮)
+  const batchActionsDiv = document.getElementById(`${type}BatchActions`);
+  const deleteButton = batchActionsDiv
+    ? batchActionsDiv.querySelector("button.bg-red-600")
+    : null;
+
+  let originalDeleteBtnHtml = "";
+  if (deleteButton) {
+    originalDeleteBtnHtml = deleteButton.innerHTML;
+    deleteButton.disabled = true;
+    deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 删除中';
+  }
+
+  try {
+    const response = await fetchAPI("/api/config/keys/delete-selected", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keys: selectedKeys }),
+    });
+
+    if (response.success) {
+      // 使用 resultModal 显示更详细的结果
+      const message =
+        response.message ||
+        `成功删除 ${response.deleted_count || selectedKeys.length} 个密钥。`;
+      showResultModal(true, message, true); // true 表示成功，message，true 表示关闭后刷新
+    } else {
+      showResultModal(false, response.message || "批量删除密钥失败", true); // false 表示失败，message，true 表示关闭后刷新
+    }
+  } catch (error) {
+    console.error("批量删除 API 请求失败:", error);
+    showResultModal(false, `批量删除请求失败: ${error.message}`, true);
+  } finally {
+    // resultModal 关闭时会刷新页面，所以通常不需要在这里恢复按钮状态。
+    // 如果不刷新，则需要恢复按钮状态：
+    // if (deleteButton && (!document.getElementById("resultModal") || document.getElementById("resultModal").classList.contains("hidden") || document.getElementById("resultModalTitle").textContent.includes("失败"))) {
+    //   deleteButton.innerHTML = originalDeleteBtnHtml;
+    //   // 按钮的 disabled 状态会在 updateBatchActions 中处理，或者因页面刷新而重置
+    // }
+  }
+}
+
+// --- 结束：删除密钥相关功能 ---
+
 function toggleKeyVisibility(button) {
   const keyContainer = button.closest(".flex.items-center.gap-1");
   const keyTextSpan = keyContainer.querySelector(".key-text");
