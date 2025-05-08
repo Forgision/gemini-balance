@@ -1,17 +1,20 @@
 """
 配置路由模块
 """
+
 from typing import Any, Dict
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from app.core.security import verify_auth_token
-from app.log.logger import get_config_routes_logger, Logger
+from app.log.logger import Logger, get_config_routes_logger
 from app.service.config.config_service import ConfigService
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 logger = get_config_routes_logger()
+
 
 @router.get("", response_model=Dict[str, Any])
 async def get_config(request: Request):
@@ -49,3 +52,23 @@ async def reset_config(request: Request):
         return await ConfigService.reset_config()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/ui/models")
+async def get_ui_models(request: Request):
+    auth_token_cookie = request.cookies.get("auth_token")
+    if not auth_token_cookie or not verify_auth_token(auth_token_cookie):
+        logger.warning("Unauthorized access attempt to /api/config/ui/models")
+        raise HTTPException(status_code=403, detail="Not authenticated")
+
+    try:
+        models = await ConfigService.fetch_ui_models()
+        return models
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error in /ui/models endpoint: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred while fetching UI models: {str(e)}",
+        )
