@@ -91,6 +91,12 @@ app/
     * `-p 8000:8000`: 将容器的 8000 端口映射到主机的 8000 端口。
     * `--env-file .env`: 使用 `.env` 文件设置环境变量。
 
+    > 注意：如果使用 SQLite 数据库，需要挂载数据卷以持久化数据：
+    > ```bash
+    > docker run -d -p 8000:8000 --env-file .env -v /path/to/data:/app/data gemini-balance
+    > ```
+    > 其中 `/path/to/data` 是主机上的数据存储路径，`/app/data` 是容器内的数据目录。
+
 #### b) 用现有的docker镜像部署
 
 1. **拉取镜像**:
@@ -108,6 +114,12 @@ app/
    * `-d`: 后台运行。
    * `-p 8000:8000`: 将容器的 8000 端口映射到主机的 8000 端口 (根据需要调整)。
    * `--env-file .env`: 使用 `.env` 文件设置环境变量 (确保 `.env` 文件存在于执行命令的目录)。
+
+    > 注意：如果使用 SQLite 数据库，需要挂载数据卷以持久化数据：
+    > ```bash
+    > docker run -d -p 8000:8000 --env-file .env -v /path/to/data:/app/data ghcr.io/snailyp/gemini-balance:latest
+    > ```
+    > 其中 `/path/to/data` 是主机上的数据存储路径，`/app/data` 是容器内的数据目录。
 
 ### 本地运行 (适用于开发和测试)
 
