@@ -268,7 +268,7 @@ class OpenAIChatService:
                         "model": model,
                         "choices": [{"index": 0, "delta": {}, "finish_reason": None}],
                     }
-                    yield f"data: {json.dumps(empty_chunk)}\n\\n"
+                    yield f"data: {json.dumps(empty_chunk)}\n\n"
                     logger.debug("Sent empty data chunk for fake stream heartbeat.")
 
         empty_data_generator = send_empty_data_locally()
@@ -323,7 +323,7 @@ class OpenAIChatService:
                     base_chunk_for_text, full_text
                 )
                 final_chunk["choices"][0]["finish_reason"] = "stop"
-                yield f"data: {json.dumps(final_chunk)}\n\\n"
+                yield f"data: {json.dumps(final_chunk)}\n\n"
                 logger.info(f"Sent full response content for fake stream: {model}")
             else:
                 logger.warning(
@@ -334,7 +334,7 @@ class OpenAIChatService:
                     base_chunk_for_empty, ""
                 )
                 empty_final_chunk["choices"][0]["finish_reason"] = "stop"
-                yield f"data: {json.dumps(empty_final_chunk)}\n\\n"
+                yield f"data: {json.dumps(empty_final_chunk)}\n\n"
         else:
             error_message = "Failed to get response from model"
             if (
@@ -353,7 +353,7 @@ class OpenAIChatService:
                 base_chunk_for_error, json.dumps({"error": error_message})
             )
             error_chunk["choices"][0]["finish_reason"] = "stop"
-            yield f"data: {json.dumps(error_chunk)}\n\\n"
+            yield f"data: {json.dumps(error_chunk)}\n\n"
 
     async def _real_stream_logic_impl(
         self, model: str, payload: Dict[str, Any], api_key: str
@@ -389,7 +389,7 @@ class OpenAIChatService:
                         ) in openai_optimizer.optimize_stream_output(
                             text,
                             lambda t: self._create_char_openai_chunk(openai_chunk, t),
-                            lambda c: f"data: {json.dumps(c)}\n\\n",
+                            lambda c: f"data: {json.dumps(c)}\n\n",
                         ):
                             yield optimized_chunk_data
                     else:
@@ -405,12 +405,12 @@ class OpenAIChatService:
                         ):  # For older compatibility
                             tool_call_flag = True
 
-                        yield f"data: {json.dumps(openai_chunk)}\n\\n"
+                        yield f"data: {json.dumps(openai_chunk)}\n\n"
 
         if tool_call_flag:
-            yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='tool_calls'))}\n\\n"
+            yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='tool_calls'))}\n\n"
         else:
-            yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='stop'))}\n\\n"
+            yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='stop'))}\n\n"
 
     async def _handle_stream_completion(
         self, model: str, payload: Dict[str, Any], api_key: str
@@ -451,7 +451,7 @@ class OpenAIChatService:
 
                 # If the generator completes, it means all its data chunks (including stop/tool_calls) were yielded.
                 # Now, we send the [DONE] marker for the stream.
-                yield "data: [DONE]\n\\n"
+                yield "data: [DONE]\n\n"
                 logger.info(
                     f"Streaming completed successfully for model: {model}, FakeStream: {settings.FAKE_STREAM_ENABLED}, Attempt: {retries + 1}"
                 )
@@ -536,8 +536,8 @@ class OpenAIChatService:
             logger.error(
                 f"Streaming failed permanently for model {model} after {retries} attempts."
             )
-            yield f"data: {json.dumps({'error': f'Streaming failed after {retries} retries.'})}\n\\n"
-            yield "data: [DONE]\n\\n"
+            yield f"data: {json.dumps({'error': f'Streaming failed after {retries} retries.'})}\n\n"
+            yield "data: [DONE]\n\n"
 
     async def create_image_chat_completion(
         self, request: ChatRequest, api_key: str
