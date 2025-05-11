@@ -2,7 +2,7 @@
 Service for request log operations.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete
 
@@ -30,7 +30,7 @@ async def delete_old_request_logs_task():
     )
 
     try:
-        cutoff_date = datetime.now(datetime.timezone.utc) - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
         query = delete(RequestLog).where(RequestLog.request_time < cutoff_date)
 
