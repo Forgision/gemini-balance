@@ -39,7 +39,7 @@ def update_template_globals(app: FastAPI, update_info: dict):
 # --- Helper functions for lifespan ---
 async def _setup_database_and_config(app_settings):
     """Initializes database, syncs settings, and initializes KeyManager."""
-    await initialize_database()
+    initialize_database()
     logger.info("Database initialized successfully")
     await connect_to_db()
     await sync_initial_settings()

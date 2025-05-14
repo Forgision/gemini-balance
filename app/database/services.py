@@ -360,7 +360,38 @@ async def delete_error_log_by_id(log_id: int) -> bool:
     except Exception as e:
         logger.error(f"Error deleting error log with ID {log_id}: {e}", exc_info=True)
         raise
-
+ 
+ 
+async def delete_all_error_logs() -> int:
+    """
+    删除所有错误日志条目。
+ 
+    Returns:
+        int: 被删除的错误日志数量。
+    """
+    try:
+        # 1. 获取删除前的总数
+        count_query = select(func.count()).select_from(ErrorLog)
+        # fetch_val() is suitable here as we expect a single scalar value
+        total_to_delete = await database.fetch_val(count_query)
+ 
+        if total_to_delete == 0:
+            logger.info("No error logs found to delete.")
+            return 0
+ 
+        # 2. 执行删除操作
+        # This creates a query like "DELETE FROM error_log"
+        delete_query = delete(ErrorLog)
+        await database.execute(delete_query)
+        
+        logger.info(f"Successfully deleted all {total_to_delete} error logs.")
+        return total_to_delete
+    except Exception as e:
+        logger.error(f"Failed to delete all error logs: {str(e)}", exc_info=True)
+        # Re-raise the exception so it can be caught by the service layer or route handler
+        raise
+ 
+ 
 # 新增函数：添加请求日志
 async def add_request_log(
     model_name: Optional[str],

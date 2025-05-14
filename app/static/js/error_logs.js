@@ -111,6 +111,8 @@ let cancelDeleteBtn; // 新增：取消删除按钮
 let confirmDeleteBtn; // 新增：确认删除按钮
 let deleteConfirmMessage; // 新增：删除确认消息元素
 let idsToDeleteGlobally = []; // 新增：存储待删除的ID
+let currentConfirmCallback = null; // 新增：存储当前的确认回调
+let deleteAllLogsBtn; // 新增：清空全部按钮
 
 // Helper functions for initialization
 function cacheDOMElements() {
@@ -147,9 +149,10 @@ function cacheDOMElements() {
   cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
   confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
   deleteConfirmMessage = document.getElementById("deleteConfirmMessage");
-}
-
-function initializePageSizeControls() {
+  deleteAllLogsBtn = document.getElementById("deleteAllLogsBtn"); // 缓存清空全部按钮
+ }
+  
+ function initializePageSizeControls() {
   if (pageSizeSelector) {
     pageSizeSelector.value = errorLogState.pageSize;
     pageSizeSelector.addEventListener("change", function () {
@@ -247,9 +250,35 @@ function initializeActionControls() {
   }
   // Bulk selection listeners are closely related to actions
   setupBulkSelectionListeners();
-}
-
-// 页面加载完成后执行
+  
+   // 为 "清空全部" 按钮添加事件监听器
+   if (deleteAllLogsBtn) {
+     deleteAllLogsBtn.addEventListener("click", function() {
+       const message = "您确定要清空所有错误日志吗？此操作不可恢复！";
+       showDeleteConfirmModal(message, handleDeleteAllLogs); // 传入回调
+     });
+   }
+ }
+  
+ // 新增：处理 "清空全部" 逻辑的函数
+ async function handleDeleteAllLogs() {
+   const url = "/api/logs/errors/all";
+   const options = {
+     method: "DELETE",
+   };
+ 
+   try {
+     await fetchAPI(url, options);
+     showNotification("所有错误日志已成功清空", "success");
+     if (selectAllCheckbox) selectAllCheckbox.checked = false; // 取消全选
+     loadErrorLogs(); // 重新加载日志
+   } catch (error) {
+     console.error("清空所有错误日志失败:", error);
+     showNotification(`清空失败: ${error.message}`, "error", 5000);
+   }
+ }
+  
+ // 页面加载完成后执行
 document.addEventListener("DOMContentLoaded", function () {
   cacheDOMElements();
   initializePageSizeControls();
@@ -267,31 +296,33 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // 新增：显示删除确认模态框
-function showDeleteConfirmModal(message) {
+function showDeleteConfirmModal(message, confirmCallback) {
   if (deleteConfirmModal && deleteConfirmMessage) {
     deleteConfirmMessage.textContent = message;
+    currentConfirmCallback = confirmCallback; // 存储回调
     deleteConfirmModal.classList.add("show");
     document.body.style.overflow = "hidden"; // Prevent body scrolling
   }
 }
-
+ 
 // 新增：隐藏删除确认模态框
 function hideDeleteConfirmModal() {
   if (deleteConfirmModal) {
     deleteConfirmModal.classList.remove("show");
     document.body.style.overflow = ""; // Restore body scrolling
     idsToDeleteGlobally = []; // 清空待删除ID
+    currentConfirmCallback = null; // 清除回调
   }
 }
-
+ 
 // 新增：处理确认删除按钮点击
 function handleConfirmDelete() {
-  if (idsToDeleteGlobally.length > 0) {
-    performActualDelete(idsToDeleteGlobally);
+  if (typeof currentConfirmCallback === 'function') {
+    currentConfirmCallback(); // 调用存储的回调
   }
   hideDeleteConfirmModal(); // 关闭模态框
 }
-
+ 
 // Fallback copy function using document.execCommand
 function fallbackCopyTextToClipboard(text) {
   const textArea = document.createElement("textarea");
@@ -553,11 +584,13 @@ function handleDeleteSelected() {
   }
 
   // 存储待删除ID并显示模态框
-  idsToDeleteGlobally = logIdsToDelete;
+  idsToDeleteGlobally = logIdsToDelete; // 仍然需要设置，因为 performActualDelete 会用到
   const message = `确定要删除选中的 ${logIdsToDelete.length} 条日志吗？此操作不可恢复！`;
-  showDeleteConfirmModal(message);
+  showDeleteConfirmModal(message, function() { // 传入匿名回调
+    performActualDelete(idsToDeleteGlobally);
+  });
 }
-
+ 
 // 新增：执行实际的删除操作（提取自原 handleDeleteSelected 和 handleDeleteLogRow）
 async function performActualDelete(logIds) {
   if (!logIds || logIds.length === 0) return;
@@ -599,12 +632,14 @@ function handleDeleteLogRow(logId) {
   if (!logId) return;
 
   // 存储待删除ID并显示模态框
-  idsToDeleteGlobally = [parseInt(logId)]; // 存储为数组
+  idsToDeleteGlobally = [parseInt(logId)]; // 存储为数组 // 仍然需要设置，因为 performActualDelete 会用到
   // 使用通用确认消息，不显示具体ID
   const message = `确定要删除这条日志吗？此操作不可恢复！`;
-  showDeleteConfirmModal(message);
+  showDeleteConfirmModal(message, function() { // 传入匿名回调
+    performActualDelete([parseInt(logId)]); // 确保传递的是数组
+  });
 }
-
+ 
 // 新增：处理 ID 排序点击的函数
 function handleSortById() {
   if (errorLogState.sort.field === "id") {
