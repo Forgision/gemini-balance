@@ -4,7 +4,6 @@
 from pathlib import Path
 from databases import Database
 from sqlalchemy import create_engine, MetaData
-# from sqlalchemy.orm import sessionmaker # 不再需要
 from sqlalchemy.ext.declarative import declarative_base
 
 from app.config.config import settings

@@ -76,7 +76,6 @@ class ConfigService:
             }
 
             if key in existing_keys:
-                # Preserve original description if not explicitly provided
                 data["description"] = existing_settings_map[key].get(
                     "description", description
                 )
@@ -111,7 +110,7 @@ class ConfigService:
                         logger.info(f"Updated {len(settings_to_update)} settings.")
             except Exception as e:
                 logger.error(f"Failed to bulk update/insert settings: {str(e)}")
-                raise  # Re-raise the exception after logging
+                raise
 
         # 重置并重新初始化 KeyManager
         try:
@@ -120,8 +119,6 @@ class ConfigService:
             logger.info("KeyManager instance re-initialized with updated settings.")
         except Exception as e:
             logger.error(f"Failed to re-initialize KeyManager: {str(e)}")
-            # Decide if this error should prevent returning the updated config
-            # For now, we log the error and continue
 
         return await ConfigService.get_config()
 
@@ -244,13 +241,11 @@ class ConfigService:
             models = await model_service.get_gemini_openai_models(api_key)
             return models
         except HTTPException as e:
-            # Re-raise HTTPExceptions directly if they are already specific
             raise e
         except Exception as e:
             logger.error(
                 f"Failed to fetch models for UI in ConfigService: {e}", exc_info=True
             )
-            # Raise a generic HTTPException for other errors
             raise HTTPException(
                 status_code=500, detail=f"Failed to fetch models for UI: {str(e)}"
             )

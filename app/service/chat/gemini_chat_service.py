@@ -144,7 +144,7 @@ class GeminiChatService:
         """生成内容"""
         payload = _build_payload(model, request)
         start_time = time.perf_counter()
-        request_datetime = datetime.datetime.now() # Record request time
+        request_datetime = datetime.datetime.now()
         is_success = False
         status_code = None
         response = None
@@ -152,20 +152,18 @@ class GeminiChatService:
         try:
             response = await self.api_client.generate_content(payload, model, api_key)
             is_success = True
-            status_code = 200 # Assume 200 on success
+            status_code = 200
             return self.response_handler.handle_response(response, model, stream=False)
         except Exception as e:
             is_success = False
             error_log_msg = str(e)
             logger.error(f"Normal API call failed with error: {error_log_msg}")
-            # Try to parse status code from exception
             match = re.search(r"status code (\d+)", error_log_msg)
             if match:
                 status_code = int(match.group(1))
             else:
-                status_code = 500 # Default to 500 if parsing fails
+                status_code = 500
 
-            # Log error to error log table
             await add_error_log(
                 gemini_key=api_key,
                 model_name=model,
@@ -174,11 +172,10 @@ class GeminiChatService:
                 error_code=status_code,
                 request_msg=payload
             )
-            raise e # Re-throw exception for upstream handling
+            raise e
         finally:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
-            # Log request to request log table
             await add_request_log(
                 model_name=model,
                 api_key=api_key,
@@ -240,16 +237,14 @@ class GeminiChatService:
                 logger.warning(
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
                 )
-                # Parse error code for logging
                 match = re.search(r"status code (\d+)", error_log_msg)
                 if match:
                     status_code = int(match.group(1))
                 else:
                     status_code = 500
 
-                # Log error to error log table
                 await add_error_log(
-                    gemini_key=current_attempt_key, # Log key used for this failed attempt
+                    gemini_key=current_attempt_key,
                     model_name=model,
                     error_type="gemini-chat-stream",
                     error_log=error_log_msg,
@@ -257,28 +252,26 @@ class GeminiChatService:
                     request_msg=payload
                 )
 
-                # Attempt to switch API Key
                 api_key = await self.key_manager.handle_api_failure(current_attempt_key, retries)
                 if api_key:
                     logger.info(f"Switched to new API key: {api_key}")
-                else: # No more keys or retries exceeded by handle_api_failure logic
-                        logger.error(f"No valid API key available after {retries} retries.")
-                        break # Exit loop if no key available
+                else:
+                    logger.error(f"No valid API key available after {retries} retries.")
+                    break
 
                 if retries >= max_retries:
                     logger.error(
                         f"Max retries ({max_retries}) reached for streaming."
                     )
-                    break # Exit loop after max retries
+                    break
             finally:
-                # Log the final outcome of the streaming request
                 end_time = time.perf_counter()
                 latency_ms = int((end_time - start_time) * 1000)
                 await add_request_log(
                     model_name=model,
-                    api_key=final_api_key, # Log the last key used
-                    is_success=is_success, # Log the final success status
-                    status_code=status_code, # Log the last known status code
-                    latency_ms=latency_ms, # Log total time including retries
+                    api_key=final_api_key,
+                    is_success=is_success,
+                    status_code=status_code,
+                    latency_ms=latency_ms,
                     request_time=request_datetime
                 )

@@ -121,9 +121,9 @@ settings = Settings()
 
 def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
     """尝试将数据库字符串值解析为目标 Python 类型"""
-    from app.log.logger import get_config_logger  # 函数内导入
+    from app.log.logger import get_config_logger
 
-    logger = get_config_logger()  # 函数内初始化
+    logger = get_config_logger()
     try:
         # 处理 List[str]
         if target_type == List[str]:
@@ -234,9 +234,9 @@ async def sync_initial_settings():
     2. 将数据库设置合并到内存 settings (数据库优先)。
     3. 将最终的内存 settings 同步回数据库。
     """
-    from app.log.logger import get_config_logger  # 函数内导入
+    from app.log.logger import get_config_logger
 
-    logger = get_config_logger()  # 函数内初始化
+    logger = get_config_logger()
     # 延迟导入以避免循环依赖和确保数据库连接已初始化
     from app.database.connection import database
     from app.database.models import Settings as SettingsModel
@@ -360,14 +360,14 @@ async def sync_initial_settings():
                 continue
 
             # 序列化值为字符串或 JSON 字符串
-            if isinstance(value, (list, dict)):  # 处理列表和字典
+            if isinstance(value, (list, dict)):
                 db_value = json.dumps(
                     value, ensure_ascii=False
-                )  # 使用 ensure_ascii=False 以支持非 ASCII 字符
+                )
             elif isinstance(value, bool):
                 db_value = str(value).lower()
-            elif value is None:  # 处理 None 值
-                db_value = ""  # 或者根据需要设为 NULL 或其他标记
+            elif value is None:
+                db_value = ""
             else:
                 db_value = str(value)
 

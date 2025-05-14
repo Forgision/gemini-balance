@@ -42,11 +42,12 @@ class ErrorLog(Base):
     def __repr__(self):
         return f"<ErrorLog(id='{self.id}', gemini_key='{self.gemini_key}')>"
 
-# 新增 RequestLog 模型
+
 class RequestLog(Base):
     """
     API 请求日志表
     """
+
     __tablename__ = "t_request_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
