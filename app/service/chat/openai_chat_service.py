@@ -51,7 +51,7 @@ def _build_tools(
             or model.endswith("-image")
             or model.endswith("-image-generation")
         )
-        and not _has_media_parts(messages)  # Use the updated check
+        and not _has_media_parts(messages)
     ):
         tool["codeExecution"] = {}
         logger.debug("Code execution tool enabled.")
