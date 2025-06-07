@@ -426,26 +426,31 @@ endblock %} {% block head_extra_styles %}
     color: #dc2626 !important; /* 深红色文本 */
   }
 
-  /* 失败列表中的 "收起/展开" 按钮 */
+  /* 失败列表中的 "收起/展开" 按钮 - 协调的红色主题设计 */
   #resultModalMessage ul[class*="bg-red-50"] li button[class*="bg-red-200"] {
-    background-color: rgba(185, 28, 28, 0.4) !important; /* 深红色按钮背景 */
-    color: #fee2e2 !important; /* 浅红色按钮文本 */
-    border: 1px solid rgba(220, 38, 38, 0.6) !important; /* 按钮边框 */
+    background-color: #dc2626 !important; /* 深红色按钮背景，与外框协调 */
+    color: #ffffff !important; /* 白色按钮文本 */
+    border: 1px solid #b91c1c !important; /* 更深的红色边框 */
     box-shadow: none !important;
+    font-weight: 500 !important; /* 增强文字粗细以提高可读性 */
   }
   #resultModalMessage
     ul[class*="bg-red-50"]
     li
     button[class*="bg-red-200"]:hover {
-    background-color: rgba(200, 38, 38, 0.55) !important; /* 悬停时按钮背景 */
-    color: #fef2f2 !important; /* 悬停时按钮文本 */
+    background-color: #b91c1c !important; /* 悬停时更深的红色背景 */
+    color: #ffffff !important; /* 悬停时白色按钮文本 */
+    transform: translateY(-1px) !important; /* 轻微上移效果 */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important; /* 悬停阴影效果 */
   }
 
-  /* 失败列表中的错误详情框 */
+  /* 失败列表中的错误详情框 - 与红色主题协调的样式 */
   #resultModalMessage ul[class*="bg-red-50"] li div[id^="error-details-"] {
-    background-color: rgba(153, 27, 27, 0.35) !important; /* 错误详情深色背景 */
-    border-color: rgba(185, 28, 28, 0.5) !important; /* 错误详情边框 */
-    color: #fca5a5 !important; /* 错误详情浅红色文本 */
+    background-color: rgba(254, 242, 242, 0.8) !important; /* 更浅的红色背景，与外框协调 */
+    border-color: rgba(248, 113, 113, 0.3) !important; /* 浅红色边框 */
+    color: #7f1d1d !important; /* 深红色文本，确保良好对比度 */
+    font-weight: 500 !important; /* 增强文字粗细以提高可读性 */
+    line-height: 1.5 !important; /* 改善行高以提高可读性 */
   }
 
   /* 密钥使用详情模态框内表格表头样式 */
