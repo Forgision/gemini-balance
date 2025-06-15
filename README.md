@@ -264,10 +264,6 @@ Thanks to all developers who contributed to this project!
 
 If you find this project helpful, consider supporting me via [Afdian](https://afdian.com/a/snaily).
 
-## VPS Recommend
-
-[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
-
 ## License
 
 This project is licensed under the CC BY-NC 4.0 (Attribution-NonCommercial) license. Any form of commercial resale service is prohibited. See the LICENSE file for details.
