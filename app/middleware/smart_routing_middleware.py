@@ -51,11 +51,15 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
         if self.is_hf_request(path, request):
             return self.fix_hf_request(path, method, request)
 
-        # 3. 检测Gemini请求
+        # 3. 检测Vertex Express格式请求（优先级高于Gemini）
+        if self.is_vertex_express_request(path, request):
+            return self.fix_vertex_express_request(path, method, request, is_stream_request)
+
+        # 4. 检测Gemini请求
         if self.is_gemini_request(path):
             return self.fix_gemini_request(path, method, request, is_stream_request)
 
-        # 4. 默认处理其他请求（转为最快的v1端点）
+        # 5. 默认处理其他请求（转为最快的v1端点）
         return self.fix_default_request(path, method, request)
 
     def is_already_correct_format(self, path: str) -> bool:
@@ -68,6 +72,8 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
             r'^/v1/(chat/completions|models|embeddings|images/generations)$',  # v1格式
             r'^/openai/v1/(chat/completions|models|embeddings|images/generations)$',  # OpenAI格式
             r'^/hf/v1/(chat/completions|models|embeddings|images/generations)$',  # HF格式
+            r'^/vertex-express/v1beta/models/[^/:]+:(generate|streamGenerate)Content$',  # Vertex Express
+            r'^/vertex-express/v1beta/models$',  # Vertex Express模型列表
         ]
 
         for pattern in correct_patterns:
@@ -83,6 +89,10 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
     def is_hf_request(self, path: str, request: Request) -> bool:
         """检测HF格式请求"""
         return '/hf/' in path.lower()
+
+    def is_vertex_express_request(self, path: str, request: Request) -> bool:
+        """检测Vertex Express格式请求"""
+        return '/vertex-express/' in path.lower()
 
     def fix_openai_request(self, path: str, method: str, request: Request) -> tuple:
         """修复OpenAI格式请求"""
@@ -113,6 +123,35 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
                 return '/hf/v1/models', {'type': 'hf_models'}
 
         return path, None
+
+    def fix_vertex_express_request(self, path: str, method: str, request: Request, is_stream: bool) -> tuple:
+        """修复Vertex Express请求"""
+        if method != 'POST':
+            if method == 'GET' and 'models' in path.lower():
+                return '/vertex-express/v1beta/models', {'rule': 'vertex_express_models', 'preference': 'vertex_express_format'}
+            return path, None
+
+        # 提取模型名称
+        try:
+            model_name = self.extract_model_name(path, request)
+        except ValueError:
+            # 无法提取模型名称，返回原路径不做处理
+            return path, None
+
+        # 构建目标URL
+        if is_stream:
+            target_url = f'/vertex-express/v1beta/models/{model_name}:streamGenerateContent'
+        else:
+            target_url = f'/vertex-express/v1beta/models/{model_name}:generateContent'
+
+        fix_info = {
+            'rule': 'vertex_express_generate' if not is_stream else 'vertex_express_stream',
+            'preference': 'vertex_express_format',
+            'is_stream': is_stream,
+            'model': model_name
+        }
+
+        return target_url, fix_info
 
     def fix_default_request(self, path: str, method: str, request: Request) -> tuple:
         """修复默认请求（转为最快的v1端点）"""
@@ -168,19 +207,15 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
         if request.query_params.get('stream') == 'true':
             return True
 
-        # 3. Accept头部
-        accept = request.headers.get('accept', '')
-        if 'text/event-stream' in accept:
-            return True
-
         return False
+
 
     def is_gemini_request(self, path: str) -> bool:
         """判断是否为Gemini API请求"""
         path_lower = path.lower()
 
-        # 如果已经是OpenAI或HF格式，不应该被识别为Gemini
-        if '/openai/' in path_lower or '/hf/' in path_lower:
+        # 如果已经是OpenAI、HF或Vertex Express格式，不应该被识别为Gemini
+        if '/openai/' in path_lower or '/hf/' in path_lower or '/vertex-express/' in path_lower:
             return False
 
         # 1. 检查是否是明确的Gemini路径模式
