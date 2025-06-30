@@ -9,16 +9,12 @@ class ImageMetadata:
         self.size = size
         self.url = url
         self.delete_url = delete_url
-
-
 class UploadResponse:
     def __init__(self, success: bool, code: str, message: str, data: ImageMetadata):
         self.success = success
         self.code = code
         self.message = message
         self.data = data
-
-
 class ImageUploader:
     def upload(self, file: bytes, filename: str) -> UploadResponse:
         raise NotImplementedError
