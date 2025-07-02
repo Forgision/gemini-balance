@@ -3,6 +3,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config.config import settings
 from app.log.logger import get_main_logger
 import re
+import json
 
 logger = get_main_logger()
 
@@ -240,11 +241,10 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
         # 1. 从请求体中提取
         try:
             if hasattr(request, '_body') and request._body:
-                import json
                 body = json.loads(request._body.decode())
                 if 'model' in body and body['model']:
                     return body['model']
-        except:
+        except Exception:
             pass
 
         # 2. 从查询参数中提取
