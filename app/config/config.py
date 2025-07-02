@@ -114,8 +114,6 @@ class Settings(BaseSettings):
     AUTO_DELETE_REQUEST_LOGS_DAYS: int = 30
     SAFETY_SETTINGS: List[Dict[str, str]] = DEFAULT_SAFETY_SETTINGS
 
-    #是否开启新手模式
-    URL_NORMALIZATION_ENABLED: bool = False
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
