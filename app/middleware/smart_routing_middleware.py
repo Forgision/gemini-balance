@@ -69,6 +69,7 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
             r'^/v1beta/models/[^/:]+:(generate|streamGenerate)Content$',  # Gemini原生
             r'^/gemini/v1beta/models/[^/:]+:(generate|streamGenerate)Content$',  # Gemini带前缀
             r'^/v1beta/models$',  # Gemini模型列表
+            r'^/gemini/v1beta/models$',  # Gemini带前缀的模型列表
             r'^/v1/(chat/completions|models|embeddings|images/generations)$',  # v1格式
             r'^/openai/v1/(chat/completions|models|embeddings|images/generations)$',  # OpenAI格式
             r'^/hf/v1/(chat/completions|models|embeddings|images/generations)$',  # HF格式
