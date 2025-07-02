@@ -221,8 +221,8 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
 
         # 1. 检查是否是明确的Gemini路径模式
         gemini_path_patterns = [
-            r'/v1beta/models/',  # Gemini原生API路径
-            r'/gemini/v1beta/',  # 带gemini前缀的路径
+            r'/v1beta/models',  # Gemini原生API路径
+            r'/gemini/v1beta',  # 带gemini前缀的路径
         ]
 
         for pattern in gemini_path_patterns:
