@@ -78,6 +78,26 @@ def _get_safety_settings(model: str) -> List[Dict[str, str]]:
     return settings.SAFETY_SETTINGS
 
 
+def _filter_empty_parts(contents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filters out contents with empty or invalid parts."""
+    if not contents:
+        return []
+
+    filtered_contents = []
+    for content in contents:
+        if not content or "parts" not in content or not isinstance(content.get("parts"), list):
+            continue
+
+        valid_parts = [part for part in content["parts"] if isinstance(part, dict) and part]
+
+        if valid_parts:
+            new_content = content.copy()
+            new_content["parts"] = valid_parts
+            filtered_contents.append(new_content)
+
+    return filtered_contents
+
+
 def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
     """构建请求payload"""
     request_dict = request.model_dump()
@@ -87,7 +107,7 @@ def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
             request_dict["generationConfig"].pop("maxOutputTokens")
     
     payload = {
-        "contents": request_dict.get("contents", []),
+        "contents": _filter_empty_parts(request_dict.get("contents", [])),
         "tools": _build_tools(model, request_dict),
         "safetySettings": _get_safety_settings(model),
         "generationConfig": request_dict.get("generationConfig"),
@@ -200,7 +220,7 @@ class GeminiChatService:
     ) -> Dict[str, Any]:
         """计算token数量"""
         # countTokens API只需要contents
-        payload = {"contents": request.model_dump().get("contents", [])}
+        payload = {"contents": _filter_empty_parts(request.model_dump().get("contents", []))}
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()
         is_success = False
