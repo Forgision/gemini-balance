@@ -80,12 +80,10 @@ class SecurityService:
         
         # 否则检查请求头中的x-goog-api-key
         if not x_goog_api_key:
-            logger.debug(f"Failed auth attempt: key='{key}', x_goog_api_key=None")
             logger.error("Invalid key and missing x-goog-api-key header")
             raise HTTPException(status_code=401, detail="Invalid key and missing x-goog-api-key header")
         
         if x_goog_api_key not in settings.ALLOWED_TOKENS and x_goog_api_key != settings.AUTH_TOKEN:
-            logger.debug(f"Failed auth attempt: key='{key}', x_goog_api_key='{x_goog_api_key}'")
             logger.error("Invalid key and invalid x-goog-api-key")
             raise HTTPException(status_code=401, detail="Invalid key and invalid x-goog-api-key")
         
