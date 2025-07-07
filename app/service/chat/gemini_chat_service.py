@@ -195,6 +195,54 @@ class GeminiChatService:
                 request_time=request_datetime
             )
 
+    async def count_tokens(
+        self, model: str, request: GeminiRequest, api_key: str
+    ) -> Dict[str, Any]:
+        """计算token数量"""
+        # countTokens API只需要contents
+        payload = {"contents": request.model_dump().get("contents", [])}
+        start_time = time.perf_counter()
+        request_datetime = datetime.datetime.now()
+        is_success = False
+        status_code = None
+        response = None
+
+        try:
+            response = await self.api_client.count_tokens(payload, model, api_key)
+            is_success = True
+            status_code = 200
+            return response
+        except Exception as e:
+            is_success = False
+            error_log_msg = str(e)
+            logger.error(f"Count tokens API call failed with error: {error_log_msg}")
+            match = re.search(r"status code (\d+)", error_log_msg)
+            if match:
+                status_code = int(match.group(1))
+            else:
+                status_code = 500
+
+            await add_error_log(
+                gemini_key=api_key,
+                model_name=model,
+                error_type="gemini-count-tokens",
+                error_log=error_log_msg,
+                error_code=status_code,
+                request_msg=payload
+            )
+            raise e
+        finally:
+            end_time = time.perf_counter()
+            latency_ms = int((end_time - start_time) * 1000)
+            await add_request_log(
+                model_name=model,
+                api_key=api_key,
+                is_success=is_success,
+                status_code=status_code,
+                latency_ms=latency_ms,
+                request_time=request_datetime
+            )
+
     async def stream_generate_content(
         self, model: str, request: GeminiRequest, api_key: str
     ) -> AsyncGenerator[str, None]:
