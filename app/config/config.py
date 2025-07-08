@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # 智能路由配置
     URL_NORMALIZATION_ENABLED: bool = False  # 是否启用智能路由映射功能
 
+    # 自定义 Headers
+    CUSTOM_HEADERS: Dict[str, str] = {}
+
     # 模型相关配置
     SEARCH_MODELS: List[str] = ["gemini-2.0-flash-exp"]
     IMAGE_MODELS: List[str] = ["gemini-2.0-flash-exp"]

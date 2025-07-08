@@ -898,7 +898,24 @@ endblock %} {% block head_extra_styles %}
           />
           <small class="text-gray-500 mt-1 block">Gemini API的基础URL</small>
         </div>
- 
+
+        <!-- 自定义Headers -->
+        <div class="mb-6">
+            <label for="CUSTOM_HEADERS" class="block font-semibold mb-2 text-gray-700">自定义Headers</label>
+            <div class="bg-white rounded-lg border border-gray-200 p-4 mb-2 space-y-3" id="CUSTOM_HEADERS_container" style="background-color: rgba(255, 255, 255, 0.95); border: 1px solid rgba(0, 0, 0, 0.12); color: #374151;">
+                <!-- 键值对将在这里动态添加 -->
+                <div class="text-gray-500 text-sm italic">
+                    添加自定义请求头，例如 X-Api-Key: your-key
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2" id="addCustomHeaderBtn">
+                    <i class="fas fa-plus"></i> 添加Header
+                </button>
+            </div>
+            <small class="text-gray-500 mt-1 block">在这里添加的键值对将被添加到所有出站API请求的Header中。</small>
+        </div>
+
         <!-- Vertex API密钥列表 -->
         <div class="mb-6">
           <label for="VERTEX_API_KEYS" class="block font-semibold mb-2 text-gray-700"

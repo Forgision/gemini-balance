@@ -5,6 +5,9 @@ const ARRAY_INPUT_CLASS = "array-input";
 const MAP_ITEM_CLASS = "map-item";
 const MAP_KEY_INPUT_CLASS = "map-key-input";
 const MAP_VALUE_INPUT_CLASS = "map-value-input";
+const CUSTOM_HEADER_ITEM_CLASS = "custom-header-item";
+const CUSTOM_HEADER_KEY_INPUT_CLASS = "custom-header-key-input";
+const CUSTOM_HEADER_VALUE_INPUT_CLASS = "custom-header-value-input";
 const SAFETY_SETTING_ITEM_CLASS = "safety-setting-item";
 const SHOW_CLASS = "show"; // For modals
 const API_KEY_REGEX = /AIzaSy\S{33}/g;
@@ -383,6 +386,12 @@ document.addEventListener("DOMContentLoaded", function () {
     addSafetySettingBtn.addEventListener("click", () => addSafetySettingItem());
   }
 
+  // Add Custom Header button
+  const addCustomHeaderBtn = document.getElementById("addCustomHeaderBtn");
+  if (addCustomHeaderBtn) {
+    addCustomHeaderBtn.addEventListener("click", () => addCustomHeaderItem());
+  }
+
   initializeSensitiveFields(); // Initialize sensitive field handling
 
   // Vertex API Key Modal Elements and Events
@@ -691,6 +700,14 @@ async function initConfig() {
     ) {
       config.THINKING_BUDGET_MAP = {}; // 默认为空对象
     }
+    // --- 新增：处理 CUSTOM_HEADERS 默认值 ---
+    if (
+      !config.CUSTOM_HEADERS ||
+      typeof config.CUSTOM_HEADERS !== "object" ||
+      config.CUSTOM_HEADERS === null
+    ) {
+      config.CUSTOM_HEADERS = {}; // 默认为空对象
+    }
     // --- 新增：处理 SAFETY_SETTINGS 默认值 ---
     if (!config.SAFETY_SETTINGS || !Array.isArray(config.SAFETY_SETTINGS)) {
       config.SAFETY_SETTINGS = []; // 默认为空数组
@@ -756,6 +773,7 @@ async function initConfig() {
       VERTEX_EXPRESS_BASE_URL: "", // 确保默认值存在
       THINKING_MODELS: [],
       THINKING_BUDGET_MAP: {},
+      CUSTOM_HEADERS: {},
       AUTO_DELETE_ERROR_LOGS_ENABLED: false,
       AUTO_DELETE_ERROR_LOGS_DAYS: 7, // 新增默认值
       AUTO_DELETE_REQUEST_LOGS_ENABLED: false, // 新增默认值
@@ -852,6 +870,20 @@ function populateForm(config) {
   if (!budgetItemsAdded && budgetMapContainer) {
     budgetMapContainer.innerHTML =
       '<div class="text-gray-500 text-sm italic">请在上方添加思考模型，预算将自动关联。</div>';
+  }
+
+  // Populate CUSTOM_HEADERS
+  const customHeadersContainer = document.getElementById("CUSTOM_HEADERS_container");
+  let customHeadersAdded = false;
+  if (customHeadersContainer && config.CUSTOM_HEADERS && typeof config.CUSTOM_HEADERS === "object") {
+    for (const [key, value] of Object.entries(config.CUSTOM_HEADERS)) {
+      createAndAppendCustomHeaderItem(key, value);
+      customHeadersAdded = true;
+    }
+  }
+  if (!customHeadersAdded && customHeadersContainer) {
+    customHeadersContainer.innerHTML =
+        '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
   }
 
   // 4. Populate other array fields (excluding THINKING_MODELS)
@@ -1563,6 +1595,60 @@ function createAndAppendBudgetMapItem(mapKey, mapValue, modelId) {
 }
 
 /**
+ * Adds a new custom header item to the DOM.
+ */
+function addCustomHeaderItem() {
+    createAndAppendCustomHeaderItem("", "");
+}
+
+/**
+ * Creates and appends a DOM element for a custom header.
+ * @param {string} key - The header key.
+ * @param {string} value - The header value.
+ */
+function createAndAppendCustomHeaderItem(key, value) {
+    const container = document.getElementById("CUSTOM_HEADERS_container");
+    if (!container) {
+        console.error("Cannot add custom header: CUSTOM_HEADERS_container not found!");
+        return;
+    }
+
+    const placeholder = container.querySelector(".text-gray-500.italic");
+    if (placeholder && container.children.length === 1 && container.firstChild === placeholder) {
+        container.innerHTML = "";
+    }
+
+    const headerItem = document.createElement("div");
+    headerItem.className = `${CUSTOM_HEADER_ITEM_CLASS} flex items-center mb-2 gap-2`;
+
+    const keyInput = document.createElement("input");
+    keyInput.type = "text";
+    keyInput.value = key;
+    keyInput.placeholder = "Header Name";
+    keyInput.className = `${CUSTOM_HEADER_KEY_INPUT_CLASS} flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none bg-gray-100 text-gray-500`;
+
+    const valueInput = document.createElement("input");
+    valueInput.type = "text";
+    valueInput.value = value;
+    valueInput.placeholder = "Header Value";
+    valueInput.className = `${CUSTOM_HEADER_VALUE_INPUT_CLASS} flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50`;
+
+    const removeBtn = createRemoveButton();
+    removeBtn.addEventListener("click", () => {
+        headerItem.remove();
+        if (container.children.length === 0) {
+            container.innerHTML = '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
+        }
+    });
+
+    headerItem.appendChild(keyInput);
+    headerItem.appendChild(valueInput);
+    headerItem.appendChild(removeBtn);
+
+    container.appendChild(headerItem);
+}
+
+/**
  * Collects all data from the configuration form.
  * @returns {object} An object containing all configuration data.
  */
@@ -1634,6 +1720,19 @@ function collectFormData() {
         )
           ? 0
           : budgetValue;
+      }
+    });
+  }
+
+  const customHeadersContainer = document.getElementById("CUSTOM_HEADERS_container");
+  if (customHeadersContainer) {
+    formData["CUSTOM_HEADERS"] = {};
+    const customHeaderItems = customHeadersContainer.querySelectorAll(`.${CUSTOM_HEADER_ITEM_CLASS}`);
+    customHeaderItems.forEach((item) => {
+      const keyInput = item.querySelector(`.${CUSTOM_HEADER_KEY_INPUT_CLASS}`);
+      const valueInput = item.querySelector(`.${CUSTOM_HEADER_VALUE_INPUT_CLASS}`);
+      if (keyInput && valueInput && keyInput.value.trim() !== "") {
+        formData["CUSTOM_HEADERS"][keyInput.value.trim()] = valueInput.value.trim();
       }
     });
   }
