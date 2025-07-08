@@ -13,7 +13,7 @@ const SHOW_CLASS = "show"; // For modals
 const API_KEY_REGEX = /AIzaSy\S{33}/g;
 const PROXY_REGEX =
   /(?:https?|socks5):\/\/(?:[^:@\/]+(?::[^@\/]+)?@)?(?:[^:\/\s]+)(?::\d+)?/g;
-const VERTEX_API_KEY_REGEX = /AQ\.[a-zA-Z0-9_]{50}/g; // 新增 Vertex API Key 正则
+const VERTEX_API_KEY_REGEX = /AQ\.[a-zA-Z0-9_]{50}/g; // 新增 Vertex Express API Key 正则
 const MASKED_VALUE = "••••••••";
 
 // DOM Elements - Global Scope for frequently accessed elements
@@ -35,7 +35,7 @@ const bulkDeleteProxyInput = document.getElementById("bulkDeleteProxyInput");
 const resetConfirmModal = document.getElementById("resetConfirmModal");
 const configForm = document.getElementById("configForm"); // Added for frequent use
 
-// Vertex API Key Modal Elements
+// Vertex Express API Key Modal Elements
 const vertexApiKeyModal = document.getElementById("vertexApiKeyModal");
 const vertexApiKeyBulkInput = document.getElementById("vertexApiKeyBulkInput");
 const bulkDeleteVertexApiKeyModal = document.getElementById(
@@ -394,7 +394,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   initializeSensitiveFields(); // Initialize sensitive field handling
 
-  // Vertex API Key Modal Elements and Events
+  // Vertex Express API Key Modal Elements and Events
   const addVertexApiKeyBtn = document.getElementById("addVertexApiKeyBtn");
   const closeVertexApiKeyModalBtn = document.getElementById(
     "closeVertexApiKeyModalBtn"
@@ -873,9 +873,15 @@ function populateForm(config) {
   }
 
   // Populate CUSTOM_HEADERS
-  const customHeadersContainer = document.getElementById("CUSTOM_HEADERS_container");
+  const customHeadersContainer = document.getElementById(
+    "CUSTOM_HEADERS_container"
+  );
   let customHeadersAdded = false;
-  if (customHeadersContainer && config.CUSTOM_HEADERS && typeof config.CUSTOM_HEADERS === "object") {
+  if (
+    customHeadersContainer &&
+    config.CUSTOM_HEADERS &&
+    typeof config.CUSTOM_HEADERS === "object"
+  ) {
     for (const [key, value] of Object.entries(config.CUSTOM_HEADERS)) {
       createAndAppendCustomHeaderItem(key, value);
       customHeadersAdded = true;
@@ -883,7 +889,7 @@ function populateForm(config) {
   }
   if (!customHeadersAdded && customHeadersContainer) {
     customHeadersContainer.innerHTML =
-        '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
+      '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
   }
 
   // 4. Populate other array fields (excluding THINKING_MODELS)
@@ -1211,17 +1217,13 @@ function handleBulkDeleteProxies() {
 }
 
 /**
- * Handles the bulk addition of Vertex API keys from the modal input.
+ * Handles the bulk addition of Vertex Express API keys from the modal input.
  */
 function handleBulkAddVertexApiKeys() {
   const vertexApiKeyContainer = document.getElementById(
     "VERTEX_API_KEYS_container"
   );
-  if (
-    !vertexApiKeyBulkInput ||
-    !vertexApiKeyContainer ||
-    !vertexApiKeyModal
-  ) {
+  if (!vertexApiKeyBulkInput || !vertexApiKeyContainer || !vertexApiKeyModal) {
     return;
   }
 
@@ -1271,7 +1273,7 @@ function handleBulkAddVertexApiKeys() {
 }
 
 /**
- * Handles the bulk deletion of Vertex API keys based on input from the modal.
+ * Handles the bulk deletion of Vertex Express API keys based on input from the modal.
  */
 function handleBulkDeleteVertexApiKeys() {
   const vertexApiKeyContainer = document.getElementById(
@@ -1287,7 +1289,7 @@ function handleBulkDeleteVertexApiKeys() {
 
   const bulkText = bulkDeleteVertexApiKeyInput.value;
   if (!bulkText.trim()) {
-    showNotification("请粘贴需要删除的 Vertex API 密钥", "warning");
+    showNotification("请粘贴需要删除的 Vertex Express API 密钥", "warning");
     return;
   }
 
@@ -1295,13 +1297,15 @@ function handleBulkDeleteVertexApiKeys() {
 
   if (keysToDelete.size === 0) {
     showNotification(
-      "未在输入内容中提取到有效的 Vertex API 密钥格式",
+      "未在输入内容中提取到有效的 Vertex Express API 密钥格式",
       "warning"
     );
     return;
   }
 
-  const keyItems = vertexApiKeyContainer.querySelectorAll(`.${ARRAY_ITEM_CLASS}`);
+  const keyItems = vertexApiKeyContainer.querySelectorAll(
+    `.${ARRAY_ITEM_CLASS}`
+  );
   let deleteCount = 0;
 
   keyItems.forEach((item) => {
@@ -1322,7 +1326,10 @@ function handleBulkDeleteVertexApiKeys() {
   closeModal(bulkDeleteVertexApiKeyModal);
 
   if (deleteCount > 0) {
-    showNotification(`成功删除了 ${deleteCount} 个匹配的 Vertex 密钥`, "success");
+    showNotification(
+      `成功删除了 ${deleteCount} 个匹配的 Vertex 密钥`,
+      "success"
+    );
   } else {
     showNotification("列表中未找到您输入的任何 Vertex 密钥进行删除", "info");
   }
@@ -1337,8 +1344,10 @@ function switchTab(tabId) {
   console.log(`Switching to tab: ${tabId}`);
 
   // 定义选中态和未选中态的样式
-  const activeStyle = "background-color: #3b82f6 !important; color: #ffffff !important; border: 2px solid #2563eb !important; box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.4), 0 2px 6px -1px rgba(59, 130, 246, 0.2) !important; transform: translateY(-2px) !important; font-weight: 600 !important;";
-  const inactiveStyle = "background-color: #f8fafc !important; color: #64748b !important; border: 2px solid #e2e8f0 !important; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important; font-weight: 500 !important; transform: none !important;";
+  const activeStyle =
+    "background-color: #3b82f6 !important; color: #ffffff !important; border: 2px solid #2563eb !important; box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.4), 0 2px 6px -1px rgba(59, 130, 246, 0.2) !important; transform: translateY(-2px) !important; font-weight: 600 !important;";
+  const inactiveStyle =
+    "background-color: #f8fafc !important; color: #64748b !important; border: 2px solid #e2e8f0 !important; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important; font-weight: 500 !important; transform: none !important;";
 
   // 更新标签按钮状态
   const tabButtons = document.querySelectorAll(".tab-btn");
@@ -1471,8 +1480,7 @@ function addArrayItemWithValue(key, value) {
   const isThinkingModel = key === "THINKING_MODELS";
   const isAllowedToken = key === "ALLOWED_TOKENS";
   const isVertexApiKey = key === "VERTEX_API_KEYS"; // 新增判断
-  const isSensitive =
-    key === "API_KEYS" || isAllowedToken || isVertexApiKey; // 更新敏感判断
+  const isSensitive = key === "API_KEYS" || isAllowedToken || isVertexApiKey; // 更新敏感判断
   const modelId = isThinkingModel ? generateUUID() : null;
 
   const arrayItem = document.createElement("div");
@@ -1598,7 +1606,7 @@ function createAndAppendBudgetMapItem(mapKey, mapValue, modelId) {
  * Adds a new custom header item to the DOM.
  */
 function addCustomHeaderItem() {
-    createAndAppendCustomHeaderItem("", "");
+  createAndAppendCustomHeaderItem("", "");
 }
 
 /**
@@ -1607,45 +1615,52 @@ function addCustomHeaderItem() {
  * @param {string} value - The header value.
  */
 function createAndAppendCustomHeaderItem(key, value) {
-    const container = document.getElementById("CUSTOM_HEADERS_container");
-    if (!container) {
-        console.error("Cannot add custom header: CUSTOM_HEADERS_container not found!");
-        return;
+  const container = document.getElementById("CUSTOM_HEADERS_container");
+  if (!container) {
+    console.error(
+      "Cannot add custom header: CUSTOM_HEADERS_container not found!"
+    );
+    return;
+  }
+
+  const placeholder = container.querySelector(".text-gray-500.italic");
+  if (
+    placeholder &&
+    container.children.length === 1 &&
+    container.firstChild === placeholder
+  ) {
+    container.innerHTML = "";
+  }
+
+  const headerItem = document.createElement("div");
+  headerItem.className = `${CUSTOM_HEADER_ITEM_CLASS} flex items-center mb-2 gap-2`;
+
+  const keyInput = document.createElement("input");
+  keyInput.type = "text";
+  keyInput.value = key;
+  keyInput.placeholder = "Header Name";
+  keyInput.className = `${CUSTOM_HEADER_KEY_INPUT_CLASS} flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none bg-gray-100 text-gray-500`;
+
+  const valueInput = document.createElement("input");
+  valueInput.type = "text";
+  valueInput.value = value;
+  valueInput.placeholder = "Header Value";
+  valueInput.className = `${CUSTOM_HEADER_VALUE_INPUT_CLASS} flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50`;
+
+  const removeBtn = createRemoveButton();
+  removeBtn.addEventListener("click", () => {
+    headerItem.remove();
+    if (container.children.length === 0) {
+      container.innerHTML =
+        '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
     }
+  });
 
-    const placeholder = container.querySelector(".text-gray-500.italic");
-    if (placeholder && container.children.length === 1 && container.firstChild === placeholder) {
-        container.innerHTML = "";
-    }
+  headerItem.appendChild(keyInput);
+  headerItem.appendChild(valueInput);
+  headerItem.appendChild(removeBtn);
 
-    const headerItem = document.createElement("div");
-    headerItem.className = `${CUSTOM_HEADER_ITEM_CLASS} flex items-center mb-2 gap-2`;
-
-    const keyInput = document.createElement("input");
-    keyInput.type = "text";
-    keyInput.value = key;
-    keyInput.placeholder = "Header Name";
-    keyInput.className = `${CUSTOM_HEADER_KEY_INPUT_CLASS} flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none bg-gray-100 text-gray-500`;
-
-    const valueInput = document.createElement("input");
-    valueInput.type = "text";
-    valueInput.value = value;
-    valueInput.placeholder = "Header Value";
-    valueInput.className = `${CUSTOM_HEADER_VALUE_INPUT_CLASS} flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50`;
-
-    const removeBtn = createRemoveButton();
-    removeBtn.addEventListener("click", () => {
-        headerItem.remove();
-        if (container.children.length === 0) {
-            container.innerHTML = '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
-        }
-    });
-
-    headerItem.appendChild(keyInput);
-    headerItem.appendChild(valueInput);
-    headerItem.appendChild(removeBtn);
-
-    container.appendChild(headerItem);
+  container.appendChild(headerItem);
 }
 
 /**
@@ -1724,15 +1739,22 @@ function collectFormData() {
     });
   }
 
-  const customHeadersContainer = document.getElementById("CUSTOM_HEADERS_container");
+  const customHeadersContainer = document.getElementById(
+    "CUSTOM_HEADERS_container"
+  );
   if (customHeadersContainer) {
     formData["CUSTOM_HEADERS"] = {};
-    const customHeaderItems = customHeadersContainer.querySelectorAll(`.${CUSTOM_HEADER_ITEM_CLASS}`);
+    const customHeaderItems = customHeadersContainer.querySelectorAll(
+      `.${CUSTOM_HEADER_ITEM_CLASS}`
+    );
     customHeaderItems.forEach((item) => {
       const keyInput = item.querySelector(`.${CUSTOM_HEADER_KEY_INPUT_CLASS}`);
-      const valueInput = item.querySelector(`.${CUSTOM_HEADER_VALUE_INPUT_CLASS}`);
+      const valueInput = item.querySelector(
+        `.${CUSTOM_HEADER_VALUE_INPUT_CLASS}`
+      );
       if (keyInput && valueInput && keyInput.value.trim() !== "") {
-        formData["CUSTOM_HEADERS"][keyInput.value.trim()] = valueInput.value.trim();
+        formData["CUSTOM_HEADERS"][keyInput.value.trim()] =
+          valueInput.value.trim();
       }
     });
   }
