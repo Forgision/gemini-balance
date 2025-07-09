@@ -114,6 +114,10 @@ def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
         "systemInstruction": request_dict.get("systemInstruction"),
     }
 
+    # 确保 generationConfig 不为 None
+    if payload["generationConfig"] is None:
+        payload["generationConfig"] = {}
+
     if model.endswith("-image") or model.endswith("-image-generation"):
         payload.pop("systemInstruction")
         payload["generationConfig"]["responseModalities"] = ["Text", "Image"]
