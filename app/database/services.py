@@ -648,7 +648,7 @@ async def delete_expired_file_records() -> List[Dict[str, Any]]:
     try:
         # 先获取要删除的记录
         query = select(FileRecord).where(
-            FileRecord.expiration_time <= datetime.now(datetime.timezone.utc)
+            FileRecord.expiration_time <= datetime.now(timezone.utc)
         )
         expired_records = await database.fetch_all(query)
         
@@ -657,7 +657,7 @@ async def delete_expired_file_records() -> List[Dict[str, Any]]:
             
         # 执行删除
         delete_query = delete(FileRecord).where(
-            FileRecord.expiration_time <= datetime.now(datetime.timezone.utc)
+            FileRecord.expiration_time <= datetime.now(timezone.utc)
         )
         await database.execute(delete_query)
         
