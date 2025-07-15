@@ -2,17 +2,14 @@
 文件管理服务
 """
 import json
-import hashlib
-import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, Tuple, List
-from httpx import AsyncClient, Headers
-from collections import defaultdict
+from typing import Optional, Dict, Any, Tuple
+from httpx import AsyncClient
 import asyncio
 
 from app.config.config import settings
 from app.database import services as db_services
-from app.database.models import FileRecord, FileState
+from app.database.models import FileState
 from app.domain.file_models import FileMetadata, ListFilesResponse
 from fastapi import HTTPException
 from app.log.logger import get_files_logger
@@ -254,7 +251,7 @@ class FilesService:
             
             async with AsyncClient() as client:
                 response = await client.get(
-                    f"https://generativelanguage.googleapis.com/v1beta/{file_name}",
+                    f"{settings.BASE_URL}/{file_name}",
                     params={"key": api_key}
                 )
                 
@@ -383,7 +380,7 @@ class FilesService:
             
             async with AsyncClient() as client:
                 response = await client.delete(
-                    f"https://generativelanguage.googleapis.com/v1beta/{file_name}",
+                    f"{settings.BASE_URL}/{file_name}",
                     params={"key": api_key}
                 )
                 
@@ -422,7 +419,7 @@ class FilesService:
         try:
             async with AsyncClient() as client:
                 response = await client.get(
-                    f"https://generativelanguage.googleapis.com/v1beta/{file_name}",
+                    f"{settings.BASE_URL}/{file_name}",
                     params={"key": api_key}
                 )
                 
@@ -475,7 +472,7 @@ class FilesService:
                     
                     async with AsyncClient() as client:
                         await client.delete(
-                            f"https://generativelanguage.googleapis.com/v1beta/{file_name}",
+                            f"{settings.BASE_URL}/{file_name}",
                             params={"key": api_key}
                         )
                 except Exception as e:

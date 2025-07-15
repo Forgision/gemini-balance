@@ -2,7 +2,7 @@
 数据库服务模块
 """
 from typing import List, Optional, Dict, Any, Union
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from sqlalchemy import func, desc, asc, select, insert, update, delete
 import json
 from app.database.connection import database

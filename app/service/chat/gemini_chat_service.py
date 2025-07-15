@@ -41,7 +41,7 @@ def _extract_file_references(contents: List[Dict[str, Any]]) -> List[str]:
                 file_uri = file_data["fileUri"]
                 # 從 URI 中提取文件名
                 # 1. https://generativelanguage.googleapis.com/v1beta/files/{file_id}
-                match = re.match(r"https://generativelanguage.googleapis.com/v1beta/(files/.*)", file_uri)
+                match = re.match(rf"{re.escape(settings.BASE_URL)}/(files/.*)", file_uri)
                 if not match:
                     logger.warning(f"Invalid file URI: {file_uri}")
                     continue

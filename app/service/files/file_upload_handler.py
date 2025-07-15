@@ -2,14 +2,13 @@
 文件上传处理器
 处理 Google 的可恢复上传协议
 """
-import hashlib
-from typing import Dict, Any, Optional
+from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from httpx import AsyncClient
 from fastapi import Request, Response, HTTPException
-from fastapi.responses import StreamingResponse
 
+from app.config.config import settings
 from app.database import services as db_services
 from app.database.models import FileState
 from app.log.logger import get_files_logger
@@ -136,7 +135,7 @@ class FileUploadHandler:
                                     mime_type=file_data.get("mimeType", session_info["mime_type"]),
                                     size_bytes=int(file_data.get("sizeBytes", session_info["size_bytes"])),
                                     api_key=session_info["api_key"],
-                                    uri=file_data.get("uri", f"https://generativelanguage.googleapis.com/v1beta/{real_file_name}"),
+                                    uri=file_data.get("uri", f"{settings.BASE_URL}/{real_file_name}"),
                                     create_time=now,
                                     update_time=now,
                                     expiration_time=datetime.fromisoformat(expiration_time_str),

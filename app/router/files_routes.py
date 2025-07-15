@@ -2,14 +2,13 @@
 Files API 路由
 """
 from typing import Optional
-from fastapi import APIRouter, Request, Response, Query, Depends, Body, Header, HTTPException
+from fastapi import APIRouter, Request, Query, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.config.config import settings
 from app.domain.file_models import (
     FileMetadata, 
     ListFilesResponse, 
-    CreateFileRequest,
     DeleteFileResponse
 )
 from app.log.logger import get_files_logger
