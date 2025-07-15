@@ -69,9 +69,9 @@ if "tts" in model_name.lower():
 
 ## 📝 使用示例
 
-### 单人语音TTS请求（自动启用增强服务）
+### 1. 原生Gemini单人TTS请求（使用TTS增强服务）
 
-包含 `voiceConfig.prebuiltVoiceConfig` 的请求会自动使用TTS增强服务：
+包含 `voiceConfig.prebuiltVoiceConfig` 的原生Gemini格式请求会自动使用TTS增强服务：
 
 ```bash
 curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent" \
@@ -96,9 +96,9 @@ curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash-preview-tts
   }'
 ```
 
-### 多人语音TTS请求（自动启用增强服务）
+### 2. 原生Gemini多人TTS请求（使用TTS增强服务）
 
-包含 `multiSpeakerVoiceConfig` 的请求会自动使用TTS增强服务：
+包含 `multiSpeakerVoiceConfig` 的原生Gemini格式请求会自动使用TTS增强服务：
 
 ```bash
 curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent" \
@@ -107,7 +107,7 @@ curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash-preview-tts
   -d '{
     "contents": [{
       "parts": [{
-        "text": "小雅： 听众朋友们大家好！欢迎收听今天的节目。\n李想： 小雅好，听众朋友们好！今天我们来聊聊人工智能的发展。"
+        "text": "Alice: Hello everyone, welcome to our show today.\nBob: Hi Alice, and hello to all our listeners! Today we are talking about AI development."
       }]
     }],
     "generationConfig": {
@@ -116,18 +116,18 @@ curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash-preview-tts
         "multiSpeakerVoiceConfig": {
           "speakerVoiceConfigs": [
             {
-              "speaker": "李想",
+              "speaker": "Alice",
               "voiceConfig": {
                 "prebuiltVoiceConfig": {
-                  "voiceName": "Kore"
+                  "voiceName": "Puck"
                 }
               }
             },
             {
-              "speaker": "小雅",
+              "speaker": "Bob",
               "voiceConfig": {
                 "prebuiltVoiceConfig": {
-                  "voiceName": "Puck"
+                  "voiceName": "Kore"
                 }
               }
             }
@@ -138,32 +138,27 @@ curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash-preview-tts
   }'
 ```
 
-### 单人TTS请求（使用原有服务）
+### 3. OpenAI兼容TTS请求（使用原有服务）
 
-不包含 `multiSpeakerVoiceConfig` 的TTS请求会使用原有的Gemini TTS服务：
+OpenAI兼容格式的TTS请求使用不同的API路径，不受本模块影响：
 
 ```bash
-curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent" \
+curl -X POST "https://your-domain.com/v1/audio/speech" \
   -H "Content-Type: application/json" \
-  -H "x-goog-api-key: your-token" \
+  -H "Authorization: Bearer your-token" \
   -d '{
-    "contents": [{
-      "parts": [{
-        "text": "Hello, this is a single speaker test."
-      }]
-    }],
-    "generationConfig": {
-      "responseModalities": ["AUDIO"],
-      "speechConfig": {
-        "voiceConfig": {
-          "prebuiltVoiceConfig": {
-            "voiceName": "Kore"
-          }
-        }
-      }
-    }
-  }'
+    "model": "tts-1",
+    "input": "这是一个OpenAI兼容格式的TTS测试。",
+    "voice": "alloy"
+  }' \
+  --output openai_tts_test.wav
 ```
+
+**注意**：OpenAI兼容TTS请求：
+- 使用路径：`/v1/audio/speech`
+- 使用Authorization头而不是x-goog-api-key
+- 返回音频文件而不是JSON响应
+- 不受本模块的TTS增强服务影响
 
 ### 普通文本生成（使用原有服务）
 
