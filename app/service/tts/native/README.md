@@ -165,7 +165,7 @@ curl -X POST "https://your-domain.com/v1/audio/speech" \
 非TTS模型的请求会使用原有的Gemini聊天服务，完全不受影响：
 
 ```bash
-curl -X POST "https://your-domain.com/v1beta/models/gemini-1.5-flash:generateContent" \
+curl -X POST "https://your-domain.com/v1beta/models/gemini-2.5-flash:generateContent" \
   -H "Content-Type: application/json" \
   -H "x-goog-api-key: your-token" \
   -d '{
