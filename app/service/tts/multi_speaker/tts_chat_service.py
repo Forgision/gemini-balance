@@ -66,19 +66,20 @@ class TTSGeminiChatService(GeminiChatService):
         status_code = None
 
         try:
-            # 构建TTS专用的payload
-            from app.service.chat.gemini_chat_service import _filter_empty_parts, _build_tools, _get_safety_settings
+            # 构建TTS专用的payload - 不包含tools和safetySettings
+            from app.service.chat.gemini_chat_service import _filter_empty_parts
 
             request_dict = request.model_dump()
 
-            # 构建基础payload
+            # 构建TTS专用的简化payload
             payload = {
                 "contents": _filter_empty_parts(request_dict.get("contents", [])),
-                "tools": _build_tools(model, request_dict),
-                "safetySettings": _get_safety_settings(model),
                 "generationConfig": request_dict.get("generationConfig", {}),
-                "systemInstruction": request_dict.get("systemInstruction"),
             }
+
+            # 只在有systemInstruction时才添加
+            if request_dict.get("systemInstruction"):
+                payload["systemInstruction"] = request_dict.get("systemInstruction")
 
             # 确保 generationConfig 不为 None
             if payload["generationConfig"] is None:
