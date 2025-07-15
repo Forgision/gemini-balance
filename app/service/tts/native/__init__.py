@@ -1,6 +1,6 @@
 """
-多人对话TTS功能模块
-Multi-speaker TTS functionality for conversation scenarios
+原生Gemini TTS功能模块
+Native Gemini TTS functionality for both single and multi-speaker scenarios
 """
 
 from .tts_chat_service import TTSGeminiChatService

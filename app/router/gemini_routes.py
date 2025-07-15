@@ -9,7 +9,7 @@ from app.core.security import SecurityService
 from app.domain.gemini_models import GeminiContent, GeminiRequest, ResetSelectedKeysRequest, VerifySelectedKeysRequest
 from app.service.chat.gemini_chat_service import GeminiChatService
 from app.service.key.key_manager import KeyManager, get_key_manager_instance
-from app.service.tts.multi_speaker.tts_routes import get_tts_chat_service
+from app.service.tts.native.tts_routes import get_tts_chat_service
 from app.service.model.model_service import ModelService
 from app.handler.retry_handler import RetryHandler
 from app.handler.error_handler import handle_route_errors
@@ -113,34 +113,38 @@ async def generate_content(
         logger.info(f"Handling Gemini content generation request for model: {model_name}")
         logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
 
-        # 检测是否为多人TTS请求
-        is_multi_speaker_tts = False
+        # 检测是否为原生Gemini TTS请求
+        is_native_tts = False
         if "tts" in model_name.lower():
             try:
                 raw_body = await raw_request.body()
                 raw_data = json.loads(raw_body.decode('utf-8'))
 
-                # 检查是否包含多人语音配置
-                speech_config = raw_data.get("generationConfig", {}).get("speechConfig", {})
-                if "multiSpeakerVoiceConfig" in speech_config:
-                    is_multi_speaker_tts = True
-                    logger.info("Detected multi-speaker TTS request")
-                    logger.info(f"Raw request data for multi-speaker TTS: {json.dumps(raw_data, indent=2, ensure_ascii=False)}")
+                # 检查是否包含原生TTS配置（responseModalities和speechConfig）
+                generation_config = raw_data.get("generationConfig", {})
+                response_modalities = generation_config.get("responseModalities", [])
+                speech_config = generation_config.get("speechConfig", {})
+
+                # 如果包含AUDIO模态和语音配置，则认为是原生TTS请求
+                if "AUDIO" in response_modalities and speech_config:
+                    is_native_tts = True
+                    logger.info("Detected native Gemini TTS request")
+                    logger.info(f"Raw request data for native TTS: {json.dumps(raw_data, indent=2, ensure_ascii=False)}")
 
                     # 将TTS字段添加到请求对象中
                     setattr(request, '_raw_tts_data', raw_data)
             except Exception as e:
-                logger.warning(f"Failed to parse request for multi-speaker TTS detection: {e}")
+                logger.warning(f"Failed to parse request for native TTS detection: {e}")
 
         logger.info(f"Using API key: {api_key}")
 
         if not await model_service.check_model_support(model_name):
             raise HTTPException(status_code=400, detail=f"Model {model_name} is not supported")
 
-        # 只有多人TTS请求才使用增强服务
-        if is_multi_speaker_tts:
+        # 所有原生TTS请求都使用TTS增强服务
+        if is_native_tts:
             try:
-                logger.info("Using multi-speaker TTS enhanced service")
+                logger.info("Using native TTS enhanced service")
                 tts_service = await get_tts_chat_service(key_manager)
                 response = await tts_service.generate_content(
                     model=model_name,
@@ -149,9 +153,9 @@ async def generate_content(
                 )
                 return response
             except Exception as e:
-                logger.warning(f"Multi-speaker TTS processing failed, falling back to standard service: {e}")
+                logger.warning(f"Native TTS processing failed, falling back to standard service: {e}")
 
-        # 使用标准服务处理所有其他请求（包括单人TTS）
+        # 使用标准服务处理所有其他请求（非TTS）
         response = await chat_service.generate_content(
             model=model_name,
             request=request,

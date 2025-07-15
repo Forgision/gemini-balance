@@ -6,7 +6,7 @@ TTS扩展配置
 import os
 from typing import Union
 from app.service.chat.gemini_chat_service import GeminiChatService
-from app.service.tts.multi_speaker.tts_chat_service import TTSGeminiChatService
+from app.service.tts.native.tts_chat_service import TTSGeminiChatService
 
 
 class TTSConfig:

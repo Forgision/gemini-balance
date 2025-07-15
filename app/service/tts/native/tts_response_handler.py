@@ -1,6 +1,6 @@
 """
-TTS响应处理器扩展
-继承自原始响应处理器，添加TTS支持，保持向后兼容
+原生Gemini TTS响应处理器扩展
+继承自原始响应处理器，添加原生Gemini TTS支持，保持向后兼容
 """
 
 from typing import Any, Dict, Optional

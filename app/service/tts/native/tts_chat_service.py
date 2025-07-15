@@ -1,13 +1,13 @@
 """
-TTS聊天服务扩展
-继承自原始聊天服务，添加TTS支持，保持向后兼容
+原生Gemini TTS聊天服务扩展
+继承自原始聊天服务，添加原生Gemini TTS支持（单人和多人），保持向后兼容
 """
 
 import time
 import datetime
 from typing import Any, Dict, Optional
 from app.service.chat.gemini_chat_service import GeminiChatService
-from app.service.tts.multi_speaker.tts_response_handler import TTSResponseHandler
+from app.service.tts.native.tts_response_handler import TTSResponseHandler
 from app.domain.gemini_models import GeminiRequest
 from app.log.logger import get_gemini_logger
 from app.database.services import add_request_log, add_error_log

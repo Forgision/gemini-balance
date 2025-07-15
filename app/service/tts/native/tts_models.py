@@ -1,6 +1,6 @@
 """
-TTS扩展数据模型
-继承自原始模型，添加TTS相关字段，保持向后兼容
+原生Gemini TTS扩展数据模型
+继承自原始模型，添加原生Gemini TTS相关字段，保持向后兼容
 """
 
 from typing import Any, Dict, List, Optional
