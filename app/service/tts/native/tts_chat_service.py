@@ -85,21 +85,18 @@ class TTSGeminiChatService(GeminiChatService):
             if payload["generationConfig"] is None:
                 payload["generationConfig"] = {}
 
-            # 从原始请求中提取TTS相关字段
-            if hasattr(request, '_raw_tts_data'):
-                raw_data = getattr(request, '_raw_tts_data')
-                raw_generation_config = raw_data.get("generationConfig", {})
-
+            # 从request.generationConfig直接获取TTS相关字段
+            if request.generationConfig:
                 # 添加TTS特定字段
-                if "responseModalities" in raw_generation_config:
-                    payload["generationConfig"]["responseModalities"] = raw_generation_config["responseModalities"]
-                    logger.info(f"Added responseModalities: {raw_generation_config['responseModalities']}")
+                if request.generationConfig.responseModalities:
+                    payload["generationConfig"]["responseModalities"] = request.generationConfig.responseModalities
+                    logger.info(f"Added responseModalities: {request.generationConfig.responseModalities}")
 
-                if "speechConfig" in raw_generation_config:
-                    payload["generationConfig"]["speechConfig"] = raw_generation_config["speechConfig"]
-                    logger.info(f"Added speechConfig: {raw_generation_config['speechConfig']}")
+                if request.generationConfig.speechConfig:
+                    payload["generationConfig"]["speechConfig"] = request.generationConfig.speechConfig
+                    logger.info(f"Added speechConfig: {request.generationConfig.speechConfig}")
             else:
-                logger.warning("No raw TTS data found in request, TTS fields may be missing")
+                logger.warning("No generationConfig found in request, TTS fields may be missing")
 
             logger.info(f"TTS payload before API call: {payload}")
 

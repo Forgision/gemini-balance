@@ -53,11 +53,10 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ```python
 # app/router/gemini_routes.py 中的智能检测逻辑
-if "tts" in model_name.lower():
-    # 检查是否包含原生TTS配置
-    generation_config = raw_data.get("generationConfig", {})
-    response_modalities = generation_config.get("responseModalities", [])
-    speech_config = generation_config.get("speechConfig", {})
+if "tts" in model_name.lower() and request.generationConfig:
+    # 直接从解析后的request对象获取TTS配置
+    response_modalities = request.generationConfig.responseModalities or []
+    speech_config = request.generationConfig.speechConfig or {}
 
     # 如果包含AUDIO模态和语音配置，则认为是原生TTS请求
     if "AUDIO" in response_modalities and speech_config:
@@ -210,14 +209,14 @@ TTSGenerationConfig
 1. **请求接收**：系统接收到API请求
 2. **智能检测**：
    - 检查模型名称是否包含 "tts"
-   - 如果是TTS模型，解析请求体检查是否包含 `responseModalities: ["AUDIO"]` 和 `speechConfig`
+   - 如果是TTS模型，从 `request.generationConfig` 检查是否包含 `responseModalities: ["AUDIO"]` 和 `speechConfig`
 3. **服务选择**：
    - **原生TTS请求**：使用 `TTSGeminiChatService` 增强服务
    - **普通请求**：使用原有 `GeminiChatService`
 4. **请求处理**：
    - **原生TTS**：使用 `_handle_tts_request()` 特殊处理
    - **其他请求**：使用标准 `generate_content()` 方法
-5. **字段处理**：从原始HTTP请求体提取TTS字段（`responseModalities`, `speechConfig`）
+5. **字段处理**：从 `request.generationConfig` 直接获取TTS字段（`responseModalities`, `speechConfig`）
 6. **API调用**：构建优化的payload并调用Gemini API
 7. **自动回退**：如果原生TTS处理失败，自动回退到标准服务
 8. **响应处理**：

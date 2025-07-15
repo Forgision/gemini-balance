@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from copy import deepcopy
 import asyncio
-import json
 from app.config.config import settings
 from app.log.logger import get_gemini_logger
 from app.core.security import SecurityService
@@ -101,7 +100,6 @@ async def list_models(
 async def generate_content(
     model_name: str,
     request: GeminiRequest,
-    raw_request: Request,
     _=Depends(security_service.verify_key_or_goog_api_key),
     api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
@@ -115,26 +113,17 @@ async def generate_content(
 
         # 检测是否为原生Gemini TTS请求
         is_native_tts = False
-        if "tts" in model_name.lower():
-            try:
-                raw_body = await raw_request.body()
-                raw_data = json.loads(raw_body.decode('utf-8'))
+        if "tts" in model_name.lower() and request.generationConfig:
+            # 直接从解析后的request对象获取TTS配置
+            response_modalities = request.generationConfig.responseModalities or []
+            speech_config = request.generationConfig.speechConfig or {}
 
-                # 检查是否包含原生TTS配置（responseModalities和speechConfig）
-                generation_config = raw_data.get("generationConfig", {})
-                response_modalities = generation_config.get("responseModalities", [])
-                speech_config = generation_config.get("speechConfig", {})
-
-                # 如果包含AUDIO模态和语音配置，则认为是原生TTS请求
-                if "AUDIO" in response_modalities and speech_config:
-                    is_native_tts = True
-                    logger.info("Detected native Gemini TTS request")
-                    logger.info(f"Raw request data for native TTS: {json.dumps(raw_data, indent=2, ensure_ascii=False)}")
-
-                    # 将TTS字段添加到请求对象中
-                    setattr(request, '_raw_tts_data', raw_data)
-            except Exception as e:
-                logger.warning(f"Failed to parse request for native TTS detection: {e}")
+            # 如果包含AUDIO模态和语音配置，则认为是原生TTS请求
+            if "AUDIO" in response_modalities and speech_config:
+                is_native_tts = True
+                logger.info("Detected native Gemini TTS request")
+                logger.info(f"TTS responseModalities: {response_modalities}")
+                logger.info(f"TTS speechConfig: {speech_config}")
 
         logger.info(f"Using API key: {api_key}")
 
