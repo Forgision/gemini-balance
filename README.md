@@ -1,8 +1,6 @@
 [Read this document in Chinese](README_ZH.md)
 
-# Gemini Balance
-
-> Fork版本，新增多说话人TTS功能 - Gemini API Proxy and Load Balancer
+# Gemini Balance - Gemini API Proxy and Load Balancer
 
 <p align="center">
   <a href="https://trendshift.io/repositories/13692" target="_blank">
