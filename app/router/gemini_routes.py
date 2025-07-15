@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from copy import deepcopy
 import asyncio
+import json
 from app.config.config import settings
 from app.log.logger import get_gemini_logger
 from app.core.security import SecurityService
 from app.domain.gemini_models import GeminiContent, GeminiRequest, ResetSelectedKeysRequest, VerifySelectedKeysRequest
 from app.service.chat.gemini_chat_service import GeminiChatService
 from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.tts.multi_speaker.tts_routes import get_tts_chat_service
 from app.service.model.model_service import ModelService
 from app.handler.retry_handler import RetryHandler
 from app.handler.error_handler import handle_route_errors
@@ -33,7 +35,12 @@ async def get_next_working_key(key_manager: KeyManager = Depends(get_key_manager
 
 async def get_chat_service(key_manager: KeyManager = Depends(get_key_manager)):
     """获取Gemini聊天服务实例"""
-    return GeminiChatService(settings.BASE_URL, key_manager)
+    # 检查是否启用TTS功能
+    import os
+    if os.getenv("ENABLE_TTS", "false").lower() in ("true", "1", "yes", "on"):
+        return await get_tts_chat_service(key_manager)
+    else:
+        return GeminiChatService(settings.BASE_URL, key_manager)
 
 
 @router.get("/models")
@@ -99,6 +106,7 @@ async def list_models(
 async def generate_content(
     model_name: str,
     request: GeminiRequest,
+    raw_request: Request,
     _=Depends(security_service.verify_key_or_goog_api_key),
     api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
@@ -109,6 +117,23 @@ async def generate_content(
     async with handle_route_errors(logger, operation_name, failure_message="Content generation failed"):
         logger.info(f"Handling Gemini content generation request for model: {model_name}")
         logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
+
+        # 对于TTS模型，我们需要从原始请求体中提取TTS字段
+        if "tts" in model_name.lower():
+            try:
+                raw_body = await raw_request.body()
+                raw_data = json.loads(raw_body.decode('utf-8'))
+                logger.info(f"Raw request data for TTS: {json.dumps(raw_data, indent=2, ensure_ascii=False)}")
+
+                # 将TTS字段添加到请求对象中
+                if hasattr(request, '_raw_tts_data'):
+                    request._raw_tts_data = raw_data
+                else:
+                    # 动态添加属性
+                    setattr(request, '_raw_tts_data', raw_data)
+            except Exception as e:
+                logger.warning(f"Failed to parse raw request for TTS: {e}")
+
         logger.info(f"Using API key: {api_key}")
 
         if not await model_service.check_model_support(model_name):
