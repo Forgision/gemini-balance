@@ -113,7 +113,7 @@ class FilesService:
                     try:
                         request_data = json.loads(body)
                         display_name = request_data.get("displayName", "")
-                    except:
+                    except Exception:
                         pass
                 # 從 upload URL 中提取 upload_id
                 import urllib.parse
