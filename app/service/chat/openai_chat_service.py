@@ -184,7 +184,10 @@ def _build_payload(
         payload["generationConfig"]["responseModalities"] = ["Text", "Image"]
     
     if request.model.endswith("-non-thinking"):
-        payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
+        if "gemini-2.5-pro" in request.model:
+            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 128}
+        else:
+            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0} 
     
     if request.model in settings.THINKING_BUDGET_MAP:
         if settings.SHOW_THINKING_PROCESS:

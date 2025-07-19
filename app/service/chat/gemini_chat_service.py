@@ -206,7 +206,10 @@ def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
     else:
         # 客户端没有提供思考配置，使用默认配置    
         if model.endswith("-non-thinking"):
-            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0} 
+            if "gemini-2.5-pro" in model:
+                payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 128}
+            else:
+                payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0} 
         elif model in settings.THINKING_BUDGET_MAP:
             if settings.SHOW_THINKING_PROCESS:
                 payload["generationConfig"]["thinkingConfig"] = {
