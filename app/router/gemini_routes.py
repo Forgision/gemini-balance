@@ -339,7 +339,9 @@ async def verify_key(api_key: str, chat_service: GeminiChatService = Depends(get
         )
         
         if response:
-            return JSONResponse({"status": "valid"})        
+            # 如果密钥验证成功，则重置其失败计数
+            await key_manager.reset_key_failure_count(api_key)
+            return JSONResponse({"status": "valid"})
     except Exception as e:
         logger.error(f"Key verification failed: {str(e)}")
         
@@ -382,6 +384,8 @@ async def verify_selected_keys(
                 api_key
             )
             successful_keys.append(api_key)
+            # 如果密钥验证成功，则重置其失败计数
+            await key_manager.reset_key_failure_count(api_key)
             return api_key, "valid", None
         except Exception as e:
             error_message = str(e)
