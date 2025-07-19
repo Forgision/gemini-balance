@@ -185,6 +185,8 @@ app/
 | `THINKING_MODELS`            | 可选，支持思考功能的模型列表                                   | `[]`                                                  |
 | `THINKING_BUDGET_MAP`        | 可选，思考功能预算映射 (模型名:预算值)                         | `{}`                                                  |
 | `URL_NORMALIZATION_ENABLED`  | 可选，是否启用智能路由映射功能                                 | `false`                                               |
+| `URL_CONTEXT_ENABLED`        | 可选，是否启用URL上下文理解功能                                | `false`                                               |
+| `URL_CONTEXT_MODELS`         | 可选，支持URL上下文理解功能的模型列表                          | `[]`                                                  |
 | `BASE_URL`                   | 可选，Gemini API 基础 URL，默认无需修改                        | `https://generativelanguage.googleapis.com/v1beta`    |
 | `MAX_FAILURES`               | 可选，允许单个key失败的次数                                    | `3`                                                   |
 | `MAX_RETRIES`                | 可选，API 请求失败时的最大重试次数                             | `3`                                                   |

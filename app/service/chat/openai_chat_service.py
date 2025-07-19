@@ -87,6 +87,10 @@ def _build_tools(
 
     if model.endswith("-search"):
         tool["googleSearch"] = {}
+        
+    real_model = _get_real_model(model)
+    if real_model in settings.URL_CONTEXT_MODELS and settings.URL_CONTEXT_ENABLED:
+        tool["urlContext"] = {}
 
     # 将 request 中的 tools 合并到 tools 中
     if request.tools:
@@ -126,8 +130,21 @@ def _build_tools(
     if tool.get("functionDeclarations"):
         tool.pop("googleSearch", None)
         tool.pop("codeExecution", None)
+        tool.pop("urlContext",None)
 
     return [tool] if tool else []
+
+
+def _get_real_model(model: str) -> str:
+    if model.endswith("-search"):
+        model = model[:-7]
+    if model.endswith("-image"):
+        model = model[:-6]
+    if model.endswith("-non-thinking"):
+        model = model[:-13]
+    if "-search" in model and "-non-thinking" in model:
+        model = model[:-20]
+    return model
 
 
 def _get_safety_settings(model: str) -> List[Dict[str, str]]:
