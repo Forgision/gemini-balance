@@ -206,7 +206,7 @@ def _build_payload(
         else:
             payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0} 
     
-    if request.model in settings.THINKING_BUDGET_MAP:
+    if _get_real_model(request.model) in settings.THINKING_BUDGET_MAP:
         if settings.SHOW_THINKING_PROCESS:
             payload["generationConfig"]["thinkingConfig"] = {
                 "thinkingBudget": settings.THINKING_BUDGET_MAP.get(request.model, 1000),
