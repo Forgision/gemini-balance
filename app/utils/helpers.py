@@ -154,6 +154,22 @@ def is_valid_api_key(key: str) -> bool:
 
 
 
+def redact_key_for_logging(key: str) -> str:
+    """
+    Redacts API key for secure logging by showing only first and last 6 characters.
+
+    Args:
+        key: API key to redact
+
+    Returns:
+        str: Redacted key in format "first6...last6" or original if too short
+    """
+    if not key or len(key) <= 12:
+        return "***"
+
+    return f"{key[:6]}...{key[-6:]}"
+
+
 def get_current_version(default_version: str = "0.0.0") -> str:
     """Reads the current version from the VERSION file."""
     version_file = VERSION_FILE_PATH
