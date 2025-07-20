@@ -80,6 +80,21 @@ def _clean_json_schema_properties(obj: Any) -> Any:
 def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
     """构建工具"""
     
+    def _has_function_call(contents: List[Dict[str, Any]]) -> bool:
+        """检查内容中是否包含 functionCall"""
+        if not contents or not isinstance(contents, list):
+            return False
+        for content in contents:
+            if not content or not isinstance(content, dict) or "parts" not in content:
+                continue
+            parts = content.get("parts", [])
+            if not parts or not isinstance(parts, list):
+                continue
+            for part in parts:
+                if isinstance(part, dict) and "functionCall" in part:
+                    return True
+        return False
+    
     def _merge_tools(tools: List[Dict[str, Any]]) -> Dict[str, Any]:
         record = dict()
         for item in tools:
@@ -125,7 +140,7 @@ def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         tool["urlContext"] = {}
         
     # 解决 "Tool use with function calling is unsupported" 问题
-    if tool.get("functionDeclarations"):
+    if tool.get("functionDeclarations") or _has_function_call(payload.get("contents", [])):
         tool.pop("googleSearch", None)
         tool.pop("codeExecution", None)
         tool.pop("urlContext", None)
