@@ -14,15 +14,7 @@ COLORS = {
 }
 
 
-def _redact_key_for_logging(key: str) -> str:
-    """
-    Redacts API key for secure logging by showing only first and last 6 characters.
-    (Internal function to avoid circular imports)
-    """
-    if not key or len(key) <= 12:
-        return "***"
-
-    return f"{key[:6]}...{key[-6:]}"
+from app.utils.helpers import redact_key_for_logging as _redact_key_for_logging
 
 # Windows系统启用ANSI支持
 if platform.system() == "Windows":
@@ -54,9 +46,8 @@ class AccessLogFormatter(logging.Formatter):
 
     # API key patterns to match in URLs
     API_KEY_PATTERNS = [
-        r'AIza[0-9A-Za-z_-]{35}',  # Google API keys (like Gemini)
-        r'sk-[0-9A-Za-z]{48}',     # OpenAI API keys
-        r'sk-[0-9A-Za-z_-]{20,}',  # General sk- prefixed keys
+        r'\bAIza[0-9A-Za-z_-]{35}',  # Google API keys (like Gemini)
+        r'\bsk-[0-9A-Za-z_-]{20,}',  # OpenAI and general sk- prefixed keys
     ]
 
     def __init__(self, *args, **kwargs):
@@ -75,14 +66,21 @@ class AccessLogFormatter(logging.Formatter):
         """
         Replace API keys in log message with redacted versions
         """
-        for pattern in self.compiled_patterns:
-            def replace_key(match):
-                key = match.group(0)
-                return _redact_key_for_logging(key)
+        try:
+            for pattern in self.compiled_patterns:
+                def replace_key(match):
+                    key = match.group(0)
+                    return _redact_key_for_logging(key)
 
-            message = pattern.sub(replace_key, message)
+                message = pattern.sub(replace_key, message)
 
-        return message
+            return message
+        except Exception as e:
+            # Log the error but don't expose the original message in case it contains keys
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error redacting API keys in access log: {e}")
+            return "[LOG_REDACTION_ERROR]"
 
 
 # 日志格式 - 使用 fileloc 并设置固定宽度 (例如 30)

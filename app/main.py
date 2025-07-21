@@ -5,10 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.core.application import create_app
-from app.log.logger import get_main_logger, setup_access_logging
-
-# Setup access logging with API key redaction when app is imported (for CLI usage)
-setup_access_logging()
+from app.log.logger import get_main_logger
 
 app = create_app()
 

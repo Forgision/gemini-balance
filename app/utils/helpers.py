@@ -162,12 +162,15 @@ def redact_key_for_logging(key: str) -> str:
         key: API key to redact
 
     Returns:
-        str: Redacted key in format "first6...last6" or original if too short
+        str: Redacted key in format "first6...last6" or descriptive placeholder for edge cases
     """
-    if not key or len(key) <= 12:
-        return "***"
+    if not key:
+        return key
 
-    return f"{key[:6]}...{key[-6:]}"
+    if len(key) <= 12:
+        return f"{key[:3]}...{key[-3:]}"
+    else:
+        return f"{key[:6]}...{key[-6:]}"
 
 
 def get_current_version(default_version: str = "0.0.0") -> str:
