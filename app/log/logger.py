@@ -3,6 +3,7 @@ import platform
 import sys
 import re
 from typing import Dict, Optional
+from app.utils.helpers import redact_key_for_logging as _redact_key_for_logging
 
 # ANSI转义序列颜色代码
 COLORS = {
@@ -14,7 +15,6 @@ COLORS = {
 }
 
 
-from app.utils.helpers import redact_key_for_logging as _redact_key_for_logging
 
 # Windows系统启用ANSI支持
 if platform.system() == "Windows":
