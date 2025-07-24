@@ -1100,62 +1100,198 @@ function initializeAutoRefreshControls() {
   }
 }
 
-// These variables are used by pagination and search, define them in a scope accessible by initializeKeyPaginationAndSearch
+// Debounce function
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
+
+// --- Key List Display & Pagination ---
+
+/**
+ * Fetches and displays keys.
+ * @param {string} type 'valid' or 'invalid'
+ * @param {number} page Page number (1-based)
+ */
+async function fetchAndDisplayKeys(type, page = 1) {
+    const listElement = document.getElementById(`${type}Keys`);
+    const paginationControls = document.getElementById(`${type}PaginationControls`);
+    if (!listElement || !paginationControls) return;
+
+    // Show loading indicator
+    listElement.innerHTML = `<li><div class="text-center py-4 col-span-full"><i class="fas fa-spinner fa-spin"></i> Loading...</div></li>`;
+
+    const itemsPerPageSelect = document.getElementById("itemsPerPageSelect");
+    const limit = itemsPerPageSelect ? parseInt(itemsPerPageSelect.value, 10) : 10;
+    
+    const searchInput = document.getElementById("keySearchInput");
+    const searchTerm = searchInput ? searchInput.value : '';
+
+    const thresholdInput = document.getElementById("failCountThreshold");
+    const failCountThreshold = thresholdInput ? (thresholdInput.value === '' ? null : parseInt(thresholdInput.value, 10)) : null;
+
+    try {
+        const params = new URLSearchParams({
+            page: page,
+            limit: limit,
+            status: type,
+        });
+        if (searchTerm) {
+            params.append('search', searchTerm);
+        }
+        if (failCountThreshold !== null) {
+            params.append('fail_count_threshold', failCountThreshold);
+        }
+
+        const data = await fetchAPI(`/api/keys?${params.toString()}`);
+
+        listElement.innerHTML = ""; // Clear loading indicator
+
+        const keys = data.keys || {};
+        if (Object.keys(keys).length > 0) {
+            Object.entries(keys).forEach(([key, fail_count]) => {
+                const listItem = createKeyListItem(key, fail_count, type);
+                listElement.appendChild(listItem);
+            });
+        } else {
+            listElement.innerHTML = `<li><div class="text-center py-4 col-span-full">No keys found.</div></li>`;
+        }
+
+        setupPaginationControls(type, data.current_page, data.total_pages);
+        updateBatchActions(type);
+
+    } catch (error) {
+        console.error(`Error fetching ${type} keys:`, error);
+        listElement.innerHTML = `<li><div class="text-center py-4 text-red-500 col-span-full">Error loading keys.</div></li>`;
+    }
+}
+
+
+/**
+ * Creates a single key list item element.
+ * @param {string} key The API key.
+ * @param {number} fail_count The failure count for the key.
+ * @param {string} type 'valid' or 'invalid'.
+ * @returns {HTMLElement} The created list item element.
+ */
+function createKeyListItem(key, fail_count, type) {
+    const li = document.createElement("li");
+    li.className = `bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-all duration-300 border ${type === 'valid' ? 'hover:border-success-300' : 'hover:border-danger-300'} transform hover:-translate-y-1`;
+    li.dataset.key = key;
+    li.dataset.failCount = fail_count;
+
+    const statusBadge = type === 'valid'
+        ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600"><i class="fas fa-check mr-1"></i> 有效</span>`
+        : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-600"><i class="fas fa-times mr-1"></i> 无效</span>`;
+
+    li.innerHTML = `
+        <input type="checkbox" class="form-checkbox h-5 w-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mt-1 key-checkbox" data-key-type="${type}" value="${key}">
+        <div class="flex-grow">
+            <div class="flex flex-col justify-between h-full gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    ${statusBadge}
+                    <div class="flex items-center gap-1">
+                        <span class="key-text font-mono" data-full-key="${key}">${key.substring(0, 4)}...${key.substring(key.length - 4)}</span>
+                        <button class="text-gray-500 hover:text-primary-600 transition-colors" onclick="toggleKeyVisibility(this)" title="Show/Hide Key">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-600">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        失败: ${fail_count}
+                    </span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button class="flex items-center gap-1 bg-success-600 hover:bg-success-700 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="verifyKey('${key}', this)"><i class="fas fa-check-circle"></i> 验证</button>
+                    <button class="flex items-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="resetKeyFailCount('${key}', this)"><i class="fas fa-redo-alt"></i> 重置</button>
+                    <button class="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="copyKey('${key}')"><i class="fas fa-copy"></i> 复制</button>
+                    <button class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="showKeyUsageDetails('${key}')"><i class="fas fa-chart-pie"></i> 详情</button>
+                    <button class="flex items-center gap-1 bg-red-800 hover:bg-red-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="showSingleKeyDeleteConfirmModal('${key}', this)"><i class="fas fa-trash-alt"></i> 删除</button>
+                </div>
+            </div>
+        </div>
+    `;
+    return li;
+}
+
+
+/**
+ * Sets up pagination controls.
+ * @param {string} type 'valid' or 'invalid'
+ * @param {number} currentPage Current page number
+ * @param {number} totalPages Total number of pages
+ */
+function setupPaginationControls(type, currentPage, totalPages) {
+    const controlsContainer = document.getElementById(`${type}PaginationControls`);
+    if (!controlsContainer) return;
+
+    controlsContainer.innerHTML = "";
+
+    if (totalPages <= 1) return;
+
+    // Previous Button
+    const prevButton = document.createElement("button");
+    prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prevButton.className = `pagination-button px-3 py-1 rounded text-sm transition-colors duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed`;
+    prevButton.disabled = currentPage === 1;
+    prevButton.onclick = () => fetchAndDisplayKeys(type, currentPage - 1);
+    controlsContainer.appendChild(prevButton);
+
+    // Page Number Buttons
+    for (let i = 1; i <= totalPages; i++) {
+        // Simple pagination for now, can be improved with ellipsis for many pages
+        const pageButton = document.createElement("button");
+        pageButton.textContent = i;
+        pageButton.className = `pagination-button px-3 py-1 rounded text-sm transition-colors duration-150 ease-in-out ${i === currentPage ? 'active font-semibold' : ''}`;
+        pageButton.onclick = () => fetchAndDisplayKeys(type, i);
+        controlsContainer.appendChild(pageButton);
+    }
+
+    // Next Button
+    const nextButton = document.createElement("button");
+    nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    nextButton.className = `pagination-button px-3 py-1 rounded text-sm transition-colors duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed`;
+    nextButton.disabled = currentPage === totalPages;
+    nextButton.onclick = () => fetchAndDisplayKeys(type, currentPage + 1);
+    controlsContainer.appendChild(nextButton);
+}
 let allValidKeys = [];
-let allInvalidKeys = [];
-let filteredValidKeys = [];
-let itemsPerPage = 10; // Default
-let validCurrentPage = 1; // Also used by displayPage
-let invalidCurrentPage = 1; // Also used by displayPage
-
+  let allInvalidKeys = [];
+  let filteredValidKeys = [];
+  let itemsPerPage = 10; // Default
+  let validCurrentPage = 1; // Also used by displayPage
+  let invalidCurrentPage = 1; // Also used by displayPage
+  
 function initializeKeyPaginationAndSearch() {
-  const validKeysListElement = document.getElementById("validKeys");
-  const invalidKeysListElement = document.getElementById("invalidKeys");
-  const searchInput = document.getElementById("keySearchInput");
-  const itemsPerPageSelect = document.getElementById("itemsPerPageSelect");
-  const thresholdInput = document.getElementById("failCountThreshold"); // Already used by initializeKeyFilterControls
+    const debouncedFetchValidKeys = debounce(() => fetchAndDisplayKeys('valid', 1), 300);
+    const debouncedFetchInvalidKeys = debounce(() => fetchAndDisplayKeys('invalid', 1), 300);
 
-  if (validKeysListElement) {
-    allValidKeys = Array.from(
-      validKeysListElement.querySelectorAll("li[data-key]")
-    );
-    allValidKeys.forEach((li) => {
-      const keyTextSpan = li.querySelector(".key-text");
-      if (keyTextSpan && keyTextSpan.dataset.fullKey) {
-        li.dataset.key = keyTextSpan.dataset.fullKey;
-      }
-    });
-    filteredValidKeys = [...allValidKeys];
-  }
-  if (invalidKeysListElement) {
-    allInvalidKeys = Array.from(
-      invalidKeysListElement.querySelectorAll("li[data-key]")
-    );
-    allInvalidKeys.forEach((li) => {
-      const keyTextSpan = li.querySelector(".key-text");
-      if (keyTextSpan && keyTextSpan.dataset.fullKey) {
-        li.dataset.key = keyTextSpan.dataset.fullKey;
-      }
-    });
-  }
+    const searchInput = document.getElementById("keySearchInput");
+    if (searchInput) {
+        searchInput.addEventListener("input", debouncedFetchValidKeys);
+    }
 
-  if (itemsPerPageSelect) {
-    itemsPerPage = parseInt(itemsPerPageSelect.value, 10); // Initialize itemsPerPage
-    itemsPerPageSelect.addEventListener("change", () => {
-      itemsPerPage = parseInt(itemsPerPageSelect.value, 10);
-      filterAndSearchValidKeys(); // Re-filter and display page 1 for valid keys
-      displayPage("invalid", 1, allInvalidKeys); // Reset invalid keys to page 1
-    });
-  }
+    const thresholdInput = document.getElementById("failCountThreshold");
+    if (thresholdInput) {
+        thresholdInput.addEventListener("input", debouncedFetchValidKeys);
+    }
+    
+    const itemsPerPageSelect = document.getElementById("itemsPerPageSelect");
+    if (itemsPerPageSelect) {
+        itemsPerPageSelect.addEventListener("change", () => {
+             fetchAndDisplayKeys('valid', 1);
+             fetchAndDisplayKeys('invalid', 1);
+        });
+    }
 
-  // Initial display calls
-  filterAndSearchValidKeys();
-  displayPage("invalid", 1, allInvalidKeys);
-
-  // Event listeners for search and filter (thresholdInput listener is in initializeKeyFilterControls)
-  if (searchInput) {
-    searchInput.addEventListener("input", filterAndSearchValidKeys);
-  }
+    // Initial fetch
+    fetchAndDisplayKeys('valid');
+    fetchAndDisplayKeys('invalid');
 }
 
 function registerServiceWorker() {
@@ -1649,77 +1785,11 @@ function displayPage(type, page, keyItemsArray) {
   );
   if (!listElement || !paginationControls) return;
 
-  // Update current page based on type
-  if (type === "valid") {
-    validCurrentPage = page;
-    // Read itemsPerPage from the select specifically for valid keys
-    const itemsPerPageSelect = document.getElementById("itemsPerPageSelect");
-    itemsPerPage = itemsPerPageSelect
-      ? parseInt(itemsPerPageSelect.value, 10)
-      : 10;
-  } else {
-    invalidCurrentPage = page;
-    // For invalid keys, use a fixed itemsPerPage or the same global one
-    // itemsPerPage = 10; // Or read from a different select if needed
-  }
-
-  const totalItems = keyItemsArray.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  page = Math.max(1, Math.min(page, totalPages || 1)); // Ensure page is valid
-
-  // Update current page variable again after validation
-  if (type === "valid") {
-    validCurrentPage = page;
-  } else {
-    invalidCurrentPage = page;
-  }
-
-  const startIndex = (page - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-
-  listElement.innerHTML = ""; // Clear current list content
-
-  const pageItems = keyItemsArray.slice(startIndex, endIndex);
-
-  if (pageItems.length > 0) {
-    pageItems.forEach((originalMasterItem) => {
-      const listItemClone = originalMasterItem.cloneNode(true);
-      // The checkbox's 'checked' state is cloned from the master item.
-      // Now, ensure the 'selected' class on the clone matches this cloned checkbox state.
-      const checkboxInClone = listItemClone.querySelector(".key-checkbox");
-      if (checkboxInClone) {
-        listItemClone.classList.toggle("selected", checkboxInClone.checked);
-      }
-      listElement.appendChild(listItemClone);
-    });
-  } else if (
-    totalItems === 0 &&
-    type === "valid" &&
-    (document.getElementById("failCountThreshold").value !== "0" ||
-      document.getElementById("keySearchInput").value !== "")
-  ) {
-    // Handle empty state after filtering/searching for valid keys
-    const noMatchMsgId = "no-valid-keys-msg";
-    let noMatchMsg = listElement.querySelector(`#${noMatchMsgId}`);
-    if (!noMatchMsg) {
-      noMatchMsg = document.createElement("li");
-      noMatchMsg.id = noMatchMsgId;
-      noMatchMsg.className = "text-center text-gray-500 py-4 col-span-full";
-      noMatchMsg.textContent = "没有符合条件的有效密钥";
-      listElement.appendChild(noMatchMsg);
-    }
-    noMatchMsg.style.display = "";
-  } else if (totalItems === 0) {
-    // Handle empty state for initially empty lists
-    const emptyMsg = document.createElement("li");
-    emptyMsg.className = "text-center text-gray-500 py-4 col-span-full";
-    emptyMsg.textContent = `暂无${type === "valid" ? "有效" : "无效"}密钥`;
-    listElement.appendChild(emptyMsg);
-  }
-
-  setupPaginationControls(type, page, totalPages, keyItemsArray);
+  // This function is now mostly handled by fetchAndDisplayKeys.
+  // We can simplify this or remove it if all display logic is in fetchAndDisplayKeys.
+  // For now, let's keep it for rendering the pagination controls as a separate step.
+  setupPaginationControls(type, page, totalPages);
   updateBatchActions(type); // Update batch actions based on the currently displayed page
-  // Re-attach event listeners for buttons inside the newly added list items if needed (using event delegation is better)
 }
 
 /**
@@ -1729,7 +1799,7 @@ function displayPage(type, page, keyItemsArray) {
  * @param {number} totalPages Total number of pages
  * @param {Array} keyItemsArray The array of li elements being paginated
  */
-function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
+function setupPaginationControls(type, currentPage, totalPages) {
   const controlsContainer = document.getElementById(
     `${type}PaginationControls`
   );
@@ -1754,7 +1824,7 @@ function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
   prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
   prevButton.className = `${baseButtonClasses} disabled:opacity-50 disabled:cursor-not-allowed`;
   prevButton.disabled = currentPage === 1;
-  prevButton.onclick = () => displayPage(type, currentPage - 1, keyItemsArray);
+  prevButton.onclick = () => fetchAndDisplayKeys(type, currentPage - 1);
   controlsContainer.appendChild(prevButton);
 
   // Page Number Buttons (Logic for ellipsis)
@@ -1771,7 +1841,7 @@ function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
     const firstPageButton = document.createElement("button");
     firstPageButton.textContent = "1";
     firstPageButton.className = `${baseButtonClasses}`;
-    firstPageButton.onclick = () => displayPage(type, 1, keyItemsArray);
+    firstPageButton.onclick = () => fetchAndDisplayKeys(type, 1);
     controlsContainer.appendChild(firstPageButton);
     if (startPage > 2) {
       const ellipsis = document.createElement("span");
@@ -1790,7 +1860,7 @@ function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
         ? "active font-semibold" // Relies on .pagination-button.active CSS for styling
         : "" // Non-active buttons just use .pagination-button style
     }`;
-    pageButton.onclick = () => displayPage(type, i, keyItemsArray);
+    pageButton.onclick = () => fetchAndDisplayKeys(type, i);
     controlsContainer.appendChild(pageButton);
   }
 
@@ -1805,7 +1875,7 @@ function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
     const lastPageButton = document.createElement("button");
     lastPageButton.textContent = totalPages;
     lastPageButton.className = `${baseButtonClasses}`;
-    lastPageButton.onclick = () => displayPage(type, totalPages, keyItemsArray);
+    lastPageButton.onclick = () => fetchAndDisplayKeys(type, totalPages);
     controlsContainer.appendChild(lastPageButton);
   }
 
@@ -1814,7 +1884,7 @@ function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
   nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
   nextButton.className = `${baseButtonClasses} disabled:opacity-50 disabled:cursor-not-allowed`;
   nextButton.disabled = currentPage === totalPages;
-  nextButton.onclick = () => displayPage(type, currentPage + 1, keyItemsArray);
+  nextButton.onclick = () => fetchAndDisplayKeys(type, currentPage + 1);
   controlsContainer.appendChild(nextButton);
 }
 
@@ -1825,26 +1895,5 @@ function setupPaginationControls(type, currentPage, totalPages, keyItemsArray) {
  * Updates the `filteredValidKeys` array and redisplays the first page.
  */
 function filterAndSearchValidKeys() {
-  const thresholdInput = document.getElementById("failCountThreshold");
-  const searchInput = document.getElementById("keySearchInput");
-
-  const threshold = parseInt(thresholdInput.value, 10);
-  const filterThreshold = isNaN(threshold) || threshold < 0 ? 0 : threshold;
-  const searchTerm = searchInput.value.trim().toLowerCase();
-
-  // Filter from the original full list (allValidKeys)
-  filteredValidKeys = allValidKeys.filter((item) => {
-    const failCount = parseInt(item.dataset.failCount, 10);
-    const fullKey = item.dataset.key || ""; // Use data-key which should hold the full key
-
-    const failCountMatch = failCount >= filterThreshold;
-    const searchMatch =
-      searchTerm === "" || fullKey.toLowerCase().includes(searchTerm);
-
-    return failCountMatch && searchMatch;
-  });
-
-  // Reset to the first page after filtering/searching
-  validCurrentPage = 1;
-  displayPage("valid", validCurrentPage, filteredValidKeys);
+    fetchAndDisplayKeys('valid', 1);
 }

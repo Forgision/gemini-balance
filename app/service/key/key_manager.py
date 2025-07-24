@@ -141,6 +141,18 @@ class KeyManager:
         """获取指定 Vertex 密钥的失败次数"""
         return self.vertex_key_failure_counts.get(key, 0)
 
+    async def get_all_keys_with_fail_count(self) -> dict:
+        """获取所有API key及其失败次数"""
+        all_keys = {}
+        async with self.failure_count_lock:
+            for key in self.api_keys:
+                all_keys[key] = self.key_failure_counts.get(key, 0)
+        
+        valid_keys = {k: v for k, v in all_keys.items() if v < self.MAX_FAILURES}
+        invalid_keys = {k: v for k, v in all_keys.items() if v >= self.MAX_FAILURES}
+        
+        return {"valid_keys": valid_keys, "invalid_keys": invalid_keys, "all_keys": all_keys}
+
     async def get_keys_by_status(self) -> dict:
         """获取分类后的API key列表，包括失败次数"""
         valid_keys = {}
