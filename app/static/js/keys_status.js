@@ -602,82 +602,50 @@ function showVerificationResultModal(data) {
 }
 
 async function executeResetAll(type) {
-  try {
-    // 关闭确认模态框
-    closeResetModal();
+  closeResetModal();
+  const keysToReset = getSelectedKeys(type);
+  if (keysToReset.length === 0) {
+    showNotification("没有选中的密钥可重置", "warning");
+    return;
+  }
 
-    // 找到对应的重置按钮以显示加载状态
-    const resetButton = document.querySelector(
-      `button[data-reset-type="${type}"]`
-    );
-    if (!resetButton) {
-      showResultModal(
-        false,
-        `找不到${type === "valid" ? "有效" : "无效"}密钥区域的批量重置按钮`,
-        false
-      ); // Don't reload if button not found
-      return;
-    }
+  showProgressModal(`批量重置 ${keysToReset.length} 个密钥的失败计数`);
 
-    // 获取选中的密钥
-    const keysToReset = getSelectedKeys(type);
+  let successCount = 0;
+  let failCount = 0;
 
-    if (keysToReset.length === 0) {
-      showNotification(
-        `没有选中的${type === "valid" ? "有效" : "无效"}密钥可重置`,
-        "warning"
-      );
-      return;
-    }
-
-    // 禁用按钮并显示加载状态
-    resetButton.disabled = true;
-    const originalHtml = resetButton.innerHTML;
-    resetButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 重置中';
+  for (let i = 0; i < keysToReset.length; i++) {
+    const key = keysToReset[i];
+    const keyDisplay = `${key.substring(0, 4)}...${key.substring(
+      key.length - 4
+    )}`;
+    updateProgress(i, keysToReset.length, `正在重置: ${keyDisplay}`);
 
     try {
-      const options = {
+      const data = await fetchAPI(`/gemini/v1beta/reset-fail-count/${key}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys: keysToReset, key_type: type }),
-      };
-      const data = await fetchAPI(
-        `/gemini/v1beta/reset-selected-fail-counts`,
-        options
-      );
-
-      // 根据重置结果显示模态框
+      });
       if (data.success) {
-        const message =
-          data.reset_count !== undefined
-            ? `成功重置 ${data.reset_count} 个选中的${
-                type === "valid" ? "有效" : "无效"
-              }密钥的失败次数`
-            : `成功重置 ${keysToReset.length} 个选中的密钥`;
-        showResultModal(true, message); // 成功后刷新页面
+        successCount++;
+        addProgressLog(`✅ ${keyDisplay}: 重置成功`);
       } else {
-        const errorMsg = data.message || "批量重置失败";
-        // 失败后不自动刷新页面，让用户看到错误信息
-        showResultModal(false, "批量重置失败: " + errorMsg, false);
+        failCount++;
+        addProgressLog(
+          `❌ ${keyDisplay}: 重置失败 - ${data.message || "未知错误"}`,
+          true
+        );
       }
     } catch (apiError) {
-      console.error("批量重置 API 请求失败:", apiError);
-      showResultModal(false, `批量重置请求失败: ${apiError.message}`, false);
-    } finally {
-      // 恢复按钮状态 (仅在不刷新的情况下)
-      if (
-        !document.getElementById("resultModal") ||
-        document.getElementById("resultModal").classList.contains("hidden") ||
-        document.getElementById("resultModalTitle").textContent.includes("失败")
-      ) {
-        resetButton.innerHTML = originalHtml;
-        resetButton.disabled = false;
-      }
+      failCount++;
+      addProgressLog(`❌ ${keyDisplay}: 请求失败 - ${apiError.message}`, true);
     }
-  } catch (error) {
-    console.error("批量重置处理失败:", error);
-    showResultModal(false, "批量重置处理失败: " + error.message, false); // 失败后不自动刷新
   }
+
+  updateProgress(
+    keysToReset.length,
+    keysToReset.length,
+    `重置完成！成功: ${successCount}, 失败: ${failCount}`
+  );
 }
 
 function scrollToTop() {
@@ -929,56 +897,136 @@ function initializeGlobalBatchVerificationHandlers() {
 
   // executeVerifyAll 变为 initializeGlobalBatchVerificationHandlers 的局部函数
   async function executeVerifyAll(type) {
-    // Removed window.
-    try {
-      window.closeVerifyModal(); // Calls the global close function, which is fine.
-      const verifyButton = document.querySelector(
-        `#${type}BatchActions button:nth-child(1)`
-      ); // Assuming verify is the first button
-      let originalVerifyHtml = "";
-      if (verifyButton) {
-        originalVerifyHtml = verifyButton.innerHTML;
-        verifyButton.disabled = true;
-        verifyButton.innerHTML =
-          '<i class="fas fa-spinner fa-spin"></i> 验证中';
-      }
-      const keysToVerify = getSelectedKeys(type);
-      if (keysToVerify.length === 0) {
-        showNotification(
-          `没有选中的${type === "valid" ? "有效" : "无效"}密钥可验证`,
-          "warning"
-        );
-        if (verifyButton) {
-          // Restore button if no keys selected
-          verifyButton.innerHTML = originalVerifyHtml;
-        }
-        return;
-      }
-      showNotification("开始批量验证，请稍候...", "info");
-      const options = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys: keysToVerify }),
-      };
-      const data = await fetchAPI(
-        `/gemini/v1beta/verify-selected-keys`,
-        options
-      );
-      if (data) {
-        showVerificationResultModal(data);
-      } else {
-        throw new Error("API did not return verification data.");
-      }
-    } catch (apiError) {
-      console.error("批量验证处理失败:", apiError);
-      showResultModal(false, `批量验证处理失败: ${apiError.message}`, true);
-    } finally {
-      console.log("Bulk verification process finished.");
-      // Button state will be reset on page reload or by updateBatchActions
+    closeVerifyModal();
+    const keysToVerify = getSelectedKeys(type);
+    if (keysToVerify.length === 0) {
+      showNotification("没有选中的密钥可验证", "warning");
+      return;
     }
+
+    const batchSizeInput = document.getElementById("batchSize");
+    const batchSize = parseInt(batchSizeInput.value, 10) || 10;
+
+    showProgressModal(`批量验证 ${keysToVerify.length} 个密钥`);
+
+    let allSuccessfulKeys = [];
+    let allFailedKeys = {};
+    let processedCount = 0;
+
+    for (let i = 0; i < keysToVerify.length; i += batchSize) {
+      const batch = keysToVerify.slice(i, i + batchSize);
+      const progressText = `正在验证批次 ${Math.floor(i / batchSize) + 1} / ${Math.ceil(keysToVerify.length / batchSize)} (密钥 ${i + 1}-${Math.min(i + batchSize, keysToVerify.length)})`;
+      
+      updateProgress(i, keysToVerify.length, progressText);
+      addProgressLog(`处理批次: ${batch.length}个密钥...`);
+
+      try {
+        const options = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keys: batch }),
+        };
+        const data = await fetchAPI(`/gemini/v1beta/verify-selected-keys`, options);
+
+        if (data) {
+          if (data.successful_keys && data.successful_keys.length > 0) {
+            allSuccessfulKeys = allSuccessfulKeys.concat(data.successful_keys);
+            addProgressLog(`✅ 批次成功: ${data.successful_keys.length} 个`);
+          }
+          if (data.failed_keys && Object.keys(data.failed_keys).length > 0) {
+            Object.assign(allFailedKeys, data.failed_keys);
+             addProgressLog(`❌ 批次失败: ${Object.keys(data.failed_keys).length} 个`, true);
+          }
+        } else {
+           addProgressLog(`- 批次返回空数据`, true);
+        }
+      } catch (apiError) {
+         addProgressLog(`❌ 批次请求失败: ${apiError.message}`, true);
+         // Mark all keys in this batch as failed due to API error
+         batch.forEach(key => {
+            allFailedKeys[key] = apiError.message;
+         });
+      }
+      processedCount += batch.length;
+      updateProgress(processedCount, keysToVerify.length, progressText);
+    }
+
+    updateProgress(
+      keysToVerify.length,
+      keysToVerify.length,
+      `所有批次验证完成！`
+    );
+    
+    // Close progress modal and show final results
+    closeProgressModal(false); // Don't reload yet
+    showVerificationResultModal({
+        successful_keys: allSuccessfulKeys,
+        failed_keys: allFailedKeys,
+        valid_count: allSuccessfulKeys.length,
+        invalid_count: Object.keys(allFailedKeys).length
+    });
   }
   // The confirmButton.onclick in showVerifyModal (defined earlier in initializeGlobalBatchVerificationHandlers)
   // will correctly reference this local executeVerifyAll due to closure.
+}
+
+// --- 进度条模态框函数 ---
+function showProgressModal(title) {
+  const modal = document.getElementById("progressModal");
+  const titleElement = document.getElementById("progressModalTitle");
+  const statusText = document.getElementById("progressStatusText");
+  const progressBar = document.getElementById("progressBar");
+  const progressPercentage = document.getElementById("progressPercentage");
+  const progressLog = document.getElementById("progressLog");
+  const closeButton = document.getElementById("progressModalCloseBtn");
+  const closeIcon = document.getElementById("closeProgressModalBtn");
+
+  titleElement.textContent = title;
+  statusText.textContent = "准备开始...";
+  progressBar.style.width = "0%";
+  progressPercentage.textContent = "0%";
+  progressLog.innerHTML = "";
+  closeButton.disabled = true;
+  closeIcon.disabled = true;
+
+  modal.classList.remove("hidden");
+}
+
+function updateProgress(processed, total, status) {
+  const progressBar = document.getElementById("progressBar");
+  const progressPercentage = document.getElementById("progressPercentage");
+  const statusText = document.getElementById("progressStatusText");
+  const closeButton = document.getElementById("progressModalCloseBtn");
+  const closeIcon = document.getElementById("closeProgressModalBtn");
+
+  const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+  progressBar.style.width = `${percentage}%`;
+  progressPercentage.textContent = `${percentage}%`;
+  statusText.textContent = status;
+
+  if (processed === total) {
+    closeButton.disabled = false;
+    closeIcon.disabled = false;
+  }
+}
+
+function addProgressLog(message, isError = false) {
+  const progressLog = document.getElementById("progressLog");
+  const logEntry = document.createElement("div");
+  logEntry.textContent = message;
+  logEntry.className = isError
+    ? "text-danger-600"
+    : "text-gray-700";
+  progressLog.appendChild(logEntry);
+  progressLog.scrollTop = progressLog.scrollHeight; // Auto-scroll to bottom
+}
+
+function closeProgressModal(reload = false) {
+  const modal = document.getElementById("progressModal");
+  modal.classList.add("hidden");
+  if (reload) {
+    location.reload();
+  }
 }
 
 function initializeKeySelectionListeners() {
@@ -1309,6 +1357,25 @@ function registerServiceWorker() {
   }
 }
 
+// 初始化下拉菜单
+function initializeDropdownMenu() {
+  // 阻止下拉菜单按钮的点击事件冒泡
+  const dropdownButton = document.getElementById('dropdownMenuButton');
+  if (dropdownButton) {
+    dropdownButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+  }
+  
+  // 阻止下拉菜单内部点击事件冒泡
+  const dropdownMenu = document.getElementById('dropdownMenu');
+  if (dropdownMenu) {
+    dropdownMenu.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+  }
+}
+
 // 初始化
 document.addEventListener("DOMContentLoaded", () => {
   initializePageAnimationsAndEffects();
@@ -1319,6 +1386,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeAutoRefreshControls();
   initializeKeyPaginationAndSearch(); // This will also handle initial display
   registerServiceWorker();
+  initializeDropdownMenu(); // 初始化下拉菜单
 
   // Initial batch actions update might be needed if not covered by displayPage
   // updateBatchActions('valid');
@@ -1896,4 +1964,180 @@ function setupPaginationControls(type, currentPage, totalPages) {
  */
 function filterAndSearchValidKeys() {
     fetchAndDisplayKeys('valid', 1);
+}
+
+// --- 下拉菜单功能 ---
+
+// 切换下拉菜单显示/隐藏
+window.toggleDropdownMenu = function() {
+  const dropdownMenu = document.getElementById('dropdownMenu');
+  const isVisible = dropdownMenu.classList.contains('show');
+  
+  if (isVisible) {
+    hideDropdownMenu();
+  } else {
+    showDropdownMenu();
+  }
+}
+
+// 显示下拉菜单
+function showDropdownMenu() {
+  const dropdownMenu = document.getElementById('dropdownMenu');
+  dropdownMenu.classList.add('show');
+  
+  // 点击其他地方时隐藏菜单
+  document.addEventListener('click', handleOutsideClick);
+}
+
+// 隐藏下拉菜单
+function hideDropdownMenu() {
+  const dropdownMenu = document.getElementById('dropdownMenu');
+  dropdownMenu.classList.remove('show');
+  
+  // 移除事件监听器
+  document.removeEventListener('click', handleOutsideClick);
+}
+
+// 处理点击菜单外部区域
+function handleOutsideClick(event) {
+  const dropdownToggle = document.querySelector('.dropdown-toggle');
+  if (!dropdownToggle.contains(event.target)) {
+    hideDropdownMenu();
+  }
+}
+
+// 复制全部密钥
+async function copyAllKeys() {
+  hideDropdownMenu();
+  
+  try {
+    // 获取所有密钥（有效和无效）
+    const response = await fetchAPI('/api/keys/all');
+    
+    const allKeys = [...response.valid_keys, ...response.invalid_keys];
+    
+    if (allKeys.length === 0) {
+      showNotification("没有找到任何密钥", "warning");
+      return;
+    }
+    
+    const keysText = allKeys.join('\n');
+    await copyToClipboard(keysText);
+    showNotification(`已成功复制 ${allKeys.length} 个密钥到剪贴板`);
+    
+  } catch (error) {
+    console.error('复制全部密钥失败:', error);
+    showNotification(`复制失败: ${error.message}`, "error");
+  }
+}
+
+// 验证所有密钥
+window.verifyAllKeys = async function() {
+  hideDropdownMenu();
+  
+  try {
+    // 获取所有密钥（有效和无效）
+    const response = await fetchAPI('/api/keys/all');
+    
+    const allKeys = [...response.valid_keys, ...response.invalid_keys];
+    
+    if (allKeys.length === 0) {
+      showNotification("没有找到任何密钥可验证", "warning");
+      return;
+    }
+    
+    // 使用验证模态框显示确认对话框
+    showVerifyModalForAllKeys(allKeys);
+    
+  } catch (error) {
+    console.error('获取所有密钥失败:', error);
+    showNotification(`获取密钥失败: ${error.message}`, "error");
+  }
+}
+
+// 显示验证所有密钥的模态框
+function showVerifyModalForAllKeys(allKeys) {
+  const modalElement = document.getElementById("verifyModal");
+  const titleElement = document.getElementById("verifyModalTitle");
+  const messageElement = document.getElementById("verifyModalMessage");
+  const confirmButton = document.getElementById("confirmVerifyBtn");
+  
+  titleElement.textContent = "批量验证所有密钥";
+  messageElement.textContent = `确定要验证所有 ${allKeys.length} 个密钥吗？此操作可能需要较长时间。`;
+  confirmButton.disabled = false;
+  
+  // 设置确认按钮事件
+  confirmButton.onclick = () => executeVerifyAllKeys(allKeys);
+  
+  // 显示模态框
+  modalElement.classList.remove("hidden");
+}
+
+// 执行验证所有密钥
+async function executeVerifyAllKeys(allKeys) {
+  closeVerifyModal();
+  
+  // 获取批次大小
+  const batchSizeInput = document.getElementById("batchSize");
+  const batchSize = parseInt(batchSizeInput.value, 10) || 10;
+  
+  // 开始批量验证
+  showProgressModal(`批量验证所有 ${allKeys.length} 个密钥`);
+  
+  let allSuccessfulKeys = [];
+  let allFailedKeys = {};
+  let processedCount = 0;
+  
+  for (let i = 0; i < allKeys.length; i += batchSize) {
+    const batch = allKeys.slice(i, i + batchSize);
+    const progressText = `正在验证批次 ${Math.floor(i / batchSize) + 1} / ${Math.ceil(allKeys.length / batchSize)} (密钥 ${i + 1}-${Math.min(i + batchSize, allKeys.length)})`;
+    
+    updateProgress(i, allKeys.length, progressText);
+    addProgressLog(`处理批次: ${batch.length}个密钥...`);
+    
+    try {
+      const options = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keys: batch }),
+      };
+      const data = await fetchAPI(`/gemini/v1beta/verify-selected-keys`, options);
+      
+      if (data) {
+        if (data.successful_keys && data.successful_keys.length > 0) {
+          allSuccessfulKeys = allSuccessfulKeys.concat(data.successful_keys);
+          addProgressLog(`✅ 批次成功: ${data.successful_keys.length} 个`);
+        }
+        if (data.failed_keys && Object.keys(data.failed_keys).length > 0) {
+          Object.assign(allFailedKeys, data.failed_keys);
+          addProgressLog(`❌ 批次失败: ${Object.keys(data.failed_keys).length} 个`, true);
+        }
+      } else {
+        addProgressLog(`- 批次返回空数据`, true);
+      }
+    } catch (apiError) {
+      addProgressLog(`❌ 批次请求失败: ${apiError.message}`, true);
+      // 将此批次的所有密钥标记为失败
+      batch.forEach(key => {
+        allFailedKeys[key] = apiError.message;
+      });
+    }
+    processedCount += batch.length;
+    updateProgress(processedCount, allKeys.length, progressText);
+  }
+  
+  updateProgress(
+    allKeys.length,
+    allKeys.length,
+    `所有批次验证完成！`
+  );
+  
+  // 关闭进度模态框并显示最终结果
+  closeProgressModal(false);
+  showVerificationResultModal({
+    successful_keys: allSuccessfulKeys,
+    failed_keys: allFailedKeys,
+    valid_count: allSuccessfulKeys.length,
+    invalid_count: Object.keys(allFailedKeys).length
+  });
 }

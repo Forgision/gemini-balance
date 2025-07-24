@@ -61,3 +61,23 @@ async def get_keys_paginated(
         "total_pages": (total_items + limit - 1) // limit,
         "current_page": page,
     }
+
+@router.get("/api/keys/all")
+async def get_all_keys(
+    request: Request,
+    key_manager: KeyManager = Depends(get_key_manager_instance),
+):
+    """
+    Get all keys (both valid and invalid) for bulk operations.
+    """
+    auth_token = request.cookies.get("auth_token")
+    if not auth_token or not verify_auth_token(auth_token):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    all_keys_with_status = await key_manager.get_all_keys_with_fail_count()
+    
+    return {
+        "valid_keys": list(all_keys_with_status["valid_keys"].keys()),
+        "invalid_keys": list(all_keys_with_status["invalid_keys"].keys()),
+        "total_count": len(all_keys_with_status["valid_keys"]) + len(all_keys_with_status["invalid_keys"])
+    }
