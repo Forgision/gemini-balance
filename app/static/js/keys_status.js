@@ -862,6 +862,12 @@ function initializeKeyFilterControls() {
   if (thresholdInput) {
     thresholdInput.addEventListener("input", filterValidKeys);
   }
+  
+  // 为无效密钥添加筛选控件监听器
+  const invalidThresholdInput = document.getElementById("invalidFailCountThreshold");
+  if (invalidThresholdInput) {
+    invalidThresholdInput.addEventListener("input", () => fetchAndDisplayKeys('invalid', 1));
+  }
 }
 
 function initializeGlobalBatchVerificationHandlers() {
@@ -1174,13 +1180,14 @@ async function fetchAndDisplayKeys(type, page = 1) {
     // Show loading indicator
     listElement.innerHTML = `<li><div class="text-center py-4 col-span-full"><i class="fas fa-spinner fa-spin"></i> Loading...</div></li>`;
 
-    const itemsPerPageSelect = document.getElementById("itemsPerPageSelect");
+    // 根据类型选择对应的控件
+    const itemsPerPageSelect = document.getElementById(type === 'valid' ? "itemsPerPageSelect" : "invalidItemsPerPageSelect");
     const limit = itemsPerPageSelect ? parseInt(itemsPerPageSelect.value, 10) : 10;
     
-    const searchInput = document.getElementById("keySearchInput");
+    const searchInput = document.getElementById(type === 'valid' ? "keySearchInput" : "invalidKeySearchInput");
     const searchTerm = searchInput ? searchInput.value : '';
 
-    const thresholdInput = document.getElementById("failCountThreshold");
+    const thresholdInput = document.getElementById(type === 'valid' ? "failCountThreshold" : "invalidFailCountThreshold");
     const failCountThreshold = thresholdInput ? (thresholdInput.value === '' ? null : parseInt(thresholdInput.value, 10)) : null;
 
     try {
@@ -1319,6 +1326,7 @@ function initializeKeyPaginationAndSearch() {
     const debouncedFetchValidKeys = debounce(() => fetchAndDisplayKeys('valid', 1), 300);
     const debouncedFetchInvalidKeys = debounce(() => fetchAndDisplayKeys('invalid', 1), 300);
 
+    // 有效密钥的搜索和筛选控件
     const searchInput = document.getElementById("keySearchInput");
     if (searchInput) {
         searchInput.addEventListener("input", debouncedFetchValidKeys);
@@ -1333,6 +1341,23 @@ function initializeKeyPaginationAndSearch() {
     if (itemsPerPageSelect) {
         itemsPerPageSelect.addEventListener("change", () => {
              fetchAndDisplayKeys('valid', 1);
+        });
+    }
+
+    // 无效密钥的搜索和筛选控件
+    const invalidSearchInput = document.getElementById("invalidKeySearchInput");
+    if (invalidSearchInput) {
+        invalidSearchInput.addEventListener("input", debouncedFetchInvalidKeys);
+    }
+
+    const invalidThresholdInput = document.getElementById("invalidFailCountThreshold");
+    if (invalidThresholdInput) {
+        invalidThresholdInput.addEventListener("input", debouncedFetchInvalidKeys);
+    }
+    
+    const invalidItemsPerPageSelect = document.getElementById("invalidItemsPerPageSelect");
+    if (invalidItemsPerPageSelect) {
+        invalidItemsPerPageSelect.addEventListener("change", () => {
              fetchAndDisplayKeys('invalid', 1);
         });
     }

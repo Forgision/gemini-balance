@@ -875,7 +875,8 @@ endblock %} {% block head_extra_styles %}
   }
 
   /* Fix specific pagination elements by ID and class */
-  #validKeysPageSize, #invalidKeysPageSize {
+  #validKeysPageSize, #invalidKeysPageSize,
+  #itemsPerPageSelect, #invalidItemsPerPageSelect {
     background-color: rgba(255, 255, 255, 0.95) !important;
     color: #374151 !important; /* gray-700 */
     border: 1px solid rgba(0, 0, 0, 0.12) !important;
@@ -884,7 +885,8 @@ endblock %} {% block head_extra_styles %}
     font-size: 0.875rem !important; /* text-sm */
   }
 
-  #validKeysPageSize:focus, #invalidKeysPageSize:focus {
+  #validKeysPageSize:focus, #invalidKeysPageSize:focus,
+  #itemsPerPageSelect:focus, #invalidItemsPerPageSelect:focus {
     border-color: #3b82f6 !important; /* blue-500 */
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
     outline: none !important;
@@ -947,7 +949,10 @@ endblock %} {% block head_extra_styles %}
   label[for="selectAllInvalid"],
   label[for="failCountThreshold"],
   label[for="keySearchInput"],
-  label[for="itemsPerPageSelect"] {
+  label[for="itemsPerPageSelect"],
+  label[for="invalidFailCountThreshold"],
+  label[for="invalidKeySearchInput"],
+  label[for="invalidItemsPerPageSelect"] {
     color: #1f2937 !important; /* gray-800 for maximum contrast */
     font-weight: 600 !important; /* font-semibold for better visibility */
     text-shadow: none !important;
@@ -1434,12 +1439,72 @@ endblock %} {% block head_extra_styles %}
             无效密钥列表 ({{ invalid_key_count }})
           </h2>
         </div>
+        <!-- Middle: Filters and Search (Allow wrapping) -->
+        <div
+          class="flex items-center gap-x-4 gap-y-2 flex-grow flex-wrap justify-start md:justify-center"
+        >
+          <!-- Allow wrapping, center on medium+ -->
+          <!-- 失败次数筛选 -->
+          <div class="flex items-center gap-1">
+            <label
+              for="invalidFailCountThreshold"
+              class="text-sm select-none whitespace-nowrap font-semibold"
+              style="color: #1f2937 !important;"
+              >失败次数≥</label
+            >
+            <input
+              type="number"
+              id="invalidFailCountThreshold"
+              value="0"
+              min="0"
+              class="form-input h-7 w-16 px-2 py-1 text-sm border rounded focus:ring-primary-500 focus:border-primary-500"
+              onclick="event.stopPropagation();"
+            />
+          </div>
+          <!-- 密钥搜索 -->
+          <div class="flex items-center gap-1">
+            <label
+              for="invalidKeySearchInput"
+              class="text-sm select-none whitespace-nowrap font-semibold"
+              style="color: #1f2937 !important;"
+              ><i class="fas fa-search mr-1"></i>搜索</label
+            >
+            <input
+              type="search"
+              id="invalidKeySearchInput"
+              placeholder="输入密钥..."
+              class="form-input h-7 w-32 px-2 py-1 text-sm border rounded focus:ring-primary-500 focus:border-primary-500"
+              onclick="event.stopPropagation();"
+            />
+          </div>
+          <!-- 每页显示数量 -->
+          <div class="flex items-center gap-1">
+            <label
+              for="invalidItemsPerPageSelect"
+              class="text-sm select-none whitespace-nowrap font-semibold"
+              style="color: #1f2937 !important;"
+              >每页</label
+            >
+            <select
+              id="invalidItemsPerPageSelect"
+              class="form-select h-7 px-2 py-1 text-sm border rounded focus:ring-primary-500 focus:border-primary-500"
+              onclick="event.stopPropagation();"
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="500">500</option>
+            </select>
+            <span class="text-sm select-none font-semibold" style="color: #1f2937 !important;">项</span>
+          </div>
+        </div>
         <!-- Right side: Select All -->
         <div
-          class="flex items-center gap-1 ml-auto flex-shrink-0"
+          class="flex items-center gap-1 flex-shrink-0"
           onclick="event.stopPropagation();"
         >
-          <!-- Use ml-auto, Prevent shrinking -->
+          <!-- Prevent shrinking -->
           <input
             type="checkbox"
             id="selectAllInvalid"
