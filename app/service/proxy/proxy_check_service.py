@@ -3,7 +3,7 @@ Proxy detection service module
 """
 import asyncio
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 import httpx
