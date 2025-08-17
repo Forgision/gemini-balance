@@ -230,3 +230,27 @@ def setup_api_stats_routes(app: FastAPI) -> None:
                 f"Error fetching API stats details for period {period}: {str(e)}"
             )
             return {"error": "Internal server error"}, 500
+
+    @app.get("/api/stats/key-details")
+    async def api_stats_key_details(request: Request, key: str, period: str):
+        """获取指定密钥在指定时间段内的调用详情"""
+        try:
+            auth_token = request.cookies.get("auth_token")
+            if not auth_token or not verify_auth_token(auth_token):
+                logger.warning("Unauthorized access attempt to API key stats details")
+                return {"error": "Unauthorized"}, 401
+
+            logger.info(f"Fetching key call details for key=...{key[-4:] if key else ''}, period: {period}")
+            stats_service = StatsService()
+            details = await stats_service.get_key_call_details(key, period)
+            return details
+        except ValueError as e:
+            logger.warning(
+                f"Invalid period requested for key stats details: {period} - {str(e)}"
+            )
+            return {"error": str(e)}, 400
+        except Exception as e:
+            logger.error(
+                f"Error fetching key stats details for period {period}: {str(e)}"
+            )
+            return {"error": "Internal server error"}, 500
