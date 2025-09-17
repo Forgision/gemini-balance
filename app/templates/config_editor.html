@@ -809,7 +809,7 @@ endblock %} {% block head_extra_styles %}
 
     <h1 class="text-3xl font-extrabold text-center text-gray-800 mb-4">
       <img
-        src="/static/icons/logo.png"
+        src="{{ static_url('icons/logo.png') }}"
         alt="Gemini Balance Logo"
         class="h-9 inline-block align-middle mr-2"
       />
@@ -2870,7 +2870,7 @@ endblock %} {% block head_extra_styles %}
 </div>
 
 {% endblock %} {% block body_scripts %}
-<script src="/static/js/config_editor.js"></script>
+<script src="{{ static_url('js/config_editor.js') }}"></script>
 <!-- 增强下拉框样式和交互性 -->
 <script>
   document.addEventListener("DOMContentLoaded", function () {
