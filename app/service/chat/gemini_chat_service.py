@@ -365,13 +365,9 @@ class GeminiChatService:
             return self.response_handler.handle_response(response, model, stream=False)
         except Exception as e:
             is_success = False
-            error_log_msg = str(e)
+            status_code = e.args[0]
+            error_log_msg = e.args[1]
             logger.error(f"Normal API call failed with error: {error_log_msg}")
-            match = re.search(r"status code (\d+)", error_log_msg)
-            if match:
-                status_code = int(match.group(1))
-            else:
-                status_code = 500
 
             await add_error_log(
                 gemini_key=api_key,
@@ -416,13 +412,9 @@ class GeminiChatService:
             return response
         except Exception as e:
             is_success = False
-            error_log_msg = str(e)
+            status_code = e.args[0]
+            error_log_msg = e.args[1]
             logger.error(f"Count tokens API call failed with error: {error_log_msg}")
-            match = re.search(r"status code (\d+)", error_log_msg)
-            if match:
-                status_code = int(match.group(1))
-            else:
-                status_code = 500
 
             await add_error_log(
                 gemini_key=api_key,
@@ -470,7 +462,6 @@ class GeminiChatService:
         is_success = False
         status_code = None
         final_api_key = api_key
-        last_error_msg = None
 
         while retries < max_retries:
             request_datetime = datetime.datetime.now()
@@ -509,16 +500,11 @@ class GeminiChatService:
             except Exception as e:
                 retries += 1
                 is_success = False
-                error_log_msg = str(e)
-                last_error_msg = error_log_msg
+                status_code = e.args[0]
+                error_log_msg = e.args[1]
                 logger.warning(
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
                 )
-                match = re.search(r"status code (\d+)", error_log_msg)
-                if match:
-                    status_code = int(match.group(1))
-                else:
-                    status_code = 500
 
                 await add_error_log(
                     gemini_key=current_attempt_key,
@@ -539,11 +525,11 @@ class GeminiChatService:
                     )
                 else:
                     logger.error(f"No valid API key available after {retries} retries.")
-                    break
+                    raise
 
                 if retries >= max_retries:
                     logger.error(f"Max retries ({max_retries}) reached for streaming.")
-                    break
+                    raise
             finally:
                 end_time = time.perf_counter()
                 latency_ms = int((end_time - start_time) * 1000)
@@ -555,26 +541,3 @@ class GeminiChatService:
                     latency_ms=latency_ms,
                     request_time=request_datetime,
                 )
-
-        # Emit final error SSE event if all retries failed
-        if not is_success:
-            # 从错误消息中提取嵌套JSON
-            parsed_error = None
-            if last_error_msg:
-                try:
-                    # 查找JSON起始位置
-                    json_start = last_error_msg.find('{')
-                    if json_start != -1:
-                        json_str = last_error_msg[json_start:]
-                        parsed_error = json.loads(json_str)
-                except json.JSONDecodeError:
-                    pass
-
-            error_data = {
-                "error": {
-                    "code": parsed_error['error']['code'] if (parsed_error and 'error' in parsed_error and 'code' in parsed_error['error']) else (status_code or 500),
-                    "message": parsed_error['error']['message'] if (parsed_error and 'error' in parsed_error and 'message' in parsed_error['error']) else (last_error_msg or "Streaming failed"),
-                    "status": parsed_error['error']['status'] if (parsed_error and 'error' in parsed_error and 'status' in parsed_error['error']) else "INTERNAL"
-                }
-            }
-            yield json.dumps(error_data, ensure_ascii=False)
