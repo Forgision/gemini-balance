@@ -8,7 +8,12 @@ from typing import Any, AsyncGenerator, Dict, List
 
 from app.config.config import settings
 from app.core.constants import GEMINI_2_FLASH_EXP_SAFETY_SETTINGS
-from app.database.services import add_error_log, add_request_log, get_file_api_key
+from app.database.services import (
+    add_error_log,
+    add_request_log,
+    get_file_api_key,
+    update_usage_stats,
+)
 from app.domain.gemini_models import GeminiRequest
 from app.handler.response_handler import GeminiResponseHandler
 from app.handler.stream_optimizer import gemini_optimizer
@@ -308,8 +313,25 @@ class GeminiChatService:
         self.key_manager = key_manager
         self.response_handler = GeminiResponseHandler()
 
+    async def _update_usage_stats(
+        self,
+        api_key: str,
+        model_name: str,
+        response: Dict[str, Any],
+    ):
+        """Update usage statistics."""
+        token_count = 0
+        if "usageMetadata" in response:
+            token_count = response["usageMetadata"].get("totalTokenCount", 0)
+
+        await update_usage_stats(
+            api_key=api_key,
+            model_name=model_name,
+            token_count=token_count,
+        )
+
     def _extract_text_from_response(self, response: Dict[str, Any]) -> str:
-        """从响应中提取文本内容"""
+        """Extract text content from the response."""
         if not response.get("candidates"):
             return ""
 
@@ -362,6 +384,7 @@ class GeminiChatService:
             response = await self.api_client.generate_content(payload, model, api_key)
             is_success = True
             status_code = 200
+            await self._update_usage_stats(api_key, model, response)
             return self.response_handler.handle_response(response, model, stream=False)
         except Exception as e:
             is_success = False
@@ -469,6 +492,7 @@ class GeminiChatService:
             current_attempt_key = api_key
             final_api_key = current_attempt_key
             try:
+                full_response = {}
                 async for line in self.api_client.stream_generate_content(
                     payload, model, current_attempt_key
                 ):
@@ -478,10 +502,11 @@ class GeminiChatService:
                         response_data = self.response_handler.handle_response(
                             json.loads(line), model, stream=True
                         )
+                        full_response.update(response_data)
                         text = self._extract_text_from_response(response_data)
-                        # 如果有文本内容，且开启了流式输出优化器，则使用流式输出优化器处理
+                        # If there is text content and the stream optimizer is enabled, use the stream optimizer to process it
                         if text and settings.STREAM_OPTIMIZER_ENABLED:
-                            # 使用流式输出优化器处理文本输出
+                            # Use the stream optimizer to process text output
                             async for (
                                 optimized_chunk
                             ) in gemini_optimizer.optimize_stream_output(
@@ -491,8 +516,9 @@ class GeminiChatService:
                             ):
                                 yield optimized_chunk
                         else:
-                            # 如果没有文本内容（如工具调用等），整块输出
+                            # If there is no text content (e.g., tool calls), output the whole chunk
                             yield "data: " + json.dumps(response_data) + "\n\n"
+                await self._update_usage_stats(api_key, model, full_response)
                 logger.info("Streaming completed successfully")
                 is_success = True
                 status_code = 200

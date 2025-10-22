@@ -10,7 +10,14 @@ from typing import Any, Dict, List, Optional, Union
 from sqlalchemy import asc, delete, desc, func, insert, select, update
 
 from app.database.connection import database
-from app.database.models import ErrorLog, FileRecord, FileState, RequestLog, Settings
+from app.database.models import (
+    ErrorLog,
+    FileRecord,
+    FileState,
+    RequestLog,
+    Settings,
+    UsageStats,
+)
 from app.log.logger import get_database_logger
 from app.utils.helpers import redact_key_for_logging
 
@@ -99,6 +106,51 @@ async def update_setting(
     except Exception as e:
         logger.error(f"Failed to update setting {key}: {str(e)}")
         return False
+
+
+async def get_usage_stats_by_key_and_model(
+    api_key: str, model_name: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Get usage statistics for a given API key and model.
+
+    Args:
+        api_key: The API key.
+        model_name: The model name.
+
+    Returns:
+        Optional[Dict[str, Any]]: The usage statistics, or None if not found.
+    """
+    try:
+        query = (
+            select(UsageStats)
+            .where(
+                UsageStats.api_key == api_key,
+                UsageStats.model_name == model_name,
+            )
+            .order_by(desc(UsageStats.timestamp))
+        )
+        result = await database.fetch_one(query)
+        return dict(result) if result else None
+    except Exception as e:
+        logger.error(f"Failed to get usage stats: {str(e)}")
+        raise
+
+
+async def get_all_usage_stats() -> List[Dict[str, Any]]:
+    """
+    Get all usage statistics.
+
+    Returns:
+        List[Dict[str, Any]]: A list of usage statistics.
+    """
+    try:
+        query = select(UsageStats)
+        result = await database.fetch_all(query)
+        return [dict(row) for row in result]
+    except Exception as e:
+        logger.error(f"Failed to get all usage stats: {str(e)}")
+        raise
 
 
 async def add_error_log(
@@ -803,3 +855,61 @@ async def get_file_api_key(name: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Failed to get file API key: {str(e)}")
         raise
+
+
+async def update_usage_stats(
+    api_key: str, model_name: str, token_count: int
+) -> bool:
+    """
+    Update usage statistics.
+
+    Args:
+        api_key: The API key used.
+        model_name: The model name used.
+        token_count: The number of tokens used.
+
+    Returns:
+        bool: Whether the update was successful.
+    """
+    try:
+        now = datetime.now()
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        async with database.transaction():
+            # Find the record for today
+            query = select(UsageStats).where(
+                UsageStats.api_key == api_key,
+                UsageStats.model_name == model_name,
+                UsageStats.timestamp >= start_of_day,
+            )
+            record = await database.fetch_one(query)
+
+            if record:
+                # Update existing record
+                update_query = (
+                    update(UsageStats)
+                    .where(UsageStats.id == record["id"])
+                    .values(
+                        rpm=UsageStats.rpm + 1,
+                        rpd=UsageStats.rpd + 1,
+                        token_count=UsageStats.token_count + token_count,
+                        timestamp=now,
+                    )
+                )
+                await database.execute(update_query)
+            else:
+                # Insert new record
+                insert_query = insert(UsageStats).values(
+                    api_key=api_key,
+                    model_name=model_name,
+                    rpm=1,
+                    rpd=1,
+                    token_count=token_count,
+                    timestamp=now,
+                )
+                await database.execute(insert_query)
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update usage stats: {str(e)}")
+        return False

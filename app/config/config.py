@@ -1,5 +1,5 @@
 """
-应用程序配置模块
+Application Configuration Module
 """
 
 import datetime
@@ -28,8 +28,8 @@ from app.log.logger import Logger
 
 
 class Settings(BaseSettings):
-    # 数据库配置
-    DATABASE_TYPE: str = "mysql"  # sqlite 或 mysql
+    # Database Configuration
+    DATABASE_TYPE: str = "sqlite"  # sqlite or mysql
     SQLITE_DATABASE: str = "default_db"
     MYSQL_HOST: str = ""
     MYSQL_PORT: int = 3306
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     MYSQL_DATABASE: str = ""
     MYSQL_SOCKET: str = ""
 
-    # 验证 MySQL 配置
+    # Validate MySQL Configuration
     @field_validator(
         "MYSQL_HOST", "MYSQL_PORT", "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE"
     )
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
                 )
         return v
 
-    # API相关配置
+    # API Related Configuration
     API_KEYS: List[str] = []
     ALLOWED_TOKENS: List[str] = []
     BASE_URL: str = f"https://generativelanguage.googleapis.com/{API_VERSION}"
@@ -60,24 +60,26 @@ class Settings(BaseSettings):
     TIME_OUT: int = DEFAULT_TIMEOUT
     MAX_RETRIES: int = MAX_RETRIES
     PROXIES: List[str] = []
-    PROXIES_USE_CONSISTENCY_HASH_BY_API_KEY: bool = True  # 是否使用一致性哈希来选择代理
+    PROXIES_USE_CONSISTENCY_HASH_BY_API_KEY: bool = (
+        True  # Whether to use consistent hashing to select a proxy
+    )
     VERTEX_API_KEYS: List[str] = []
     VERTEX_EXPRESS_BASE_URL: str = (
         "https://aiplatform.googleapis.com/v1beta1/publishers/google"
     )
 
-    # 智能路由配置
-    URL_NORMALIZATION_ENABLED: bool = False  # 是否启用智能路由映射功能
+    # Smart Routing Configuration
+    URL_NORMALIZATION_ENABLED: bool = False  # Whether to enable smart routing mapping
 
-    # 自定义 Headers
+    # Custom Headers
     CUSTOM_HEADERS: Dict[str, str] = {}
 
-    # 模型相关配置
+    # Model Related Configuration
     SEARCH_MODELS: List[str] = ["gemini-2.5-flash", "gemini-2.5-pro"]
     IMAGE_MODELS: List[str] = ["gemini-2.0-flash-exp", "gemini-2.5-flash-image-preview"]
     FILTERED_MODELS: List[str] = DEFAULT_FILTER_MODELS
     TOOLS_CODE_EXECUTION_ENABLED: bool = False
-    # 是否启用网址上下文
+    # Whether to enable URL context
     URL_CONTEXT_ENABLED: bool = False
     URL_CONTEXT_MODELS: List[str] = [
         "gemini-2.5-pro",
@@ -91,12 +93,12 @@ class Settings(BaseSettings):
     THINKING_MODELS: List[str] = []
     THINKING_BUDGET_MAP: Dict[str, float] = {}
 
-    # TTS相关配置
+    # TTS Related Configuration
     TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
     TTS_VOICE_NAME: str = "Zephyr"
     TTS_SPEED: str = "normal"
 
-    # 图像生成相关配置
+    # Image Generation Related Configuration
     PAID_KEY: str = ""
     CREATE_IMAGE_MODEL: str = DEFAULT_CREATE_IMAGE_MODEL
     UPLOAD_PROVIDER: str = "smms"
@@ -106,7 +108,7 @@ class Settings(BaseSettings):
     CLOUDFLARE_IMGBED_URL: str = ""
     CLOUDFLARE_IMGBED_AUTH_CODE: str = ""
     CLOUDFLARE_IMGBED_UPLOAD_FOLDER: str = ""
-    # 阿里云OSS配置
+    # Alibaba Cloud OSS Configuration
     OSS_ENDPOINT: str = ""
     OSS_ENDPOINT_INNER: str = ""
     OSS_ACCESS_KEY: str = ""
@@ -114,7 +116,7 @@ class Settings(BaseSettings):
     OSS_BUCKET_NAME: str = ""
     OSS_REGION: str = ""
 
-    # 流式输出优化器配置
+    # Streaming Output Optimizer Configuration
     STREAM_OPTIMIZER_ENABLED: bool = False
     STREAM_MIN_DELAY: float = DEFAULT_STREAM_MIN_DELAY
     STREAM_MAX_DELAY: float = DEFAULT_STREAM_MAX_DELAY
@@ -122,19 +124,21 @@ class Settings(BaseSettings):
     STREAM_LONG_TEXT_THRESHOLD: int = DEFAULT_STREAM_LONG_TEXT_THRESHOLD
     STREAM_CHUNK_SIZE: int = DEFAULT_STREAM_CHUNK_SIZE
 
-    # 假流式配置 (Fake Streaming Configuration)
-    FAKE_STREAM_ENABLED: bool = False  # 是否启用假流式输出
-    FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS: int = 5  # 假流式发送空数据的间隔时间（秒）
+    # Fake Streaming Configuration
+    FAKE_STREAM_ENABLED: bool = False  # Whether to enable fake streaming output
+    FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS: int = (
+        5  # Interval for sending empty data in fake streaming (seconds)
+    )
 
-    # 调度器配置
-    CHECK_INTERVAL_HOURS: int = 1  # 默认检查间隔为1小时
-    TIMEZONE: str = "Asia/Shanghai"  # 默认时区
+    # Scheduler Configuration
+    CHECK_INTERVAL_HOURS: int = 1  # Default check interval is 1 hour
+    TIMEZONE: str = "Asia/Shanghai"  # Default timezone
 
-    # github
+    # Github
     GITHUB_REPO_OWNER: str = "snailyp"
     GITHUB_REPO_NAME: str = "gemini-balance"
 
-    # 日志配置
+    # Log Configuration
     LOG_LEVEL: str = "INFO"
     ERROR_LOG_RECORD_REQUEST_BODY: bool = False
     AUTO_DELETE_ERROR_LOGS_ENABLED: bool = True
@@ -158,17 +162,17 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # 设置默认AUTH_TOKEN（如果未提供）
+        # Set default AUTH_TOKEN (if not provided)
         if not self.AUTH_TOKEN and self.ALLOWED_TOKENS:
             self.AUTH_TOKEN = self.ALLOWED_TOKENS[0]
 
 
-# 创建全局配置实例
+# Create a global configuration instance
 settings = Settings()
 
 
 def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
-    """尝试将数据库字符串值解析为目标 Python 类型"""
+    """Attempt to parse a database string value into the target Python type"""
     from app.log.logger import get_config_logger
 
     logger = get_config_logger()
@@ -176,9 +180,9 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
         origin_type = get_origin(target_type)
         args = get_args(target_type)
 
-        # 处理 List 类型
+        # Handle List type
         if origin_type is list:
-            # 处理 List[str]
+            # Handle List[str]
             if args and args[0] == str:
                 try:
                     parsed = json.loads(db_value)
@@ -192,7 +196,7 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                     f"Could not parse '{db_value}' as List[str] for key '{key}', falling back to comma split or empty list."
                 )
                 return [item.strip() for item in db_value.split(",") if item.strip()]
-            # 处理 List[Dict[str, str]]
+            # Handle List[Dict[str, str]]
             elif args and get_origin(args[0]) is dict:
                 try:
                     parsed = json.loads(db_value)
@@ -225,9 +229,9 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                         f"Error parsing List[Dict[str, str]] for key '{key}': {e}. Value: {db_value}. Returning empty list."
                     )
                     return []
-        # 处理 Dict 类型
+        # Handle Dict type
         elif origin_type is dict:
-            # 处理 Dict[str, str]
+            # Handle Dict[str, str]
             if args and args == (str, str):
                 parsed_dict = {}
                 try:
@@ -243,7 +247,7 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                         f"Could not parse '{db_value}' as Dict[str, str] for key '{key}'. Returning empty dict."
                     )
                 return parsed_dict
-            # 处理 Dict[str, float]
+            # Handle Dict[str, float]
             elif args and args == (str, float):
                 parsed_dict = {}
                 try:
@@ -279,36 +283,36 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                             f"Could not parse '{db_value}' as Dict[str, float] for key '{key}': {e1}. Returning empty dict."
                         )
                 return parsed_dict
-        # 处理 bool
+        # Handle bool
         elif target_type == bool:
             return db_value.lower() in ("true", "1", "yes", "on")
-        # 处理 int
+        # Handle int
         elif target_type == int:
             return int(db_value)
-        # 处理 float
+        # Handle float
         elif target_type == float:
             return float(db_value)
-        # 默认为 str 或其他 pydantic 能直接处理的类型
+        # Default to str or other types that pydantic can handle directly
         else:
             return db_value
     except (ValueError, TypeError, json.JSONDecodeError) as e:
         logger.warning(
             f"Failed to parse db_value '{db_value}' for key '{key}' as type {target_type}: {e}. Using original string value."
         )
-        return db_value  # 解析失败则返回原始字符串
+        return db_value  # Return the original string if parsing fails
 
 
 async def sync_initial_settings():
     """
-    应用启动时同步配置：
-    1. 从数据库加载设置。
-    2. 将数据库设置合并到内存 settings (数据库优先)。
-    3. 将最终的内存 settings 同步回数据库。
+    Synchronize settings on application startup:
+    1. Load settings from the database.
+    2. Merge database settings into memory settings (database takes precedence).
+    3. Synchronize the final memory settings back to the database.
     """
     from app.log.logger import get_config_logger
 
     logger = get_config_logger()
-    # 延迟导入以避免循环依赖和确保数据库连接已初始化
+    # Deferred import to avoid circular dependencies and ensure the database connection is initialized
     from app.database.connection import database
     from app.database.models import Settings as SettingsModel
 
@@ -326,7 +330,7 @@ async def sync_initial_settings():
             return
 
     try:
-        # 1. 从数据库加载设置
+        # 1. Load settings from the database
         db_settings_raw: List[Dict[str, Any]] = []
         try:
             query = select(SettingsModel.key, SettingsModel.value)
@@ -339,13 +343,13 @@ async def sync_initial_settings():
             logger.error(
                 f"Failed to fetch settings from database: {e}. Proceeding with environment/dotenv settings."
             )
-            # 即使数据库读取失败，也要继续执行，确保基于 env/dotenv 的配置能同步到数据库
+            # Continue even if database read fails, to ensure env/dotenv-based config can be synced to the DB
 
         db_settings_map: Dict[str, str] = {
             s["key"]: s["value"] for s in db_settings_raw
         }
 
-        # 2. 将数据库设置合并到内存 settings (数据库优先)
+        # 2. Merge database settings into memory settings (database takes precedence)
         updated_in_memory = False
 
         for key, db_value in db_settings_map.items():
@@ -362,10 +366,10 @@ async def sync_initial_settings():
                         parsed_db_value = _parse_db_value(key, db_value, target_type)
                         memory_value = getattr(settings, key)
 
-                        # 比较解析后的值和内存中的值
-                        # 注意：对于列表等复杂类型，直接比较可能不够健壮，但这里简化处理
+                        # Compare the parsed value with the value in memory
+                        # Note: For complex types like lists, direct comparison may not be robust, but it's simplified here
                         if parsed_db_value != memory_value:
-                            # 检查类型是否匹配，以防解析函数返回了不兼容的类型
+                            # Check if types match, in case the parse function returned an incompatible type
                             type_match = False
                             origin_type = get_origin(target_type)
                             if origin_type:  # It's a generic type
@@ -395,10 +399,10 @@ async def sync_initial_settings():
                     f"Database setting '{key}' not found in Settings model definition. Ignoring."
                 )
 
-        # 如果内存中有更新，重新验证 Pydantic 模型（可选但推荐）
+        # If there were updates in memory, re-validate the Pydantic model (optional but recommended)
         if updated_in_memory:
             try:
-                # 重新加载以确保类型转换和验证
+                # Reload to ensure type conversion and validation
                 settings = Settings(**settings.model_dump())
                 logger.info(
                     "Settings object re-validated after merging database values."
@@ -408,7 +412,7 @@ async def sync_initial_settings():
                     f"Validation error after merging database settings: {e}. Settings might be inconsistent."
                 )
 
-        # 3. 将最终的内存 settings 同步回数据库
+        # 3. Synchronize the final memory settings back to the database
         final_memory_settings = settings.model_dump()
         settings_to_update: List[Dict[str, Any]] = []
         settings_to_insert: List[Dict[str, Any]] = []
@@ -424,7 +428,7 @@ async def sync_initial_settings():
                 )
                 continue
 
-            # 序列化值为字符串或 JSON 字符串
+            # Serialize values to string or JSON string
             if isinstance(value, (list, dict)):
                 db_value = json.dumps(value, ensure_ascii=False)
             elif isinstance(value, bool):
@@ -442,20 +446,20 @@ async def sync_initial_settings():
             }
 
             if key in existing_db_keys:
-                # 仅当值与数据库中的不同时才更新
+                # Only update if the value is different from the one in the database
                 if db_settings_map[key] != db_value:
                     settings_to_update.append(data)
             else:
-                # 如果键不在数据库中，则插入
+                # Insert if the key is not in the database
                 data["created_at"] = now
                 settings_to_insert.append(data)
 
-        # 在事务中执行批量插入和更新
+        # Execute bulk insert and update in a transaction
         if settings_to_insert or settings_to_update:
             try:
                 async with database.transaction():
                     if settings_to_insert:
-                        # 获取现有描述以避免覆盖
+                        # Get existing descriptions to avoid overwriting
                         query_existing = select(
                             SettingsModel.key, SettingsModel.description
                         ).where(
@@ -479,7 +483,7 @@ async def sync_initial_settings():
                         )
 
                     if settings_to_update:
-                        # 获取现有描述以避免覆盖
+                        # Get existing descriptions to avoid overwriting
                         query_existing = select(
                             SettingsModel.key, SettingsModel.description
                         ).where(
@@ -518,7 +522,7 @@ async def sync_initial_settings():
                 "No setting changes detected between memory and database during initial sync."
             )
 
-        # 刷新日志等级
+        # Refresh log levels
         Logger.update_log_levels(final_memory_settings.get("LOG_LEVEL"))
 
     except Exception as e:

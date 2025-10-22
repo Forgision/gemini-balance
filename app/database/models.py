@@ -1,5 +1,5 @@
 """
-数据库模型模块
+Database Models Module
 """
 import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, BigInteger, Enum
@@ -10,16 +10,16 @@ from app.database.connection import Base
 
 class Settings(Base):
     """
-    设置表，对应.env中的配置项
+    Settings table, corresponding to the configuration items in .env
     """
     __tablename__ = "t_settings"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    key = Column(String(100), nullable=False, unique=True, comment="配置项键名")
-    value = Column(Text, nullable=True, comment="配置项值")
-    description = Column(String(255), nullable=True, comment="配置项描述")
-    created_at = Column(DateTime, default=datetime.datetime.now, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now, comment="更新时间")
+    key = Column(String(100), nullable=False, unique=True, comment="Configuration item key name")
+    value = Column(Text, nullable=True, comment="Configuration item value")
+    description = Column(String(255), nullable=True, comment="Configuration item description")
+    created_at = Column(DateTime, default=datetime.datetime.now, comment="Creation time")
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now, comment="Update time")
     
     def __repr__(self):
         return f"<Settings(key='{self.key}', value='{self.value}')>"
@@ -27,18 +27,18 @@ class Settings(Base):
 
 class ErrorLog(Base):
     """
-    错误日志表
+    Error log table
     """
     __tablename__ = "t_error_logs"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gemini_key = Column(String(100), nullable=True, comment="Gemini API密钥")
-    model_name = Column(String(100), nullable=True, comment="模型名称")
-    error_type = Column(String(50), nullable=True, comment="错误类型")
-    error_log = Column(Text, nullable=True, comment="错误日志")
-    error_code = Column(Integer, nullable=True, comment="错误代码")
-    request_msg = Column(JSON, nullable=True, comment="请求消息")
-    request_time = Column(DateTime, default=datetime.datetime.now, comment="请求时间")
+    gemini_key = Column(String(100), nullable=True, comment="Gemini API key")
+    model_name = Column(String(100), nullable=True, comment="Model name")
+    error_type = Column(String(50), nullable=True, comment="Error type")
+    error_log = Column(Text, nullable=True, comment="Error log")
+    error_code = Column(Integer, nullable=True, comment="Error code")
+    request_msg = Column(JSON, nullable=True, comment="Request message")
+    request_time = Column(DateTime, default=datetime.datetime.now, comment="Request time")
     
     def __repr__(self):
         return f"<ErrorLog(id='{self.id}', gemini_key='{self.gemini_key}')>"
@@ -46,25 +46,25 @@ class ErrorLog(Base):
 
 class RequestLog(Base):
     """
-    API 请求日志表
+    API request log table
     """
 
     __tablename__ = "t_request_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    request_time = Column(DateTime, default=datetime.datetime.now, comment="请求时间")
-    model_name = Column(String(100), nullable=True, comment="模型名称")
-    api_key = Column(String(100), nullable=True, comment="使用的API密钥")
-    is_success = Column(Boolean, nullable=False, comment="请求是否成功")
-    status_code = Column(Integer, nullable=True, comment="API响应状态码")
-    latency_ms = Column(Integer, nullable=True, comment="请求耗时(毫秒)")
+    request_time = Column(DateTime, default=datetime.datetime.now, comment="Request time")
+    model_name = Column(String(100), nullable=True, comment="Model name")
+    api_key = Column(String(100), nullable=True, comment="API key used")
+    is_success = Column(Boolean, nullable=False, comment="Whether the request was successful")
+    status_code = Column(Integer, nullable=True, comment="API response status code")
+    latency_ms = Column(Integer, nullable=True, comment="Request latency (milliseconds)")
 
     def __repr__(self):
         return f"<RequestLog(id='{self.id}', key='{self.api_key[:4]}...', success='{self.is_success}')>"
 
 
 class FileState(enum.Enum):
-    """文件状态枚举"""
+    """File status enumeration"""
     PROCESSING = "PROCESSING"
     ACTIVE = "ACTIVE"
     FAILED = "FAILED"
@@ -72,41 +72,41 @@ class FileState(enum.Enum):
 
 class FileRecord(Base):
     """
-    文件记录表，用于存储上传到 Gemini 的文件信息
+    File record table for storing information about files uploaded to Gemini
     """
     __tablename__ = "t_file_records"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # 文件基本信息
-    name = Column(String(255), unique=True, nullable=False, comment="文件名称，格式: files/{file_id}")
-    display_name = Column(String(255), nullable=True, comment="用户上传时的原始文件名")
-    mime_type = Column(String(100), nullable=False, comment="MIME 类型")
-    size_bytes = Column(BigInteger, nullable=False, comment="文件大小（字节）")
-    sha256_hash = Column(String(255), nullable=True, comment="文件的 SHA256 哈希值")
+    # File basic information
+    name = Column(String(255), unique=True, nullable=False, comment="File name, format: files/{file_id}")
+    display_name = Column(String(255), nullable=True, comment="Original file name when uploaded by the user")
+    mime_type = Column(String(100), nullable=False, comment="MIME type")
+    size_bytes = Column(BigInteger, nullable=False, comment="File size (bytes)")
+    sha256_hash = Column(String(255), nullable=True, comment="SHA256 hash of the file")
     
-    # 状态信息
-    state = Column(Enum(FileState), nullable=False, default=FileState.PROCESSING, comment="文件状态")
+    # Status information
+    state = Column(Enum(FileState), nullable=False, default=FileState.PROCESSING, comment="File status")
     
-    # 时间戳
-    create_time = Column(DateTime, nullable=False, comment="创建时间")
-    update_time = Column(DateTime, nullable=False, comment="更新时间")
-    expiration_time = Column(DateTime, nullable=False, comment="过期时间")
+    # Timestamps
+    create_time = Column(DateTime, nullable=False, comment="Creation time")
+    update_time = Column(DateTime, nullable=False, comment="Update time")
+    expiration_time = Column(DateTime, nullable=False, comment="Expiration time")
     
-    # API 相关
-    uri = Column(String(500), nullable=False, comment="文件访问 URI")
-    api_key = Column(String(100), nullable=False, comment="上传时使用的 API Key")
-    upload_url = Column(Text, nullable=True, comment="临时上传 URL（用于分块上传）")
+    # API related
+    uri = Column(String(500), nullable=False, comment="File access URI")
+    api_key = Column(String(100), nullable=False, comment="API Key used for upload")
+    upload_url = Column(Text, nullable=True, comment="Temporary upload URL (for chunked uploads)")
     
-    # 额外信息
-    user_token = Column(String(100), nullable=True, comment="上传用户的 token")
-    upload_completed = Column(DateTime, nullable=True, comment="上传完成时间")
+    # Additional information
+    user_token = Column(String(100), nullable=True, comment="Token of the uploading user")
+    upload_completed = Column(DateTime, nullable=True, comment="Upload completion time")
     
     def __repr__(self):
         return f"<FileRecord(name='{self.name}', state='{self.state.value if self.state else 'None'}', api_key='{self.api_key[:8]}...')>"
     
     def to_dict(self):
-        """转换为字典格式，用于 API 响应"""
+        """Convert to dictionary format for API response"""
         return {
             "name": self.name,
             "displayName": self.display_name,
@@ -121,9 +121,27 @@ class FileRecord(Base):
         }
     
     def is_expired(self):
-        """检查文件是否已过期"""
-        # 确保比较时都是 timezone-aware
+        """Check if the file has expired"""
+        # Ensure comparison is timezone-aware
         expiration_time = self.expiration_time
         if expiration_time.tzinfo is None:
             expiration_time = expiration_time.replace(tzinfo=datetime.timezone.utc)
         return datetime.datetime.now(datetime.timezone.utc) > expiration_time
+
+
+class UsageStats(Base):
+    """
+    Usage statistics table
+    """
+    __tablename__ = "t_usage_stats"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    api_key = Column(String(100), nullable=False, index=True)
+    model_name = Column(String(100), nullable=False, index=True)
+    token_count = Column(Integer, nullable=False, default=0)
+    rpm = Column(Integer, nullable=False, default=0)
+    rpd = Column(Integer, nullable=False, default=0)
+    timestamp = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+    def __repr__(self):
+        return f"<UsageStats(api_key='{self.api_key}', model_name='{self.model_name}', token_count='{self.token_count}')>"
