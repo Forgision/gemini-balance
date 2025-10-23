@@ -1,7 +1,7 @@
 import uvicorn
 from dotenv import load_dotenv
 
-# 在导入应用程序配置之前加载 .env 文件到环境变量
+# Load the .env file into environment variables before importing application configuration
 load_dotenv()
 
 from app.core.application import create_app
