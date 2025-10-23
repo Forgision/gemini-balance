@@ -21,18 +21,18 @@ class ImageCreateService:
         self.aspect_ratio = aspect_ratio
 
     def parse_prompt_parameters(self, prompt: str) -> tuple:
-        """从prompt中解析参数
-        支持的格式:
-        - {n:数量} 例如: {n:2} 生成2张图片
-        - {ratio:比例} 例如: {ratio:16:9} 使用16:9比例
+        """Parse parameters from the prompt.
+        Supported formats:
+        - {n:number} e.g.: {n:2} Generate 2 images
+        - {ratio:ratio} e.g.: {ratio:16:9} Use 16:9 ratio
         """
         import re
 
-        # 默认值
+        # Default values
         n = 1
         aspect_ratio = self.aspect_ratio
 
-        # 解析n参数
+        # Parse n parameter
         n_match = re.search(r"{n:(\d+)}", prompt)
         if n_match:
             n = int(n_match.group(1))
@@ -40,7 +40,7 @@ class ImageCreateService:
                 raise ValueError(f"Invalid n value: {n}. Must be between 1 and 4.")
             prompt = prompt.replace(n_match.group(0), "").strip()
 
-        # 解析ratio参数
+        # Parse ratio parameter
         ratio_match = re.search(r"{ratio:(\d+:\d+)}", prompt)
         if ratio_match:
             aspect_ratio = ratio_match.group(1)
@@ -66,17 +66,17 @@ class ImageCreateService:
                 f"Invalid size: {request.size}. Supported sizes are 1024x1024, 1792x1024, and 1024x1792."
             )
 
-        # 解析prompt中的参数
+        # Parse parameters from the prompt
         cleaned_prompt, prompt_n, prompt_ratio = self.parse_prompt_parameters(
             request.prompt
         )
         request.prompt = cleaned_prompt
 
-        # 如果prompt中指定了n，则覆盖请求中的n
+        # If n is specified in the prompt, it overrides the n in the request
         if prompt_n > 1:
             request.n = prompt_n
 
-        # 如果prompt中指定了ratio，则覆盖默认的aspect_ratio
+        # If ratio is specified in the prompt, it overrides the default aspect_ratio
         if prompt_ratio != self.aspect_ratio:
             self.aspect_ratio = prompt_ratio
 
@@ -174,7 +174,7 @@ class ImageCreateService:
                         f"![Generated Image {index+1}]({image_data['url']})"
                     )
                 else:
-                    # 如果是base64格式，创建data URL
+                    # If it is in base64 format, create a data URL
                     markdown_images.append(
                         f"![Generated Image {index+1}](data:image/png;base64,{image_data['b64_json']})"
                     )

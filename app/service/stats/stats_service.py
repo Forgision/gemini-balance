@@ -16,7 +16,7 @@ class StatsService:
     """Service class for handling statistics related operations."""
 
     async def get_calls_in_last_seconds(self, seconds: int) -> dict[str, int]:
-        """获取过去 N 秒内的调用次数 (总数、成功、失败)"""
+        """Get the number of calls in the last N seconds (total, success, failure)."""
         try:
             cutoff_time = datetime.datetime.now() - datetime.timedelta(seconds=seconds)
             query = select(
@@ -60,15 +60,15 @@ class StatsService:
             return {"total": 0, "success": 0, "failure": 0}
 
     async def get_calls_in_last_minutes(self, minutes: int) -> dict[str, int]:
-        """获取过去 N 分钟内的调用次数 (总数、成功、失败)"""
+        """Get the number of calls in the last N minutes (total, success, failure)."""
         return await self.get_calls_in_last_seconds(minutes * 60)
 
     async def get_calls_in_last_hours(self, hours: int) -> dict[str, int]:
-        """获取过去 N 小时内的调用次数 (总数、成功、失败)"""
+        """Get the number of calls in the last N hours (total, success, failure)."""
         return await self.get_calls_in_last_seconds(hours * 3600)
 
     async def get_calls_in_current_month(self) -> dict[str, int]:
-        """获取当前自然月内的调用次数 (总数、成功、失败)"""
+        """Get the number of calls in the current calendar month (total, success, failure)."""
         try:
             now = datetime.datetime.now()
             start_of_month = now.replace(
@@ -115,7 +115,7 @@ class StatsService:
             return {"total": 0, "success": 0, "failure": 0}
 
     async def get_api_usage_stats(self) -> dict:
-        """获取所有需要的 API 使用统计数据 (总数、成功、失败)"""
+        """Get all required API usage statistics (total, success, failure)."""
         try:
             stats_1m = await self.get_calls_in_last_minutes(1)
             stats_1h = await self.get_calls_in_last_hours(1)
@@ -140,16 +140,16 @@ class StatsService:
 
     async def get_api_call_details(self, period: str) -> list[dict]:
         """
-        获取指定时间段内的 API 调用详情
+        Get API call details for the specified period.
 
         Args:
-            period: 时间段标识 ('1m', '1h', '24h')
+            period: Time period identifier ('1m', '1h', '24h')
 
         Returns:
-            包含调用详情的字典列表，每个字典包含 timestamp, key, model, status, status_code, latency_ms, error_log_id(可选)
+            A list of dictionaries containing call details, each dictionary includes timestamp, key, model, status, status_code, latency_ms, error_log_id (optional).
 
         Raises:
-            ValueError: 如果 period 无效
+            ValueError: If the period is invalid.
         """
         now = datetime.datetime.now()
         if period == "1m":
@@ -161,7 +161,7 @@ class StatsService:
         elif period == "24h":
             start_time = now - datetime.timedelta(hours=24)
         else:
-            raise ValueError(f"无效的时间段标识: {period}")
+            raise ValueError(f"Invalid time period identifier: {period}")
 
         try:
             query = (
@@ -205,7 +205,7 @@ class StatsService:
             raise
 
     async def get_key_call_details(self, key: str, period: str) -> list[dict]:
-        """获取指定密钥在指定时间段内的调用详情 (与 get_api_call_details 结构一致)"""
+        """Get call details for the specified key and period (same structure as get_api_call_details)."""
         now = datetime.datetime.now()
         if period == "1m":
             start_time = now - datetime.timedelta(minutes=1)
@@ -216,7 +216,7 @@ class StatsService:
         elif period == "24h":
             start_time = now - datetime.timedelta(hours=24)
         else:
-            raise ValueError(f"无效的时间段标识: {period}")
+            raise ValueError(f"Invalid time period identifier: {period}")
 
         try:
             query = (
@@ -263,9 +263,9 @@ class StatsService:
     async def get_attention_keys_last_24h(
         self, include_keys: set[str], limit: int = 20, status_code: int = 429
     ) -> list[dict]:
-        """返回最近24小时内指定状态码(默认429)最多的Key列表，仅包含include_keys中的Key。
+        """Returns the list of keys with the most specified status codes (default 429) in the last 24 hours, including only the keys in include_keys.
 
-        Returns: [{"key": str, "count": int, "status_code": int}, ...] 按次数降序
+        Returns: [{"key": str, "count": int, "status_code": int}, ...] sorted by count in descending order.
         """
         try:
             now = datetime.datetime.now()
@@ -301,14 +301,14 @@ class StatsService:
 
     async def get_key_usage_details_last_24h(self, key: str) -> Union[dict, None]:
         """
-        获取指定 API 密钥在过去 24 小时内按模型统计的调用次数。
+        Get the number of calls for the specified API key in the last 24 hours, grouped by model.
 
         Args:
-            key: 要查询的 API 密钥。
+            key: The API key to query.
 
         Returns:
-            一个字典，其中键是模型名称，值是调用次数。
-            如果查询出错或没有找到记录，可能返回 None 或空字典。
+            A dictionary where the keys are model names and the values are the number of calls.
+            May return None or an empty dictionary if an error occurs or no records are found.
             Example: {"gemini-pro": 10, "gemini-1.5-pro-latest": 5}
         """
         logger.info(

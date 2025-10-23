@@ -26,7 +26,7 @@ logger = get_gemini_logger()
 
 
 def _has_image_parts(contents: List[Dict[str, Any]]) -> bool:
-    """判断消息是否包含图片部分"""
+    """Check if the message contains image parts."""
     for content in contents:
         if "parts" in content:
             for part in content["parts"]:
@@ -36,7 +36,7 @@ def _has_image_parts(contents: List[Dict[str, Any]]) -> bool:
 
 
 def _extract_file_references(contents: List[Dict[str, Any]]) -> List[str]:
-    """從內容中提取文件引用"""
+    """Extract file references from the content."""
     file_names = []
     for content in contents:
         if "parts" in content:
@@ -47,7 +47,7 @@ def _extract_file_references(contents: List[Dict[str, Any]]) -> List[str]:
                 if "fileUri" not in file_data:
                     continue
                 file_uri = file_data["fileUri"]
-                # 從 URI 中提取文件名
+                # Extract file name from URI
                 # 1. https://generativelanguage.googleapis.com/v1beta/files/{file_id}
                 match = re.match(
                     rf"{re.escape(settings.BASE_URL)}/(files/.*)", file_uri
@@ -62,11 +62,11 @@ def _extract_file_references(contents: List[Dict[str, Any]]) -> List[str]:
 
 
 def _clean_json_schema_properties(obj: Any) -> Any:
-    """清理JSON Schema中Gemini API不支持的字段"""
+    """Clean up fields in JSON Schema that are not supported by the Gemini API."""
     if not isinstance(obj, dict):
         return obj
 
-    # Gemini API不支持的JSON Schema字段
+    # JSON Schema fields not supported by the Gemini API
     unsupported_fields = {
         "exclusiveMaximum",
         "exclusiveMinimum",
@@ -105,10 +105,10 @@ def _clean_json_schema_properties(obj: Any) -> Any:
 
 
 def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """构建工具"""
+    """Build tools."""
 
     def _has_function_call(contents: List[Dict[str, Any]]) -> bool:
-        """检查内容中是否包含 functionCall"""
+        """Check if the content contains a functionCall."""
         if not contents or not isinstance(contents, list):
             return False
         for content in contents:
@@ -131,7 +131,7 @@ def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
             for k, v in item.items():
                 if k == "functionDeclarations" and v and isinstance(v, list):
                     functions = record.get("functionDeclarations", [])
-                    # 清理每个函数声明中的不支持字段
+                    # Clean up unsupported fields in each function declaration
                     cleaned_functions = []
                     for func in v:
                         if isinstance(func, dict):
@@ -146,7 +146,7 @@ def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         return record
 
     def _is_structured_output_request(payload: Dict[str, Any]) -> bool:
-        """检查请求是否要求结构化JSON输出"""
+        """Check if the request requires structured JSON output."""
         try:
             generation_config = payload.get("generationConfig", {})
             return generation_config.get("responseMimeType") == "application/json"
@@ -162,8 +162,8 @@ def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
             tool.update(_merge_tools(items))
 
     # "Tool use with a response mime type: 'application/json' is unsupported"
-    # Gemini API限制：不支持同时使用tools和结构化输出(response_mime_type='application/json')
-    # 当请求指定了JSON响应格式时，跳过所有工具的添加以避免API错误
+    # Gemini API limitation: Does not support using tools and structured output (response_mime_type='application/json') at the same time
+    # When the request specifies a JSON response format, skip adding all tools to avoid API errors
     has_structured_output = _is_structured_output_request(payload)
     if not has_structured_output:
         if (
@@ -180,7 +180,7 @@ def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         if real_model in settings.URL_CONTEXT_MODELS and settings.URL_CONTEXT_ENABLED:
             tool["urlContext"] = {}
 
-    # 解决 "Tool use with function calling is unsupported" 问题
+    # Solve the "Tool use with function calling is unsupported" problem
     if tool.get("functionDeclarations") or _has_function_call(
         payload.get("contents", [])
     ):
@@ -204,7 +204,7 @@ def _get_real_model(model: str) -> str:
 
 
 def _get_safety_settings(model: str) -> List[Dict[str, str]]:
-    """获取安全设置"""
+    """Get safety settings."""
     if model == "gemini-2.0-flash-exp":
         return GEMINI_2_FLASH_EXP_SAFETY_SETTINGS
     return settings.SAFETY_SETTINGS
@@ -237,29 +237,29 @@ def _filter_empty_parts(contents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
-    """构建请求payload"""
+    """Build the request payload."""
     request_dict = request.model_dump(exclude_none=False)
     if request.generationConfig:
         if request.generationConfig.maxOutputTokens is None:
-            # 如果未指定最大输出长度，则不传递该字段，解决截断的问题
+            # If maxOutputTokens is not specified, do not pass this field to solve the truncation problem
             if "maxOutputTokens" in request_dict["generationConfig"]:
                 request_dict["generationConfig"].pop("maxOutputTokens")
 
-    # 检查是否为TTS模型
+    # Check if it is a TTS model
     is_tts_model = "tts" in model.lower()
 
     if is_tts_model:
-        # TTS模型使用简化的payload，不包含tools和safetySettings
+        # TTS models use a simplified payload that does not include tools and safetySettings
         payload = {
             "contents": _filter_empty_parts(request_dict.get("contents", [])),
             "generationConfig": request_dict.get("generationConfig"),
         }
 
-        # 只在有systemInstruction时才添加
+        # Add only when systemInstruction is present
         if request_dict.get("systemInstruction"):
             payload["systemInstruction"] = request_dict.get("systemInstruction")
     else:
-        # 非TTS模型使用完整的payload
+        # Non-TTS models use the full payload
         payload = {
             "contents": _filter_empty_parts(request_dict.get("contents", [])),
             "tools": _build_tools(model, request_dict),
@@ -268,7 +268,7 @@ def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
             "systemInstruction": request_dict.get("systemInstruction"),
         }
 
-    # 确保 generationConfig 不为 None
+    # Ensure generationConfig is not None
     if payload["generationConfig"] is None:
         payload["generationConfig"] = {}
 
@@ -276,16 +276,16 @@ def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
         payload.pop("systemInstruction")
         payload["generationConfig"]["responseModalities"] = ["Text", "Image"]
 
-    # 处理思考配置：优先使用客户端提供的配置，否则使用默认配置
+    # Handle thinking configuration: prioritize using the client-provided configuration, otherwise use the default configuration
     client_thinking_config = None
     if request.generationConfig and request.generationConfig.thinkingConfig:
         client_thinking_config = request.generationConfig.thinkingConfig
 
     if client_thinking_config is not None:
-        # 客户端提供了思考配置，直接使用
+        # The client provides the thinking configuration, use it directly
         payload["generationConfig"]["thinkingConfig"] = client_thinking_config
     else:
-        # 客户端没有提供思考配置，使用默认配置
+        # The client does not provide a thinking configuration, use the default configuration
         if model.endswith("-non-thinking"):
             if "gemini-2.5-pro" in model:
                 payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 128}
@@ -306,7 +306,7 @@ def _build_payload(model: str, request: GeminiRequest) -> Dict[str, Any]:
 
 
 class GeminiChatService:
-    """聊天服务"""
+    """Chat service."""
 
     def __init__(self, base_url: str, key_manager: KeyManager):
         self.api_client = GeminiApiClient(base_url, settings.TIME_OUT)
@@ -346,7 +346,7 @@ class GeminiChatService:
     def _create_char_response(
         self, original_response: Dict[str, Any], text: str
     ) -> Dict[str, Any]:
-        """创建包含指定文本的响应"""
+        """Create a response containing the specified text."""
         response_copy = json.loads(json.dumps(original_response))
         if response_copy.get("candidates") and response_copy["candidates"][0].get(
             "content", {}
@@ -357,8 +357,8 @@ class GeminiChatService:
     async def generate_content(
         self, model: str, request: GeminiRequest, api_key: str
     ) -> Dict[str, Any]:
-        """生成内容"""
-        # 檢查並獲取文件專用的 API key（如果有文件）
+        """Generate content."""
+        # Check and get the dedicated API key for the file (if there is a file)
         file_names = _extract_file_references(request.model_dump().get("contents", []))
         if file_names:
             logger.info(f"Request contains file references: {file_names}")
@@ -367,7 +367,7 @@ class GeminiChatService:
                 logger.info(
                     f"Found API key for file {file_names[0]}: {redact_key_for_logging(file_api_key)}"
                 )
-                api_key = file_api_key  # 使用文件的 API key
+                api_key = file_api_key  # Use the file's API key
             else:
                 logger.warning(
                     f"No API key found for file {file_names[0]}, using default key: {redact_key_for_logging(api_key)}"
@@ -417,8 +417,8 @@ class GeminiChatService:
     async def count_tokens(
         self, model: str, request: GeminiRequest, api_key: str
     ) -> Dict[str, Any]:
-        """计算token数量"""
-        # countTokens API只需要contents
+        """Count tokens."""
+        # countTokens API only needs contents
         payload = {
             "contents": _filter_empty_parts(request.model_dump().get("contents", []))
         }
@@ -463,8 +463,8 @@ class GeminiChatService:
     async def stream_generate_content(
         self, model: str, request: GeminiRequest, api_key: str
     ) -> AsyncGenerator[str, None]:
-        """流式生成内容"""
-        # 檢查並獲取文件專用的 API key（如果有文件）
+        """Stream generate content."""
+        # Check and get the dedicated API key for the file (if there is a file)
         file_names = _extract_file_references(request.model_dump().get("contents", []))
         if file_names:
             logger.info(f"Request contains file references: {file_names}")
@@ -473,7 +473,7 @@ class GeminiChatService:
                 logger.info(
                     f"Found API key for file {file_names[0]}: {redact_key_for_logging(file_api_key)}"
                 )
-                api_key = file_api_key  # 使用文件的 API key
+                api_key = file_api_key  # Use the file's API key
             else:
                 logger.warning(
                     f"No API key found for file {file_names[0]}, using default key: {redact_key_for_logging(api_key)}"

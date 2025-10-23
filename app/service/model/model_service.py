@@ -14,7 +14,7 @@ class ModelService:
         gemini_models = await api_client.get_models(api_key)
 
         if gemini_models is None:
-            logger.error("从 API 客户端获取模型列表失败。")
+            logger.error("Failed to get model list from API client.")
             return None
 
         try:
@@ -29,11 +29,11 @@ class ModelService:
             gemini_models["models"] = filtered_models_list
             return gemini_models
         except Exception as e:
-            logger.error(f"处理模型列表时出错: {e}")
+            logger.error(f"Error processing model list: {e}")
             return None
 
     async def get_gemini_openai_models(self, api_key: str) -> Optional[Dict[str, Any]]:
-        """获取 Gemini 模型并转换为 OpenAI 格式"""
+        """Get Gemini models and convert to OpenAI format."""
         gemini_models = await self.get_gemini_models(api_key)
         if gemini_models is None:
             return None

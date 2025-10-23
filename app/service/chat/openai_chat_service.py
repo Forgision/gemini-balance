@@ -26,7 +26,7 @@ logger = get_openai_logger()
 
 
 def _has_media_parts(messages: List[Dict[str, Any]]) -> bool:
-    """判断消息是否包含多媒体部分"""
+    """Check if the message contains multimedia parts."""
     for message in messages:
         if "parts" in message:
             for part in message["parts"]:
@@ -36,11 +36,11 @@ def _has_media_parts(messages: List[Dict[str, Any]]) -> bool:
 
 
 def _clean_json_schema_properties(obj: Any) -> Any:
-    """清理JSON Schema中Gemini API不支持的字段"""
+    """Clean up fields in JSON Schema that are not supported by the Gemini API."""
     if not isinstance(obj, dict):
         return obj
 
-    # Gemini API不支持的JSON Schema字段
+    # JSON Schema fields not supported by the Gemini API
     unsupported_fields = {
         "exclusiveMaximum",
         "exclusiveMinimum",
@@ -81,7 +81,7 @@ def _clean_json_schema_properties(obj: Any) -> Any:
 def _build_tools(
     request: ChatRequest, messages: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
-    """构建工具"""
+    """Build tools."""
     tool = dict()
     model = request.model
 
@@ -107,7 +107,7 @@ def _build_tools(
     if real_model in settings.URL_CONTEXT_MODELS and settings.URL_CONTEXT_ENABLED:
         tool["urlContext"] = {}
 
-    # 将 request 中的 tools 合并到 tools 中
+    # Merge tools from the request into the tools
     if request.tools:
         function_declarations = []
         for item in request.tools:
@@ -122,26 +122,26 @@ def _build_tools(
                 ):
                     function.pop("parameters", None)
 
-                # 清理函数中的不支持字段
+                # Clean up unsupported fields in the function
                 function = _clean_json_schema_properties(function)
                 function_declarations.append(function)
 
         if function_declarations:
-            # 按照 function 的 name 去重
+            # Deduplicate by function name
             names, functions = set(), []
             for fc in function_declarations:
                 if fc.get("name") not in names:
                     if fc.get("name") == "googleSearch":
-                        # cherry开启内置搜索时，添加googleSearch工具
+                        # When cherry enables built-in search, add the googleSearch tool
                         tool["googleSearch"] = {}
                     else:
-                        # 其他函数，添加到functionDeclarations中
+                        # Other functions, add to functionDeclarations
                         names.add(fc.get("name"))
                         functions.append(fc)
 
             tool["functionDeclarations"] = functions
 
-    # 解决 "Tool use with function calling is unsupported" 问题
+    # Solve the "Tool use with function calling is unsupported" problem
     if tool.get("functionDeclarations"):
         tool.pop("googleSearch", None)
         tool.pop("codeExecution", None)
@@ -163,7 +163,7 @@ def _get_real_model(model: str) -> str:
 
 
 def _get_safety_settings(model: str) -> List[Dict[str, str]]:
-    """获取安全设置"""
+    """Get safety settings."""
     # if (
     #     "2.0" in model
     #     and "gemini-2.0-flash-thinking-exp" not in model
@@ -177,16 +177,16 @@ def _get_safety_settings(model: str) -> List[Dict[str, str]]:
 def _validate_and_set_max_tokens(
     payload: Dict[str, Any], max_tokens: Optional[int], logger_instance
 ) -> None:
-    """验证并设置 max_tokens 参数"""
+    """Validate and set the max_tokens parameter."""
     if max_tokens is None:
         return
 
-    # 参数验证和处理
+    # Parameter validation and handling
     if max_tokens <= 0:
         logger_instance.warning(
             f"Invalid max_tokens value: {max_tokens}, will not set maxOutputTokens"
         )
-        # 不设置 maxOutputTokens，让 Gemini API 使用默认值
+        # Do not set maxOutputTokens, let the Gemini API use the default value
     else:
         payload["generationConfig"]["maxOutputTokens"] = max_tokens
 
@@ -196,7 +196,7 @@ def _build_payload(
     messages: List[Dict[str, Any]],
     instruction: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """构建请求payload"""
+    """Build the request payload."""
     payload = {
         "contents": messages,
         "generationConfig": {
@@ -209,10 +209,10 @@ def _build_payload(
         "safetySettings": _get_safety_settings(request.model),
     }
 
-    # 处理 max_tokens 参数
+    # Handle the max_tokens parameter
     _validate_and_set_max_tokens(payload, request.max_tokens, logger)
 
-    # 处理 n 参数
+    # Handle the n parameter
     if request.n is not None and request.n > 0:
         payload["generationConfig"]["candidateCount"] = request.n
 
@@ -250,7 +250,7 @@ def _build_payload(
 
 
 class OpenAIChatService:
-    """聊天服务"""
+    """Chat service."""
 
     def __init__(self, base_url: str, key_manager: KeyManager = None):
         self.message_converter = OpenAIMessageConverter()
@@ -260,7 +260,7 @@ class OpenAIChatService:
         self.image_create_service = ImageCreateService()
 
     def _extract_text_from_openai_chunk(self, chunk: Dict[str, Any]) -> str:
-        """从OpenAI响应块中提取文本内容"""
+        """Extract text content from the OpenAI response chunk."""
         if not chunk.get("choices"):
             return ""
 
@@ -272,7 +272,7 @@ class OpenAIChatService:
     def _create_char_openai_chunk(
         self, original_chunk: Dict[str, Any], text: str
     ) -> Dict[str, Any]:
-        """创建包含指定文本的OpenAI响应块"""
+        """Create an OpenAI response chunk containing the specified text."""
         chunk_copy = json.loads(json.dumps(original_chunk))
         if chunk_copy.get("choices") and "delta" in chunk_copy["choices"][0]:
             chunk_copy["choices"][0]["delta"]["content"] = text
@@ -283,7 +283,7 @@ class OpenAIChatService:
         request: ChatRequest,
         api_key: str,
     ) -> Union[Dict[str, Any], AsyncGenerator[str, None]]:
-        """创建聊天完成"""
+        """Create chat completion."""
         messages, instruction = self.message_converter.convert(
             request.messages, request.model
         )
@@ -297,7 +297,7 @@ class OpenAIChatService:
     async def _handle_normal_completion(
         self, model: str, payload: Dict[str, Any], api_key: str
     ) -> Dict[str, Any]:
-        """处理普通聊天完成"""
+        """Handle normal chat completion."""
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()
         is_success = False
@@ -310,7 +310,7 @@ class OpenAIChatService:
             is_success = True
             status_code = 200
 
-            # 尝试处理响应，捕获可能的响应处理异常
+            # Try to process the response, catch possible response processing exceptions
             try:
                 result = self.response_handler.handle_response(
                     response,
@@ -325,7 +325,7 @@ class OpenAIChatService:
                     f"Response processing failed for model {model}: {str(response_error)}"
                 )
 
-                # 记录详细的错误信息
+                # Log detailed error information
                 if "parts" in str(response_error):
                     logger.error("Response structure issue - missing or invalid parts")
                     if response.get("candidates"):
@@ -333,7 +333,7 @@ class OpenAIChatService:
                         content = candidate.get("content", {})
                         logger.error(f"Content structure: {content}")
 
-                # 重新抛出异常
+                # Re-throw the exception
                 raise response_error
 
         except Exception as e:
@@ -342,14 +342,14 @@ class OpenAIChatService:
             error_log_msg = e.args[1]
             logger.error(f"API call failed for model {model}: {error_log_msg}")
 
-            # 特别记录 max_tokens 相关的错误
+            # Specifically record max_tokens related errors
             gen_config = payload.get("generationConfig", {})
             if "maxOutputTokens" in gen_config:
                 logger.error(
                     f"Request had maxOutputTokens: {gen_config['maxOutputTokens']}"
                 )
 
-            # 如果是响应处理错误，记录更多信息
+            # If it is a response processing error, record more information
             if "parts" in error_log_msg:
                 logger.error("This is likely a response processing error")
 
@@ -382,7 +382,7 @@ class OpenAIChatService:
     async def _fake_stream_logic_impl(
         self, model: str, payload: Dict[str, Any], api_key: str
     ) -> AsyncGenerator[str, None]:
-        """处理伪流式 (fake stream) 的核心逻辑"""
+        """Handle the core logic of fake streaming."""
         logger.info(
             f"Fake streaming enabled for model: {model}. Calling non-streaming endpoint."
         )
@@ -395,7 +395,7 @@ class OpenAIChatService:
         try:
             while not api_response_task.done():
                 i = i + 1
-                """定期发送空数据以保持连接"""
+                """Periodically send empty data to keep the connection alive."""
                 if i >= settings.FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS:
                     i = 0
                     empty_chunk = self.response_handler.handle_response(
@@ -439,7 +439,7 @@ class OpenAIChatService:
     async def _real_stream_logic_impl(
         self, model: str, payload: Dict[str, Any], api_key: str
     ) -> AsyncGenerator[str, None]:
-        """处理真实流式 (real stream) 的核心逻辑"""
+        """Handle the core logic of real streaming."""
         tool_call_flag = False
         usage_metadata = None
         async for line in self.api_client.stream_generate_content(
@@ -494,7 +494,7 @@ class OpenAIChatService:
     async def _handle_stream_completion(
         self, model: str, payload: Dict[str, Any], api_key: str
     ) -> AsyncGenerator[str, None]:
-        """处理流式聊天完成，添加重试逻辑和假流式支持"""
+        """Handle streaming chat completion, adding retry logic and fake stream support."""
         retries = 0
         max_retries = settings.MAX_RETRIES
         is_success = False
@@ -626,10 +626,10 @@ class OpenAIChatService:
                     image_data, model, stream=True, finish_reason=None
                 )
                 if openai_chunk:
-                    # 提取文本内容
+                    # Extract text content
                     text = self._extract_text_from_openai_chunk(openai_chunk)
                     if text:
-                        # 使用流式输出优化器处理文本输出
+                        # Use the stream optimizer to process text output
                         async for (
                             optimized_chunk
                         ) in openai_optimizer.optimize_stream_output(
@@ -639,7 +639,7 @@ class OpenAIChatService:
                         ):
                             yield optimized_chunk
                     else:
-                        # 如果没有文本内容（如图片URL等），整块输出
+                        # If there is no text content (e.g., image URL), output the whole chunk
                         yield f"data: {json.dumps(openai_chunk)}\n\n"
             yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='stop'))}\n\n"
             logger.info(
