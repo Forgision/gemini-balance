@@ -33,10 +33,10 @@ services:
       - mysql_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
-      interval: 10s # 每隔10秒检查一次
-      timeout: 5s   # 每次检查的超时时间为5秒
-      retries: 3    # 重试3次失败后标记为 unhealthy
-      start_period: 30s # 容器启动后等待30秒再开始第一次健康检查
+      interval: 10s # Check every 10 seconds
+      timeout: 5s   # Timeout for each check is 5 seconds
+      retries: 3    # Mark as unhealthy after 3 failed retries
+      start_period: 30s # Wait 30 seconds after container startup before starting the first health check
   # adminer:
   #   image: adminer:latest
   #   container_name: gemini-balance-adminer

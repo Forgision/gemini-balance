@@ -170,11 +170,13 @@ def redact_key_for_logging(key: str) -> str:
     Returns:
         str: Redacted key in format "first6...last6" or descriptive placeholder for edge cases
     """
+    if not isinstance(key, str):
+        return "[INVALID_INPUT]"
     if not key:
-        return key
+        return "[INVALID_KEY]"
 
     if len(key) <= 12:
-        return f"{key[:3]}...{key[-3:]}"
+        return "[SHORT_KEY]"
     else:
         return f"{key[:6]}...{key[-6:]}"
 

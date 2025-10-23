@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -464,11 +464,11 @@
   <body class="bg-white min-h-screen text-gray-900 pt-6 pb-16">
     {% block content %}{% endblock %}
 
-    <!-- 底部版权 -->
+    <!-- Copyright Footer -->
     <div
       class="fixed bottom-0 left-0 w-full py-3 bg-white bg-opacity-95 backdrop-blur-md text-sm text-gray-800 border-t border-gray-200 flex flex-col items-center space-y-1"
     >
-      <!-- 第一行 -->
+      <!-- First Row -->
       <div class="flex items-center justify-center space-x-2">
         <span>© <span id="copyright-year"></span> by</span>
         <a
@@ -491,14 +491,14 @@
           <i class="fab fa-github mr-1"></i> GitHub
         </a>
       </div>
-      <!-- 第二行 -->
+      <!-- Second Row -->
       <div class="flex items-center justify-center space-x-2 text-xs">
         <a
           href="https://gb-docs.snaily.top/guide/supportme.html"
           target="_blank"
           class="text-primary-600 hover:text-primary-800 transition duration-300 flex items-center"
         >
-          <i class="fas fa-drumstick-bite text-yellow-600 mr-1"></i> 给作者加鸡腿
+          <i class="fas fa-drumstick-bite text-yellow-600 mr-1"></i> Buy the author a chicken leg
         </a>
         <span class="text-gray-400">|</span>
         <a
@@ -506,19 +506,19 @@
           target="_blank"
           class="text-primary-600 hover:text-primary-800 transition duration-300 flex items-center"
         >
-          <i class="fas fa-book mr-1"></i> 在线文档
+          <i class="fas fa-book mr-1"></i> Online Documentation
         </a>
-<span class="text-gray-400">|</span>
+        <span class="text-gray-400">|</span>
         <a
           href="https://t.me/+soaHax5lyI0wZDVl"
           target="_blank"
           class="text-primary-600 hover:text-primary-800 transition duration-300 flex items-center"
         >
-          <i class="fab fa-telegram-plane mr-1"></i> 交流群
+          <i class="fab fa-telegram-plane mr-1"></i> Community Group
         </a>
         <span class="text-gray-400">|</span>
         <span class="text-yellow-600 font-semibold flex items-center">
-          <i class="fas fa-exclamation-triangle mr-1"></i>免费项目，谨防诈骗
+          <i class="fas fa-exclamation-triangle mr-1"></i>Free project, beware of scams
         </span>
         <span id="version-info-container" class="inline-flex items-center">
           <!-- Version info will be loaded here by JavaScript -->
@@ -526,13 +526,13 @@
       </div>
     </div>
 
-    <!-- 通用JS -->
+    <!-- Common JS -->
     <script>
-      // 设置版权年份
+      // Set copyright year
       document.getElementById("copyright-year").textContent =
         new Date().getFullYear();
 
-      // 滚动到顶部/底部函数 (如果页面需要)
+      // Scroll to top/bottom functions (if needed by the page)
       function scrollToTop() {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
@@ -543,7 +543,7 @@
         });
       }
 
-      // 显示通知
+      // Show notification
       function showNotification(message, type = "success", duration = 3000) {
         const notification =
           document.getElementById("notification") ||
@@ -580,7 +580,7 @@
         return notification;
       }
 
-      // 页面刷新带加载状态
+      // Page refresh with loading state
       function refreshPage(button) {
         if (button) {
           const icon = button.querySelector("i");
@@ -601,7 +601,7 @@
       async function fetchVersionInfo() {
         if (!versionInfoContainer) return;
         versionInfoContainer.innerHTML =
-          '<span class="mx-1">|</span><span class="text-xs text-gray-700">检查更新中...</span>'; // Initial loading state
+          '<span class="mx-1">|</span><span class="text-xs text-gray-700">Checking for updates...</span>'; // Initial loading state
 
         try {
           const response = await fetch("/api/version/check");
@@ -615,19 +615,19 @@
             versionHtml += `
                         <span class="mx-1">|</span>
                         <a href="https://github.com/snailyp/gemini-balance/releases/latest" target="_blank" class="text-yellow-600 hover:text-yellow-800 transition duration-300 animate-pulse">
-                            <i class="fas fa-arrow-up"></i> 新版本: v${data.latest_version}
+                            <i class="fas fa-arrow-up"></i> New version: v${data.latest_version}
                         </a>`;
           } else if (data.error_message) {
             versionHtml += `
                         <span class="mx-1">|</span>
-                        <span class="text-xs text-red-500" title="${data.error_message}">更新检查失败</span>`;
+                        <span class="text-xs text-red-500" title="${data.error_message}">Update check failed</span>`;
           } else {
-            versionHtml += `<span class="mx-1">|</span><span class="text-xs text-green-500">已是最新</span>`; // Indicate up-to-date
+            versionHtml += `<span class="mx-1">|</span><span class="text-xs text-green-500">Up to date</span>`; // Indicate up-to-date
           }
           versionInfoContainer.innerHTML = versionHtml;
         } catch (error) {
           console.error("Error fetching version info:", error);
-          versionInfoContainer.innerHTML = `<span class="mx-1">|</span><span class="text-xs text-red-500" title="无法连接到服务器或解析响应">更新检查失败</span>`;
+          versionInfoContainer.innerHTML = `<span class="mx-1">|</span><span class="text-xs text-red-500" title="Could not connect to the server or parse the response">Update check failed</span>`;
         }
       }
 
