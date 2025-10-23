@@ -1,5 +1,5 @@
 """
-中间件配置模块，负责设置和配置应用程序的中间件
+Middleware configuration module, responsible for setting up and configuring the application's middleware
 """
 
 from fastapi import FastAPI, Request
@@ -18,11 +18,11 @@ logger = get_middleware_logger()
 
 class AuthMiddleware(BaseHTTPMiddleware):
     """
-    认证中间件，处理未经身份验证的请求
+    Authentication middleware, handles unauthenticated requests
     """
 
     async def dispatch(self, request: Request, call_next):
-        # 允许特定路径绕过身份验证
+        # Allow specific paths to bypass authentication
         if (
             request.url.path not in ["/", "/auth"]
             and not request.url.path.startswith("/static")
@@ -49,21 +49,21 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
 def setup_middlewares(app: FastAPI) -> None:
     """
-    设置应用程序的中间件
+    Set up the application's middleware
 
     Args:
-        app: FastAPI应用程序实例
+        app: FastAPI application instance
     """
-    # 添加智能路由中间件（必须在认证中间件之前）
+    # Add Smart Routing Middleware (must be before authentication middleware)
     app.add_middleware(SmartRoutingMiddleware)
 
-    # 添加认证中间件
+    # Add Authentication Middleware
     app.add_middleware(AuthMiddleware)
 
-    # 添加请求日志中间件（可选，默认注释掉）
+    # Add Request Logging Middleware (optional, commented out by default)
     # app.add_middleware(RequestLoggingMiddleware)
 
-    # 配置CORS中间件
+    # Configure CORS Middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

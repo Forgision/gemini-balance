@@ -1,5 +1,5 @@
 """
-日志路由模块
+Log route module
 """
 
 from datetime import datetime
@@ -66,19 +66,19 @@ async def get_error_logs_api(
     sort_order: str = Query("desc", description="Sort order ('asc' or 'desc')"),
 ):
     """
-    获取错误日志列表 (返回错误码)，支持过滤和排序
+    Get a list of error logs (returns error codes), supports filtering and sorting
 
     Args:
-        request: 请求对象
-        limit: 限制数量
-        offset: 偏移量
-        key_search: 密钥搜索
-        error_search: 错误搜索 (可能搜索类型或日志内容，由DB层决定)
-        error_code_search: 错误码搜索
-        start_date: 开始日期
-        end_date: 结束日期
-        sort_by: 排序字段
-        sort_order: 排序顺序
+        request: Request object
+        limit: Limit number
+        offset: Offset
+        key_search: Key search
+        error_search: Error search (may search type or log content, determined by the DB layer)
+        error_code_search: Error code search
+        start_date: Start date
+        end_date: End date
+        sort_by: Sort field
+        sort_order: Sort order
 
     Returns:
         ErrorLogListResponse: An object containing the list of logs (with error_code) and the total count.
@@ -126,7 +126,7 @@ class ErrorLogDetailResponse(BaseModel):
 @router.get("/errors/{log_id}/details", response_model=ErrorLogDetailResponse)
 async def get_error_log_detail_api(request: Request, log_id: int = Path(..., ge=1)):
     """
-    根据日志 ID 获取错误日志的详细信息 (包括 error_log 和 request_msg)
+    Get detailed information of an error log (including error_log and request_msg) by log ID
     """
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -155,15 +155,15 @@ async def get_error_log_detail_api(request: Request, log_id: int = Path(..., ge=
 @router.get("/errors/lookup", response_model=ErrorLogDetailResponse)
 async def lookup_error_log_by_info(
     request: Request,
-    gemini_key: str = Query(..., description="完整的 Gemini key"),
-    timestamp: datetime = Query(..., description="请求时间 (ISO8601)"),
-    status_code: Optional[int] = Query(None, description="错误码 (可选)"),
+    gemini_key: str = Query(..., description="Complete Gemini key"),
+    timestamp: datetime = Query(..., description="Request time (ISO8601)"),
+    status_code: Optional[int] = Query(None, description="Error code (optional)"),
     window_seconds: int = Query(
-        100, ge=1, le=300, description="时间窗口(秒), 默认100秒"
+        100, ge=1, le=300, description="Time window (seconds), default 100 seconds"
     ),
 ):
     """
-    通过 key / 错误码 / 时间窗口 查找最匹配的一条错误日志详情。
+    Find the best matching error log details through key / error code / time window.
     """
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -194,7 +194,7 @@ async def delete_error_logs_bulk_api(
     request: Request, payload: Dict[str, List[int]] = Body(...)
 ):
     """
-    批量删除错误日志 (异步)
+    Batch delete error logs (asynchronous)
     """
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -209,7 +209,7 @@ async def delete_error_logs_bulk_api(
         deleted_count = await error_log_service.process_delete_error_logs_by_ids(
             log_ids
         )
-        # 注意：异步函数返回的是尝试删除的数量，可能不是精确值
+        # Note: The asynchronous function returns the number of attempted deletions, which may not be an exact value
         logger.info(
             f"Attempted bulk deletion for {deleted_count} error logs with IDs: {log_ids}"
         )
@@ -224,7 +224,7 @@ async def delete_error_logs_bulk_api(
 @router.delete("/errors/all", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_all_error_logs_api(request: Request):
     """
-    删除所有错误日志 (异步)
+    Delete all error logs (asynchronous)
     """
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -246,7 +246,7 @@ async def delete_all_error_logs_api(request: Request):
 @router.delete("/errors/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_error_log_api(request: Request, log_id: int = Path(..., ge=1)):
     """
-    删除单个错误日志 (异步)
+    Delete a single error log (asynchronous)
     """
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -256,7 +256,7 @@ async def delete_error_log_api(request: Request, log_id: int = Path(..., ge=1)):
     try:
         success = await error_log_service.process_delete_error_log_by_id(log_id)
         if not success:
-            # 服务层现在在未找到时返回 False，我们在这里转换为 404
+            # The service layer now returns False when not found, which we convert to 404 here
             raise HTTPException(
                 status_code=404, detail=f"Error log with ID {log_id} not found"
             )

@@ -3,7 +3,7 @@ name: Publish Release
 on:
   push:
     tags:
-      - "v*" # 当推送以 "v" 开头的标签时触发（如 v1.0.0, v2.1.0）
+      - "v*" # Triggered when a tag starting with "v" is pushed (e.g., v1.0.0, v2.1.0)
 
 jobs:
   update-release-draft:
@@ -12,20 +12,20 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      # Step 1: 检出代码库
+      # Step 1: Check out the code repository
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # Step 2: 自动生成 Release Notes
+      # Step 2: Automatically generate Release Notes
       - name: Generate release notes
         id: changelog
         uses: mikepenz/release-changelog-builder-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Step 3: 自动生成 Release
+      # Step 3: Automatically generate Release
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -38,18 +38,18 @@ jobs:
           draft: false
           prerelease: false
 
-      # Step 4: 可选，构建zip文件
+      # Step 4: Optional, build a zip file
       - name: Create ZIP file
         run: |
           zip -r gemini-balance.zip . -x "*.git*" "*.github*" "*.env*" "logs/*" "tests/*"
 
-      # Step 5: 可选，上传构建文件
+      # Step 5: Optional, upload the build file
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./gemini-balance.zip # 替换为你的构建文件路径
-          asset_name: gemini-balance.zip # 替换为你的文件名
+          asset_path: ./gemini-balance.zip # Replace with your build file path
+          asset_name: gemini-balance.zip # Replace with your file name
           asset_content_type: application/zip

@@ -1,5 +1,5 @@
 """
-Files API 相关的领域模型
+Domain models related to the Files API.
 """
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -7,28 +7,28 @@ from pydantic import BaseModel, Field
 
 
 class FileUploadConfig(BaseModel):
-    """文件上传配置"""
-    mime_type: Optional[str] = Field(None, description="MIME 类型")
-    display_name: Optional[str] = Field(None, description="显示名称，最多40个字符")
+    """File upload configuration."""
+    mime_type: Optional[str] = Field(None, description="MIME type")
+    display_name: Optional[str] = Field(None, description="Display name, up to 40 characters")
 
 
 class CreateFileRequest(BaseModel):
-    """创建文件请求（用于初始化上传）"""
-    file: Optional[Dict[str, Any]] = Field(None, description="文件元数据")
+    """Create file request (for initializing an upload)."""
+    file: Optional[Dict[str, Any]] = Field(None, description="File metadata")
     
 
 class FileMetadata(BaseModel):
-    """文件元数据响应"""
-    name: str = Field(..., description="文件名称，格式: files/{file_id}")
-    displayName: Optional[str] = Field(None, description="显示名称")
-    mimeType: str = Field(..., description="MIME 类型")
-    sizeBytes: str = Field(..., description="文件大小（字节）")
-    createTime: str = Field(..., description="创建时间 (RFC3339)")
-    updateTime: str = Field(..., description="更新时间 (RFC3339)")
-    expirationTime: str = Field(..., description="过期时间 (RFC3339)")
-    sha256Hash: Optional[str] = Field(None, description="SHA256 哈希值")
-    uri: str = Field(..., description="文件访问 URI")
-    state: str = Field(..., description="文件状态")
+    """File metadata response."""
+    name: str = Field(..., description="File name, format: files/{file_id}")
+    displayName: Optional[str] = Field(None, description="Display name")
+    mimeType: str = Field(..., description="MIME type")
+    sizeBytes: str = Field(..., description="File size (bytes)")
+    createTime: str = Field(..., description="Creation time (RFC3339)")
+    updateTime: str = Field(..., description="Update time (RFC3339)")
+    expirationTime: str = Field(..., description="Expiration time (RFC3339)")
+    sha256Hash: Optional[str] = Field(None, description="SHA256 hash value")
+    uri: str = Field(..., description="File access URI")
+    state: str = Field(..., description="File status")
     
     class Config:
         json_encoders = {
@@ -37,25 +37,25 @@ class FileMetadata(BaseModel):
 
 
 class ListFilesRequest(BaseModel):
-    """列出文件请求参数"""
-    pageSize: Optional[int] = Field(10, ge=1, le=100, description="每页大小")
-    pageToken: Optional[str] = Field(None, description="分页标记")
+    """List files request parameters."""
+    pageSize: Optional[int] = Field(10, ge=1, le=100, description="Page size")
+    pageToken: Optional[str] = Field(None, description="Page token")
 
 
 class ListFilesResponse(BaseModel):
-    """列出文件响应"""
-    files: List[FileMetadata] = Field(default_factory=list, description="文件列表")
-    nextPageToken: Optional[str] = Field(None, description="下一页标记")
+    """List files response."""
+    files: List[FileMetadata] = Field(default_factory=list, description="List of files")
+    nextPageToken: Optional[str] = Field(None, description="Next page token")
 
 
 class UploadInitResponse(BaseModel):
-    """上传初始化响应（内部使用）"""
+    """Upload initialization response (internal use)."""
     file_metadata: FileMetadata
     upload_url: str
 
 
 class FileKeyMapping(BaseModel):
-    """文件与 API Key 的映射关系（内部使用）"""
+    """Mapping between file and API Key (internal use)."""
     file_name: str
     api_key: str
     user_token: str
@@ -64,6 +64,6 @@ class FileKeyMapping(BaseModel):
 
 
 class DeleteFileResponse(BaseModel):
-    """删除文件响应"""
-    success: bool = Field(..., description="是否删除成功")
-    message: Optional[str] = Field(None, description="消息")
+    """Delete file response."""
+    success: bool = Field(..., description="Whether the deletion was successful")
+    message: Optional[str] = Field(None, description="Message")

@@ -13,15 +13,15 @@ const SHOW_CLASS = "show"; // For modals
 const API_KEY_REGEX = /AIzaSy\S{33}/g;
 const PROXY_REGEX =
   /(?:https?|socks5):\/\/(?:[^:@\/]+(?::[^@\/]+)?@)?(?:[^:\/\s]+)(?::\d+)?/g;
-const VERTEX_API_KEY_REGEX = /AQ\.[a-zA-Z0-9_\-]{50}/g; // 新增 Vertex Express API Key 正则
+const VERTEX_API_KEY_REGEX = /AQ\.[a-zA-Z0-9_\-]{50}/g; // Added Vertex Express API Key regex
 const MASKED_VALUE = "••••••••";
 
 // API Keys Pagination Constants
-const API_KEYS_PER_PAGE = 20; // 每页显示的API密钥数量
+const API_KEYS_PER_PAGE = 20; // Number of API keys to display per page
 let currentApiKeyPage = 1;
 let totalApiKeyPages = 1;
-let allApiKeys = []; // 存储所有API密钥数据
-let filteredApiKeys = []; // 存储过滤后的API密钥数据
+let allApiKeys = []; // Stores all API key data
+let filteredApiKeys = []; // Stores filtered API key data
 
 // DOM Elements - Global Scope for frequently accessed elements
 const safetySettingsContainer = document.getElementById(
@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // 检查间隔小时数输入控制
+  // Check interval hours input control
   const checkIntervalInput = document.getElementById("CHECK_INTERVAL_HOURS");
   if (checkIntervalInput) {
     checkIntervalInput.addEventListener("input", function () {
@@ -249,7 +249,7 @@ document.addEventListener("DOMContentLoaded", function () {
   
   if (retryFailedProxiesBtn) {
     retryFailedProxiesBtn.addEventListener("click", () => {
-      // 重试失败的代理检测
+      // Retry failed proxy checks
       checkAllProxies();
     });
   }
@@ -320,8 +320,8 @@ document.addEventListener("DOMContentLoaded", function () {
       bulkDeleteApiKeyModal,
       proxyModal,
       bulkDeleteProxyModal,
-      vertexApiKeyModal, // 新增
-      bulkDeleteVertexApiKeyModal, // 新增
+      vertexApiKeyModal,
+      bulkDeleteVertexApiKeyModal,
       modelHelperModal,
     ];
     modals.forEach((modal) => {
@@ -347,7 +347,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         authTokenInput.dispatchEvent(event);
       }
-      showNotification("已生成新认证令牌", "success");
+      showNotification("New authentication token generated", "success");
     });
   }
 
@@ -406,7 +406,7 @@ document.addEventListener("DOMContentLoaded", function () {
           );
           if (budgetContainer && budgetContainer.children.length === 0) {
             budgetContainer.innerHTML =
-              '<div class="text-gray-500 text-sm italic">请在上方添加思考模型，预算将自动关联。</div>';
+              '<div class="text-gray-500 text-sm italic">Please add a thinking model above, and the budget will be automatically associated.</div>';
           }
         }
         arrayItem.remove();
@@ -417,7 +417,7 @@ document.addEventListener("DOMContentLoaded", function () {
           parentContainer.children.length === 0
         ) {
           parentContainer.innerHTML =
-            '<div class="text-gray-500 text-sm italic">定义模型的安全过滤阈值。</div>';
+            '<div class="text-gray-500 text-sm italic">Define safety filtering thresholds for the model.</div>';
         }
       } else if (
         generateButton &&
@@ -436,7 +436,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             inputField.dispatchEvent(event);
           }
-          showNotification("已生成新令牌", "success");
+          showNotification("New token generated", "success");
         }
       }
     });
@@ -690,7 +690,7 @@ function generateUUID() {
  */
 async function initConfig() {
   try {
-    showNotification("正在加载配置...", "info");
+    showNotification("Loading configuration...", "info");
     const response = await fetch("/api/config");
 
     if (!response.ok) {
@@ -699,13 +699,13 @@ async function initConfig() {
 
     const config = await response.json();
 
-    // 确保数组字段有默认值
+    // Ensure array fields have default values
     if (
       !config.API_KEYS ||
       !Array.isArray(config.API_KEYS) ||
       config.API_KEYS.length === 0
     ) {
-      config.API_KEYS = ["请在此处输入 API 密钥"];
+      config.API_KEYS = ["Please enter API keys here"];
     }
 
     if (
@@ -739,42 +739,42 @@ async function initConfig() {
     ) {
       config.FILTERED_MODELS = ["gemini-1.0-pro-latest"];
     }
-    // --- 新增：处理 VERTEX_API_KEYS 默认值 ---
+    // Added: Handle VERTEX_API_KEYS default value
     if (!config.VERTEX_API_KEYS || !Array.isArray(config.VERTEX_API_KEYS)) {
       config.VERTEX_API_KEYS = [];
     }
-    // --- 新增：处理 VERTEX_EXPRESS_BASE_URL 默认值 ---
+    // Added: Handle VERTEX_EXPRESS_BASE_URL default value
     if (typeof config.VERTEX_EXPRESS_BASE_URL === "undefined") {
       config.VERTEX_EXPRESS_BASE_URL = "";
     }
-    // --- 新增：处理 PROXIES 默认值 ---
+    // Added: Handle PROXIES default value
     if (!config.PROXIES || !Array.isArray(config.PROXIES)) {
-      config.PROXIES = []; // 默认为空数组
+      config.PROXIES = []; // Default to an empty array
     }
-    // --- 新增：处理新字段的默认值 ---
+    // Added: Handle new field default values
     if (!config.THINKING_MODELS || !Array.isArray(config.THINKING_MODELS)) {
-      config.THINKING_MODELS = []; // 默认为空数组
+      config.THINKING_MODELS = []; // Default to an empty array
     }
     if (
       !config.THINKING_BUDGET_MAP ||
       typeof config.THINKING_BUDGET_MAP !== "object" ||
       config.THINKING_BUDGET_MAP === null
     ) {
-      config.THINKING_BUDGET_MAP = {}; // 默认为空对象
+      config.THINKING_BUDGET_MAP = {}; // Default to an empty object
     }
-    // --- 新增：处理 CUSTOM_HEADERS 默认值 ---
+    // Added: Handle CUSTOM_HEADERS default value
     if (
       !config.CUSTOM_HEADERS ||
       typeof config.CUSTOM_HEADERS !== "object" ||
       config.CUSTOM_HEADERS === null
     ) {
-      config.CUSTOM_HEADERS = {}; // 默认为空对象
+      config.CUSTOM_HEADERS = {}; // Default to an empty object
     }
-    // --- 新增：处理 SAFETY_SETTINGS 默认值 ---
+    // Added: Handle SAFETY_SETTINGS default value
     if (!config.SAFETY_SETTINGS || !Array.isArray(config.SAFETY_SETTINGS)) {
-      config.SAFETY_SETTINGS = []; // 默认为空数组
+      config.SAFETY_SETTINGS = []; // Default to an empty array
     }
-    // --- 结束：处理 SAFETY_SETTINGS 默认值 ---
+    // End: Handle SAFETY_SETTINGS default value
     if (typeof config.URL_CONTEXT_ENABLED === "undefined") {
       config.URL_CONTEXT_ENABLED = true;
     }
@@ -782,36 +782,36 @@ async function initConfig() {
       config.URL_CONTEXT_MODELS = [];
     }
  
-    // --- 新增：处理自动删除错误日志配置的默认值 ---
+    // Added: Handle default values for auto-deleting error logs
     if (typeof config.AUTO_DELETE_ERROR_LOGS_ENABLED === "undefined") {
       config.AUTO_DELETE_ERROR_LOGS_ENABLED = false;
     }
     if (typeof config.AUTO_DELETE_ERROR_LOGS_DAYS === "undefined") {
       config.AUTO_DELETE_ERROR_LOGS_DAYS = 7;
     }
-    // 错误日志是否记录请求体（默认不记录）
+    // Whether error logs record the request body (default is false)
     if (typeof config.ERROR_LOG_RECORD_REQUEST_BODY === "undefined") {
       config.ERROR_LOG_RECORD_REQUEST_BODY = false;
     }
-    // --- 结束：处理自动删除错误日志配置的默认值 ---
+    // End: Handle default values for auto-deleting error logs
 
-    // --- 新增：处理自动删除请求日志配置的默认值 ---
+    // Added: Handle default values for auto-deleting request logs
     if (typeof config.AUTO_DELETE_REQUEST_LOGS_ENABLED === "undefined") {
       config.AUTO_DELETE_REQUEST_LOGS_ENABLED = false;
     }
     if (typeof config.AUTO_DELETE_REQUEST_LOGS_DAYS === "undefined") {
       config.AUTO_DELETE_REQUEST_LOGS_DAYS = 30;
     }
-    // --- 结束：处理自动删除请求日志配置的默认值 ---
+    // End: Handle default values for auto-deleting request logs
 
-    // --- 新增：处理假流式配置的默认值 ---
+    // Added: Handle default values for fake streaming configuration
     if (typeof config.FAKE_STREAM_ENABLED === "undefined") {
       config.FAKE_STREAM_ENABLED = false;
     }
     if (typeof config.FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS === "undefined") {
       config.FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS = 5;
     }
-    // --- 结束：处理假流式配置的默认值 ---
+    // End: Handle default values for fake streaming configuration
 
     populateForm(config);
     // After populateForm, initialize masking for all populated sensitive fields
@@ -823,16 +823,16 @@ async function initConfig() {
     // Ensure upload provider has a default value
     const uploadProvider = document.getElementById("UPLOAD_PROVIDER");
     if (uploadProvider && !uploadProvider.value) {
-      uploadProvider.value = "smms"; // 设置默认值为 smms
+      uploadProvider.value = "smms"; // Set default value to smms
       toggleProviderConfig("smms");
     }
 
-    showNotification("配置加载成功", "success");
+    showNotification("Configuration loaded successfully", "success");
   } catch (error) {
-    console.error("加载配置失败:", error);
-    showNotification("加载配置失败: " + error.message, "error");
+    console.error("Failed to load configuration:", error);
+    showNotification("Failed to load configuration: " + error.message, "error");
 
-    // 加载失败时，使用默认配置
+    // On failure, use default configuration
     const defaultConfig = {
       API_KEYS: [""],
       ALLOWED_TOKENS: [""],
@@ -841,19 +841,19 @@ async function initConfig() {
       FILTERED_MODELS: ["gemini-1.0-pro-latest"],
       UPLOAD_PROVIDER: "smms",
       PROXIES: [],
-      VERTEX_API_KEYS: [], // 确保默认值存在
-      VERTEX_EXPRESS_BASE_URL: "", // 确保默认值存在
+      VERTEX_API_KEYS: [], // Ensure default value exists
+      VERTEX_EXPRESS_BASE_URL: "", // Ensure default value exists
       THINKING_MODELS: [],
       THINKING_BUDGET_MAP: {},
       CUSTOM_HEADERS: {},
       AUTO_DELETE_ERROR_LOGS_ENABLED: false,
-      AUTO_DELETE_ERROR_LOGS_DAYS: 7, // 新增默认值
-      AUTO_DELETE_REQUEST_LOGS_ENABLED: false, // 新增默认值
-      AUTO_DELETE_REQUEST_LOGS_DAYS: 30, // 新增默认值
-      // --- 新增：处理假流式配置的默认值 ---
+      AUTO_DELETE_ERROR_LOGS_DAYS: 7, // Added default value
+      AUTO_DELETE_REQUEST_LOGS_ENABLED: false, // Added default value
+      AUTO_DELETE_REQUEST_LOGS_DAYS: 30, // Added default value
+      // Added: Handle default values for fake streaming configuration
       FAKE_STREAM_ENABLED: false,
       FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS: 5,
-      // --- 结束：处理假流式配置的默认值 ---
+      // End: Handle default values for fake streaming configuration
     };
 
     populateForm(defaultConfig);
@@ -941,7 +941,7 @@ function populateForm(config) {
   }
   if (!budgetItemsAdded && budgetMapContainer) {
     budgetMapContainer.innerHTML =
-      '<div class="text-gray-500 text-sm italic">请在上方添加思考模型，预算将自动关联。</div>';
+      '<div class="text-gray-500 text-sm italic">Please add a thinking model above, and the budget will be automatically associated.</div>';
   }
 
   // Populate CUSTOM_HEADERS
@@ -961,7 +961,7 @@ function populateForm(config) {
   }
   if (!customHeadersAdded && customHeadersContainer) {
     customHeadersContainer.innerHTML =
-      '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
+      '<div class="text-gray-500 text-sm italic">Add custom headers, e.g., X-Api-Key: your-key</div>';
   }
 
   // 4. Populate other array fields (excluding THINKING_MODELS and API_KEYS)
@@ -980,7 +980,7 @@ function populateForm(config) {
     }
   }
 
-  // 4.1. 特殊处理API_KEYS - 使用分页
+  // 4.1. Special handling for API_KEYS - use pagination
   if (Array.isArray(config.API_KEYS)) {
     allApiKeys = config.API_KEYS.filter(key =>
       typeof key === "string" && key.trim() !== ""
@@ -1041,10 +1041,10 @@ function populateForm(config) {
   }
   if (safetySettingsContainer && !safetyItemsAdded) {
     safetySettingsContainer.innerHTML =
-      '<div class="text-gray-500 text-sm italic">定义模型的安全过滤阈值。</div>';
+      '<div class="text-gray-500 text-sm italic">Define safety filtering thresholds for the model.</div>';
   }
 
-  // --- 新增：处理自动删除错误日志的字段 ---
+  // Added: Handle auto-deleting error logs fields
   const autoDeleteEnabledCheckbox = document.getElementById(
     "AUTO_DELETE_ERROR_LOGS_ENABLED"
   );
@@ -1053,20 +1053,20 @@ function populateForm(config) {
   );
 
   if (autoDeleteEnabledCheckbox && autoDeleteDaysSelect) {
-    autoDeleteEnabledCheckbox.checked = !!config.AUTO_DELETE_ERROR_LOGS_ENABLED; // 确保是布尔值
-    autoDeleteDaysSelect.value = config.AUTO_DELETE_ERROR_LOGS_DAYS || 7; // 默认7天
+    autoDeleteEnabledCheckbox.checked = !!config.AUTO_DELETE_ERROR_LOGS_ENABLED; // Ensure it is a boolean value
+    autoDeleteDaysSelect.value = config.AUTO_DELETE_ERROR_LOGS_DAYS || 7; // Default 7 days
 
-    // 根据复选框状态设置下拉框的禁用状态
+    // Set the disabled state of the dropdown based on the checkbox state
     autoDeleteDaysSelect.disabled = !autoDeleteEnabledCheckbox.checked;
 
-    // 添加事件监听器
+    // Add event listener
     autoDeleteEnabledCheckbox.addEventListener("change", function () {
       autoDeleteDaysSelect.disabled = !this.checked;
     });
   }
-  // --- 结束：处理自动删除错误日志的字段 ---
+  // End: Handle auto-deleting error logs fields
 
-  // --- 新增：处理自动删除请求日志的字段 ---
+  // Added: Handle auto-deleting request logs fields
   const autoDeleteRequestEnabledCheckbox = document.getElementById(
     "AUTO_DELETE_REQUEST_LOGS_ENABLED"
   );
@@ -1086,9 +1086,9 @@ function populateForm(config) {
       autoDeleteRequestDaysSelect.disabled = !this.checked;
     });
   }
-  // --- 结束：处理自动删除请求日志的字段 ---
+  // End: Handle auto-deleting request logs fields
 
-  // --- 新增：处理假流式配置的字段 ---
+  // Added: Handle fake streaming configuration fields
   const fakeStreamEnabledCheckbox = document.getElementById(
     "FAKE_STREAM_ENABLED"
   );
@@ -1100,13 +1100,13 @@ function populateForm(config) {
     fakeStreamEnabledCheckbox.checked = !!config.FAKE_STREAM_ENABLED;
     fakeStreamIntervalInput.value =
       config.FAKE_STREAM_EMPTY_DATA_INTERVAL_SECONDS || 5;
-    // 根据复选框状态设置输入框的禁用状态 (如果需要)
+    // Set the disabled state of the input based on the checkbox state (if needed)
     // fakeStreamIntervalInput.disabled = !fakeStreamEnabledCheckbox.checked;
     // fakeStreamEnabledCheckbox.addEventListener("change", function () {
     //   fakeStreamIntervalInput.disabled = !this.checked;
     // });
   }
-  // --- 结束：处理假流式配置的字段 ---
+  // End: Handle fake streaming configuration fields
 }
 
 /**
@@ -1118,14 +1118,14 @@ function handleBulkAddApiKeys() {
   const bulkText = apiKeyBulkInput.value;
   const extractedKeys = bulkText.match(API_KEY_REGEX) || [];
 
-  // 合并现有密钥和新密钥，去重
+  // Merge existing keys and new keys, removing duplicates
   const combinedKeys = new Set([...allApiKeys, ...extractedKeys]);
   const uniqueKeys = Array.from(combinedKeys);
 
-  // 更新全局密钥数组
+  // Update global key array
   allApiKeys = uniqueKeys;
   
-  // 更新过滤后的数组
+  // Update filtered array
   const searchTerm = apiKeySearchInput ? apiKeySearchInput.value.toLowerCase() : "";
   if (!searchTerm) {
     filteredApiKeys = [...allApiKeys];
@@ -1135,12 +1135,12 @@ function handleBulkAddApiKeys() {
     );
   }
 
-  // 重新渲染当前页
+  // Re-render the current page
   renderApiKeyPage();
   updateApiKeyPagination();
 
   closeModal(apiKeyModal);
-  showNotification(`添加/更新了 ${uniqueKeys.length} 个唯一密钥`, "success");
+  showNotification(`Added/Updated ${uniqueKeys.length} unique keys`, "success");
 }
 
 /**
@@ -1151,7 +1151,7 @@ function handleApiKeySearch() {
 
   const searchTerm = apiKeySearchInput.value.toLowerCase();
   
-  // 过滤API密钥
+  // Filter API keys
   if (!searchTerm) {
     filteredApiKeys = [...allApiKeys];
   } else {
@@ -1160,52 +1160,52 @@ function handleApiKeySearch() {
     );
   }
 
-  // 重置到第一页
+  // Reset to the first page
   currentApiKeyPage = 1;
   
-  // 重新渲染当前页
+  // Re-render the current page
   renderApiKeyPage();
   updateApiKeyPagination();
 }
 
 /**
- * 渲染当前页的API密钥
+ * Renders the API keys for the current page
  */
 function renderApiKeyPage() {
   const apiKeyContainer = document.getElementById("API_KEYS_container");
   if (!apiKeyContainer) return;
 
-  // 清空容器
+  // Clear container
   apiKeyContainer.innerHTML = "";
 
-  // 计算当前页的数据范围
+  // Calculate the data range for the current page
   const startIndex = (currentApiKeyPage - 1) * API_KEYS_PER_PAGE;
   const endIndex = Math.min(startIndex + API_KEYS_PER_PAGE, filteredApiKeys.length);
   const pageKeys = filteredApiKeys.slice(startIndex, endIndex);
 
-  // 渲染当前页的密钥
+  // Render the keys for the current page
   pageKeys.forEach((key) => {
     addArrayItemWithValue("API_KEYS", key);
   });
 
-  // 如果没有密钥，显示提示信息
+  // If there are no keys, display a message
   if (pageKeys.length === 0) {
     const emptyMessage = document.createElement("div");
     emptyMessage.className = "text-gray-500 text-sm italic text-center py-4";
     emptyMessage.textContent = filteredApiKeys.length === 0 ?
-      (allApiKeys.length === 0 ? "暂无API密钥" : "未找到匹配的密钥") :
-      "当前页无数据";
+      (allApiKeys.length === 0 ? "No API keys yet" : "No matching keys found") :
+      "No data on current page";
     apiKeyContainer.appendChild(emptyMessage);
   }
 }
 
 /**
- * 更新分页控件
+ * Updates the pagination controls
  */
 function updateApiKeyPagination() {
   totalApiKeyPages = Math.max(1, Math.ceil(filteredApiKeys.length / API_KEYS_PER_PAGE));
   
-  // 确保当前页在有效范围内
+  // Ensure the current page is within a valid range
   if (currentApiKeyPage > totalApiKeyPages) {
     currentApiKeyPage = totalApiKeyPages;
   }
@@ -1213,7 +1213,7 @@ function updateApiKeyPagination() {
   const paginationContainer = document.getElementById("apiKeyPagination");
   if (!paginationContainer) return;
 
-  // 如果只有一页或没有数据，隐藏分页控件
+  // If there is only one page or no data, hide the pagination controls
   if (totalApiKeyPages <= 1) {
     paginationContainer.style.display = "none";
     return;
@@ -1221,13 +1221,13 @@ function updateApiKeyPagination() {
 
   paginationContainer.style.display = "flex";
 
-  // 更新页码信息
+  // Update page number information
   const pageInfo = document.getElementById("apiKeyPageInfo");
   if (pageInfo) {
-    pageInfo.textContent = `第 ${currentApiKeyPage} 页，共 ${totalApiKeyPages} 页 (${filteredApiKeys.length} 个密钥)`;
+    pageInfo.textContent = `Page ${currentApiKeyPage} of ${totalApiKeyPages} (${filteredApiKeys.length} keys)`;
   }
 
-  // 更新按钮状态
+  // Update button states
   const prevBtn = document.getElementById("apiKeyPrevBtn");
   const nextBtn = document.getElementById("apiKeyNextBtn");
   
@@ -1247,7 +1247,7 @@ function updateApiKeyPagination() {
 }
 
 /**
- * 跳转到指定页
+ * Jumps to a specific page
  */
 function goToApiKeyPage(page) {
   if (page < 1 || page > totalApiKeyPages) return;
@@ -1258,7 +1258,7 @@ function goToApiKeyPage(page) {
 }
 
 /**
- * 上一页
+ * Previous page
  */
 function prevApiKeyPage() {
   if (currentApiKeyPage > 1) {
@@ -1267,7 +1267,7 @@ function prevApiKeyPage() {
 }
 
 /**
- * 下一页
+ * Next page
  */
 function nextApiKeyPage() {
   if (currentApiKeyPage < totalApiKeyPages) {
@@ -1283,18 +1283,18 @@ function handleBulkDeleteApiKeys() {
 
   const bulkText = bulkDeleteApiKeyInput.value;
   if (!bulkText.trim()) {
-    showNotification("请粘贴需要删除的 API 密钥", "warning");
+    showNotification("Please paste the API keys to delete", "warning");
     return;
   }
 
   const keysToDelete = new Set(bulkText.match(API_KEY_REGEX) || []);
 
   if (keysToDelete.size === 0) {
-    showNotification("未在输入内容中提取到有效的 API 密钥格式", "warning");
+    showNotification("No valid API key format was extracted from the input", "warning");
     return;
   }
 
-  // 从allApiKeys数组中删除匹配的密钥
+  // Delete matching keys from the allApiKeys array
   let deleteCount = 0;
   allApiKeys = allApiKeys.filter(key => {
     if (keysToDelete.has(key)) {
@@ -1304,7 +1304,7 @@ function handleBulkDeleteApiKeys() {
     return true;
   });
 
-  // 更新过滤后的数组
+  // Update the filtered array
   const searchTerm = apiKeySearchInput ? apiKeySearchInput.value.toLowerCase() : "";
   if (!searchTerm) {
     filteredApiKeys = [...allApiKeys];
@@ -1314,16 +1314,16 @@ function handleBulkDeleteApiKeys() {
     );
   }
 
-  // 重新渲染当前页
+  // Re-render the current page
   renderApiKeyPage();
   updateApiKeyPagination();
 
   closeModal(bulkDeleteApiKeyModal);
 
   if (deleteCount > 0) {
-    showNotification(`成功删除了 ${deleteCount} 个匹配的密钥`, "success");
+    showNotification(`Successfully deleted ${deleteCount} matching keys`, "success");
   } else {
-    showNotification("列表中未找到您输入的任何密钥进行删除", "info");
+    showNotification("No keys you entered were found in the list to delete", "info");
   }
   bulkDeleteApiKeyInput.value = "";
 }
@@ -1355,7 +1355,7 @@ function handleBulkAddProxies() {
   });
 
   closeModal(proxyModal);
-  showNotification(`添加/更新了 ${uniqueProxies.length} 个唯一代理`, "success");
+  showNotification(`Added/Updated ${uniqueProxies.length} unique proxies`, "success");
 }
 
 /**
@@ -1367,14 +1367,14 @@ function handleBulkDeleteProxies() {
 
   const bulkText = bulkDeleteProxyInput.value;
   if (!bulkText.trim()) {
-    showNotification("请粘贴需要删除的代理地址", "warning");
+    showNotification("Please paste the proxy addresses to delete", "warning");
     return;
   }
 
   const proxiesToDelete = new Set(bulkText.match(PROXY_REGEX) || []);
 
   if (proxiesToDelete.size === 0) {
-    showNotification("未在输入内容中提取到有效的代理地址格式", "warning");
+    showNotification("No valid proxy address format was extracted from the input", "warning");
     return;
   }
 
@@ -1392,9 +1392,9 @@ function handleBulkDeleteProxies() {
   closeModal(bulkDeleteProxyModal);
 
   if (deleteCount > 0) {
-    showNotification(`成功删除了 ${deleteCount} 个匹配的代理`, "success");
+    showNotification(`Successfully deleted ${deleteCount} matching proxies`, "success");
   } else {
-    showNotification("列表中未找到您输入的任何代理进行删除", "info");
+    showNotification("No proxies you entered were found in the list to delete", "info");
   }
   bulkDeleteProxyInput.value = "";
 }
@@ -1449,7 +1449,7 @@ function handleBulkAddVertexApiKeys() {
 
   closeModal(vertexApiKeyModal);
   showNotification(
-    `添加/更新了 ${uniqueKeys.length} 个唯一 Vertex 密钥`,
+    `Added/Updated ${uniqueKeys.length} unique Vertex keys`,
     "success"
   );
   vertexApiKeyBulkInput.value = "";
@@ -1472,7 +1472,7 @@ function handleBulkDeleteVertexApiKeys() {
 
   const bulkText = bulkDeleteVertexApiKeyInput.value;
   if (!bulkText.trim()) {
-    showNotification("请粘贴需要删除的 Vertex Express API 密钥", "warning");
+    showNotification("Please paste the Vertex Express API keys to delete", "warning");
     return;
   }
 
@@ -1480,7 +1480,7 @@ function handleBulkDeleteVertexApiKeys() {
 
   if (keysToDelete.size === 0) {
     showNotification(
-      "未在输入内容中提取到有效的 Vertex Express API 密钥格式",
+      "No valid Vertex Express API key format was extracted from the input",
       "warning"
     );
     return;
@@ -1510,11 +1510,11 @@ function handleBulkDeleteVertexApiKeys() {
 
   if (deleteCount > 0) {
     showNotification(
-      `成功删除了 ${deleteCount} 个匹配的 Vertex 密钥`,
+      `Successfully deleted ${deleteCount} matching Vertex keys`,
       "success"
     );
   } else {
-    showNotification("列表中未找到您输入的任何 Vertex 密钥进行删除", "info");
+    showNotification("No Vertex keys you entered were found in the list to delete", "info");
   }
   bulkDeleteVertexApiKeyInput.value = "";
 }
@@ -1526,32 +1526,32 @@ function handleBulkDeleteVertexApiKeys() {
 function switchTab(tabId) {
   console.log(`Switching to tab: ${tabId}`);
 
-  // 定义选中态和未选中态的样式
+  // Define styles for selected and unselected states
   const activeStyle =
     "background-color: #3b82f6 !important; color: #ffffff !important; border: 2px solid #2563eb !important; box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.4), 0 2px 6px -1px rgba(59, 130, 246, 0.2) !important; transform: translateY(-2px) !important; font-weight: 600 !important;";
   const inactiveStyle =
     "background-color: #f8fafc !important; color: #64748b !important; border: 2px solid #e2e8f0 !important; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important; font-weight: 500 !important; transform: none !important;";
 
-  // 更新标签按钮状态
+  // Update tab button states
   const tabButtons = document.querySelectorAll(".tab-btn");
   console.log(`Found ${tabButtons.length} tab buttons`);
 
   tabButtons.forEach((button) => {
     const buttonTabId = button.getAttribute("data-tab");
     if (buttonTabId === tabId) {
-      // 激活状态：直接设置内联样式
+      // Active state: set inline style directly
       button.classList.add("active");
       button.setAttribute("style", activeStyle);
       console.log(`Applied active style to button: ${buttonTabId}`);
     } else {
-      // 非激活状态：直接设置内联样式
+      // Inactive state: set inline style directly
       button.classList.remove("active");
       button.setAttribute("style", inactiveStyle);
       console.log(`Applied inactive style to button: ${buttonTabId}`);
     }
   });
 
-  // 更新内容区域
+  // Update content area
   const sections = document.querySelectorAll(".config-section");
   sections.forEach((section) => {
     if (section.id === `${tabId}-section`) {
@@ -1597,7 +1597,7 @@ function createArrayInput(key, value, isSensitive, modelId = null) {
   input.className = inputClasses;
   if (modelId) {
     input.setAttribute("data-model-id", modelId);
-    input.placeholder = "思考模型名称";
+    input.placeholder = "Thinking Model Name";
   }
   return input;
 }
@@ -1612,7 +1612,7 @@ function createGenerateTokenButton() {
   generateBtn.className =
     "generate-btn px-2 py-2 text-gray-500 hover:text-primary-600 focus:outline-none rounded-r-md bg-gray-100 hover:bg-gray-200 transition-colors";
   generateBtn.innerHTML = '<i class="fas fa-dice"></i>';
-  generateBtn.title = "生成随机令牌";
+  generateBtn.title = "Generate random token";
   // Event listener will be added via delegation in DOMContentLoaded
   return generateBtn;
 }
@@ -1627,7 +1627,7 @@ function createRemoveButton() {
   removeBtn.className =
     "remove-btn text-gray-400 hover:text-red-500 focus:outline-none transition-colors duration-150";
   removeBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-  removeBtn.title = "删除";
+  removeBtn.title = "Delete";
   // Event listener will be added via delegation in DOMContentLoaded
   return removeBtn;
 }
@@ -1639,7 +1639,7 @@ function createRemoveButton() {
 function createProxyStatusIcon() {
   const statusIcon = document.createElement("span");
   statusIcon.className = "proxy-status-icon px-2 py-2 text-gray-400";
-  statusIcon.innerHTML = '<i class="fas fa-question-circle" title="未检测"></i>';
+  statusIcon.innerHTML = '<i class="fas fa-question-circle" title="Not checked"></i>';
   statusIcon.setAttribute("data-status", "unknown");
   return statusIcon;
 }
@@ -1654,9 +1654,9 @@ function createProxyCheckButton() {
   checkBtn.className =
     "proxy-check-btn px-2 py-2 text-blue-500 hover:text-blue-700 focus:outline-none transition-colors duration-150 rounded-r-md";
   checkBtn.innerHTML = '<i class="fas fa-globe"></i>';
-  checkBtn.title = "检测此代理";
+  checkBtn.title = "Check this proxy";
   
-  // 添加点击事件监听器
+  // Add click event listener
   checkBtn.addEventListener("click", function(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -1664,7 +1664,7 @@ function createProxyCheckButton() {
     if (inputElement && inputElement.value.trim()) {
       checkSingleProxy(inputElement.value.trim(), this);
     } else {
-      showNotification("请先输入代理地址", "warning");
+      showNotification("Please enter a proxy address first", "warning");
     }
   });
   
@@ -1701,9 +1701,9 @@ function addArrayItemWithValue(key, value) {
 
   const isThinkingModel = key === "THINKING_MODELS";
   const isAllowedToken = key === "ALLOWED_TOKENS";
-  const isVertexApiKey = key === "VERTEX_API_KEYS"; // 新增判断
-  const isProxy = key === "PROXIES"; // 新增代理判断
-  const isSensitive = key === "API_KEYS" || isAllowedToken || isVertexApiKey; // 更新敏感判断
+  const isVertexApiKey = key === "VERTEX_API_KEYS";
+  const isProxy = key === "PROXIES";
+  const isSensitive = key === "API_KEYS" || isAllowedToken || isVertexApiKey;
   const modelId = isThinkingModel ? generateUUID() : null;
 
   const arrayItem = document.createElement("div");
@@ -1731,7 +1731,7 @@ function addArrayItemWithValue(key, value) {
     const generateBtn = createGenerateTokenButton();
     inputWrapper.appendChild(generateBtn);
   } else if (isProxy) {
-    // 为代理添加状态显示和检测按钮
+    // Add status display and check button for proxy
     const proxyStatusIcon = createProxyStatusIcon();
     inputWrapper.appendChild(proxyStatusIcon);
     
@@ -1794,7 +1794,7 @@ function createAndAppendBudgetMapItem(mapKey, mapValue, modelId) {
   const keyInput = document.createElement("input");
   keyInput.type = "text";
   keyInput.value = mapKey;
-  keyInput.placeholder = "模型名称 (自动关联)";
+  keyInput.placeholder = "Model Name (auto-associated)";
   keyInput.readOnly = true;
   keyInput.className = `${MAP_KEY_INPUT_CLASS} flex-grow px-3 py-2 border border-gray-300 rounded-md focus:outline-none bg-gray-100 text-gray-500`;
   keyInput.setAttribute("data-model-id", modelId);
@@ -1803,7 +1803,7 @@ function createAndAppendBudgetMapItem(mapKey, mapValue, modelId) {
   valueInput.type = "number";
   const intValue = parseInt(mapValue, 10);
   valueInput.value = isNaN(intValue) ? -1 : intValue;
-  valueInput.placeholder = "预算 (整数)";
+  valueInput.placeholder = "Budget (integer)";
   valueInput.className = `${MAP_VALUE_INPUT_CLASS} w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-primary-500 focus:ring focus:ring-primary-200 focus:ring-opacity-50`;
   valueInput.min = -1;
   valueInput.max = 32767;
@@ -1817,17 +1817,8 @@ function createAndAppendBudgetMapItem(mapKey, mapValue, modelId) {
     this.value = val; // Corrected variable name
   });
 
-  // Remove Button - Removed for budget map items
-  // const removeBtn = document.createElement('button');
-  // removeBtn.type = 'button';
-  // removeBtn.className = 'remove-btn text-gray-300 cursor-not-allowed focus:outline-none'; // Kept original class for reference
-  // removeBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-  // removeBtn.title = '请从上方模型列表删除';
-  // removeBtn.disabled = true;
-
   mapItem.appendChild(keyInput);
   mapItem.appendChild(valueInput);
-  // mapItem.appendChild(removeBtn); // Do not append the remove button
 
   container.appendChild(mapItem);
 }
@@ -1882,7 +1873,7 @@ function createAndAppendCustomHeaderItem(key, value) {
     headerItem.remove();
     if (container.children.length === 0) {
       container.innerHTML =
-        '<div class="text-gray-500 text-sm italic">添加自定义请求头，例如 X-Api-Key: your-key</div>';
+        '<div class="text-gray-500 text-sm italic">Add custom headers, e.g., X-Api-Key: your-key</div>';
     }
   });
 
@@ -1900,7 +1891,7 @@ function createAndAppendCustomHeaderItem(key, value) {
 function collectFormData() {
   const formData = {};
 
-  // 处理普通输入和 select
+  // Handle normal inputs and selects
   const inputsAndSelects = document.querySelectorAll(
     'input[type="text"], input[type="number"], input[type="password"], select, textarea'
   );
@@ -1934,7 +1925,7 @@ function collectFormData() {
   arrayContainers.forEach((container) => {
     const key = container.id.replace("_container", "");
     
-    // 特殊处理API_KEYS - 使用全局数组而不是DOM元素
+    // Special handling for API_KEYS - use global array instead of DOM elements
     if (key === "API_KEYS") {
       formData[key] = allApiKeys.filter(
         (value) => value && value.trim() !== "" && value !== MASKED_VALUE
@@ -2020,7 +2011,7 @@ function collectFormData() {
     });
   }
 
-  // --- 新增：收集自动删除错误日志的配置 ---
+  // Added: Collect configuration for auto-deleting error logs
   const autoDeleteEnabledCheckbox = document.getElementById(
     "AUTO_DELETE_ERROR_LOGS_ENABLED"
   );
@@ -2033,17 +2024,17 @@ function collectFormData() {
     "AUTO_DELETE_ERROR_LOGS_DAYS"
   );
   if (autoDeleteDaysSelect) {
-    // 如果复选框未选中，则不应提交天数，或者可以提交一个默认/无效值，
-    // 但后端应该只在 ENABLED 为 true 时才关心 DAYS。
-    // 这里我们总是收集它，后端逻辑会处理。
+    // If the checkbox is not checked, the number of days should not be submitted, or a default/invalid value can be submitted,
+    // but the backend should only care about DAYS when ENABLED is true.
+    // Here we always collect it, and the backend logic will handle it.
     formData["AUTO_DELETE_ERROR_LOGS_DAYS"] = parseInt(
       autoDeleteDaysSelect.value,
       10
     );
   }
-  // --- 结束：收集自动删除错误日志的配置 ---
+  // End: Collect configuration for auto-deleting error logs
 
-  // --- 新增：收集自动删除请求日志的配置 ---
+  // Added: Collect configuration for auto-deleting request logs
   const autoDeleteRequestEnabledCheckbox = document.getElementById(
     "AUTO_DELETE_REQUEST_LOGS_ENABLED"
   );
@@ -2061,9 +2052,9 @@ function collectFormData() {
       10
     );
   }
-  // --- 结束：收集自动删除请求日志的配置 ---
+  // End: Collect configuration for auto-deleting request logs
 
-  // --- 新增：收集假流式配置 ---
+  // Added: Collect fake streaming configuration
   const fakeStreamEnabledCheckbox = document.getElementById(
     "FAKE_STREAM_ENABLED"
   );
@@ -2079,7 +2070,7 @@ function collectFormData() {
       10
     );
   }
-  // --- 结束：收集假流式配置 ---
+  // End: Collect fake streaming configuration
 
   return formData;
 }
@@ -2091,12 +2082,12 @@ async function stopScheduler() {
   try {
     const response = await fetch("/api/scheduler/stop", { method: "POST" });
     if (!response.ok) {
-      console.warn(`停止定时任务失败: ${response.status}`);
+      console.warn(`Failed to stop scheduled tasks: ${response.status}`);
     } else {
-      console.log("定时任务已停止");
+      console.log("Scheduled tasks stopped");
     }
   } catch (error) {
-    console.error("调用停止定时任务API时出错:", error);
+    console.error("Error calling the stop scheduled tasks API:", error);
   }
 }
 
@@ -2107,12 +2098,12 @@ async function startScheduler() {
   try {
     const response = await fetch("/api/scheduler/start", { method: "POST" });
     if (!response.ok) {
-      console.warn(`启动定时任务失败: ${response.status}`);
+      console.warn(`Failed to start scheduled tasks: ${response.status}`);
     } else {
-      console.log("定时任务已启动");
+      console.log("Scheduled tasks started");
     }
   } catch (error) {
-    console.error("调用启动定时任务API时出错:", error);
+    console.error("Error calling the start scheduled tasks API:", error);
   }
 }
 
@@ -2123,9 +2114,9 @@ async function saveConfig() {
   try {
     const formData = collectFormData();
 
-    showNotification("正在保存配置...", "info");
+    showNotification("Saving configuration...", "info");
 
-    // 1. 停止定时任务
+    // 1. Stop scheduled tasks
     await stopScheduler();
 
     const response = await fetch("/api/config", {
@@ -2145,19 +2136,19 @@ async function saveConfig() {
 
     const result = await response.json();
 
-    // 移除居中的 saveStatus 提示
+    // Remove centered saveStatus notification
 
-    showNotification("配置保存成功", "success");
+    showNotification("Configuration saved successfully", "success");
 
-    // 3. 启动新的定时任务
+    // 3. Start new scheduled tasks
     await startScheduler();
   } catch (error) {
-    console.error("保存配置失败:", error);
-    // 保存失败时，也尝试重启定时任务，以防万一
+    console.error("Failed to save configuration:", error);
+    // If saving fails, also try to restart the scheduled tasks just in case
     await startScheduler();
-    // 移除居中的 saveStatus 提示
+    // Remove centered saveStatus notification
 
-    showNotification("保存配置失败: " + error.message, "error");
+    showNotification("Failed to save configuration: " + error.message, "error");
   }
 }
 
@@ -2166,7 +2157,7 @@ async function saveConfig() {
  * @param {Event} [event] - The click event, if triggered by a button.
  */
 function resetConfig(event) {
-  // 阻止事件冒泡和默认行为
+  // Prevent event bubbling and default behavior
   if (event) {
     event.preventDefault();
     event.stopPropagation();
@@ -2189,7 +2180,7 @@ function resetConfig(event) {
       console.error(
         "Reset confirmation modal not found! Falling back to default confirm."
       );
-      if (confirm("确定要重置所有配置吗？这将恢复到默认值。")) {
+      if (confirm("Are you sure you want to reset all configurations? This will restore default values.")) {
         executeReset();
       }
     }
@@ -2201,9 +2192,9 @@ function resetConfig(event) {
  */
 async function executeReset() {
   try {
-    showNotification("正在重置配置...", "info");
+    showNotification("Resetting configuration...", "info");
 
-    // 1. 停止定时任务
+    // 1. Stop scheduled tasks
     await stopScheduler();
     const response = await fetch("/api/config/reset", { method: "POST" });
     if (!response.ok) {
@@ -2231,14 +2222,14 @@ async function executeReset() {
         }
       });
     }
-    showNotification("配置已重置为默认值", "success");
+    showNotification("Configuration has been reset to default values", "success");
 
-    // 3. 启动新的定时任务
+    // 3. Start new scheduled tasks
     await startScheduler();
   } catch (error) {
-    console.error("重置配置失败:", error);
-    showNotification("重置配置失败: " + error.message, "error");
-    // 重置失败时，也尝试重启定时任务
+    console.error("Failed to reset configuration:", error);
+    showNotification("Failed to reset configuration: " + error.message, "error");
+    // If reset fails, also try to restart the scheduled tasks
     await startScheduler();
   }
 }
@@ -2252,17 +2243,17 @@ function showNotification(message, type = "info") {
   const notification = document.getElementById("notification");
   notification.textContent = message;
 
-  // 统一样式为黑色半透明，与 keys_status.js 保持一致
+  // Uniform style of black translucent, consistent with keys_status.js
   notification.classList.remove("bg-danger-500");
   notification.classList.add("bg-black");
   notification.style.backgroundColor = "rgba(0,0,0,0.8)";
   notification.style.color = "#fff";
 
-  // 应用过渡效果
+  // Apply transition effects
   notification.style.opacity = "1";
   notification.style.transform = "translate(-50%, 0)";
 
-  // 设置自动消失
+  // Set automatic disappearance
   setTimeout(() => {
     notification.style.opacity = "0";
     notification.style.transform = "translate(-50%, 10px)";
@@ -2331,7 +2322,7 @@ function addSafetySettingItem(category = "", threshold = "") {
     return;
   }
 
-  // 如果容器当前只有占位符，则清除它
+  // If the container currently only has the placeholder, clear it
   const placeholder = container.querySelector(".text-gray-500.italic");
   if (
     placeholder &&
@@ -2346,14 +2337,14 @@ function addSafetySettingItem(category = "", threshold = "") {
     "HARM_CATEGORY_HATE_SPEECH",
     "HARM_CATEGORY_SEXUALLY_EXPLICIT",
     "HARM_CATEGORY_DANGEROUS_CONTENT",
-    "HARM_CATEGORY_CIVIC_INTEGRITY", // 根据需要添加或移除
+    "HARM_CATEGORY_CIVIC_INTEGRITY", // Add or remove as needed
   ];
   const harmThresholds = [
     "BLOCK_NONE",
     "BLOCK_LOW_AND_ABOVE",
     "BLOCK_MEDIUM_AND_ABOVE",
     "BLOCK_ONLY_HIGH",
-    "OFF", // 根据 Google API 文档添加或移除
+    "OFF", // Add or remove according to Google API documentation
   ];
 
   const settingItem = document.createElement("div");
@@ -2386,7 +2377,7 @@ function addSafetySettingItem(category = "", threshold = "") {
   removeBtn.className =
     "remove-btn text-gray-400 hover:text-red-500 focus:outline-none transition-colors duration-150";
   removeBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-  removeBtn.title = "删除此设置";
+  removeBtn.title = "Delete this setting";
   // Event listener for removeBtn is now handled by event delegation in DOMContentLoaded
 
   settingItem.appendChild(categorySelect);
@@ -2402,7 +2393,7 @@ async function fetchModels() {
     return cachedModelsList;
   }
   try {
-    showNotification("正在从 /api/config/ui/models 加载模型列表...", "info");
+    showNotification("Loading model list from /api/config/ui/models...", "info");
     const response = await fetch("/api/config/ui/models");
     if (!response.ok) {
       const errorData = await response.text();
@@ -2416,15 +2407,15 @@ async function fetchModels() {
       Array.isArray(responseData.data)
     ) {
       cachedModelsList = responseData.data; // Use responseData.data
-      showNotification("模型列表加载成功", "success");
+      showNotification("Model list loaded successfully", "success");
       return cachedModelsList;
     } else {
       console.error("Invalid model list format received:", responseData);
-      throw new Error("模型列表格式无效或请求未成功");
+      throw new Error("Invalid model list format or request was not successful");
     }
   } catch (error) {
-    console.error("加载模型列表失败:", error);
-    showNotification(`加载模型列表失败: ${error.message}`, "error");
+    console.error("Failed to load model list:", error);
+    showNotification(`Failed to load model list: ${error.message}`, "error");
     cachedModelsList = []; // Avoid repeated fetches on error for this session, or set to null to retry
     return [];
   }
@@ -2434,7 +2425,7 @@ function renderModelsInModal() {
   if (!modelHelperListContainer) return;
   if (!cachedModelsList) {
     modelHelperListContainer.innerHTML =
-      '<p class="text-gray-400 text-sm italic">模型列表尚未加载。</p>';
+      '<p class="text-gray-400 text-sm italic">Model list has not been loaded yet.</p>';
     return;
   }
 
@@ -2447,7 +2438,7 @@ function renderModelsInModal() {
 
   if (filteredModels.length === 0) {
     modelHelperListContainer.innerHTML =
-      '<p class="text-gray-400 text-sm italic">未找到匹配的模型。</p>';
+      '<p class="text-gray-400 text-sm italic">No matching models found.</p>';
     return;
   }
 
@@ -2469,7 +2460,7 @@ function renderModelsInModal() {
 async function openModelHelperModal() {
   if (!currentModelHelperTarget) {
     console.error("Model helper target not set.");
-    showNotification("无法打开模型助手：目标未设置", "error");
+    showNotification("Cannot open model helper: target not set", "error");
     return;
   }
 
@@ -2485,12 +2476,12 @@ async function openModelHelperModal() {
         `label[for="${currentModelHelperTarget.target.id}"]`
       );
       modelHelperTitleElement.textContent = label
-        ? `为 "${label.textContent.trim()}" 选择模型`
-        : "选择模型";
+        ? `Select a model for "${label.textContent.trim()}"`
+        : "Select a model";
     } else if (currentModelHelperTarget.type === "array") {
-      modelHelperTitleElement.textContent = `为 ${currentModelHelperTarget.targetKey} 添加模型`;
+      modelHelperTitleElement.textContent = `Add a model for ${currentModelHelperTarget.targetKey}`;
     } else {
-      modelHelperTitleElement.textContent = "选择模型";
+      modelHelperTitleElement.textContent = "Select a model";
     }
   }
   if (modelHelperSearchInput) modelHelperSearchInput.value = ""; // Clear search on open
@@ -2536,21 +2527,21 @@ function handleModelSelection(selectedModelId) {
 // -- Proxy Check Functions --
 
 /**
- * 检测单个代理是否可用
- * @param {string} proxy - 代理地址
- * @param {HTMLElement} buttonElement - 触发检测的按钮元素
+ * Check if a single proxy is available
+ * @param {string} proxy - The proxy address
+ * @param {HTMLElement} buttonElement - The button element that triggered the check
  */
 async function checkSingleProxy(proxy, buttonElement) {
   const statusIcon = buttonElement.parentElement.querySelector('.proxy-status-icon');
   const originalButtonContent = buttonElement.innerHTML;
   
   try {
-    // 更新UI状态为检测中
+    // Update UI state to checking
     buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     buttonElement.disabled = true;
     if (statusIcon) {
       statusIcon.className = "proxy-status-icon px-2 py-2 text-blue-500";
-      statusIcon.innerHTML = '<i class="fas fa-spinner fa-spin" title="检测中..."></i>';
+      statusIcon.innerHTML = '<i class="fas fa-spinner fa-spin" title="Checking..."></i>';
       statusIcon.setAttribute("data-status", "checking");
     }
     
@@ -2566,55 +2557,55 @@ async function checkSingleProxy(proxy, buttonElement) {
     });
     
     if (!response.ok) {
-      throw new Error(`检测请求失败: ${response.status}`);
+      throw new Error(`Check request failed: ${response.status}`);
     }
     
     const result = await response.json();
     updateProxyStatus(statusIcon, result);
     
-    // 显示检测结果通知
+    // Show check result notification
     if (result.is_available) {
-      showNotification(`代理可用 (${result.response_time}s)`, "success");
+      showNotification(`Proxy available (${result.response_time}s)`, "success");
     } else {
-      showNotification(`代理不可用: ${result.error_message}`, "error");
+      showNotification(`Proxy unavailable: ${result.error_message}`, "error");
     }
     
   } catch (error) {
-    console.error('代理检测失败:', error);
+    console.error('Proxy check failed:', error);
     if (statusIcon) {
       statusIcon.className = "proxy-status-icon px-2 py-2 text-red-500";
-      statusIcon.innerHTML = '<i class="fas fa-times-circle" title="检测失败"></i>';
+      statusIcon.innerHTML = '<i class="fas fa-times-circle" title="Check failed"></i>';
       statusIcon.setAttribute("data-status", "error");
     }
-    showNotification(`检测失败: ${error.message}`, "error");
+    showNotification(`Check failed: ${error.message}`, "error");
   } finally {
-    // 恢复按钮状态
+    // Restore button state
     buttonElement.innerHTML = originalButtonContent;
     buttonElement.disabled = false;
   }
 }
 
 /**
- * 更新代理状态图标
- * @param {HTMLElement} statusIcon - 状态图标元素
- * @param {Object} result - 检测结果
+ * Update proxy status icon
+ * @param {HTMLElement} statusIcon - The status icon element
+ * @param {Object} result - The check result
  */
 function updateProxyStatus(statusIcon, result) {
   if (!statusIcon) return;
   
   if (result.is_available) {
     statusIcon.className = "proxy-status-icon px-2 py-2 text-green-500";
-    statusIcon.innerHTML = `<i class="fas fa-check-circle" title="可用 (${result.response_time}s)"></i>`;
+    statusIcon.innerHTML = `<i class="fas fa-check-circle" title="Available (${result.response_time}s)"></i>`;
     statusIcon.setAttribute("data-status", "available");
   } else {
     statusIcon.className = "proxy-status-icon px-2 py-2 text-red-500";
-    statusIcon.innerHTML = `<i class="fas fa-times-circle" title="不可用: ${result.error_message}"></i>`;
+    statusIcon.innerHTML = `<i class="fas fa-times-circle" title="Unavailable: ${result.error_message}"></i>`;
     statusIcon.setAttribute("data-status", "unavailable");
   }
 }
 
 /**
- * 检测所有代理
+ * Check all proxies
  */
 async function checkAllProxies() {
   const proxyContainer = document.getElementById("PROXIES_container");
@@ -2626,16 +2617,16 @@ async function checkAllProxies() {
     .filter(proxy => proxy.length > 0);
   
   if (proxies.length === 0) {
-    showNotification("没有代理需要检测", "warning");
+    showNotification("No proxies to check", "warning");
     return;
   }
   
-  // 打开检测结果模态框
+  // Open the check results modal
   const proxyCheckModal = document.getElementById("proxyCheckModal");
   if (proxyCheckModal) {
     openModal(proxyCheckModal);
     
-    // 显示进度
+    // Show progress
     const progressContainer = document.getElementById("proxyCheckProgress");
     const summaryContainer = document.getElementById("proxyCheckSummary");
     const resultsContainer = document.getElementById("proxyCheckResults");
@@ -2644,7 +2635,7 @@ async function checkAllProxies() {
     if (summaryContainer) summaryContainer.classList.add("hidden");
     if (resultsContainer) resultsContainer.innerHTML = "";
     
-    // 更新总数
+    // Update total count
     const totalCountElement = document.getElementById("totalCount");
     if (totalCountElement) totalCountElement.textContent = proxies.length;
     
@@ -2662,7 +2653,7 @@ async function checkAllProxies() {
       });
       
       if (!response.ok) {
-        throw new Error(`批量检测请求失败: ${response.status}`);
+        throw new Error(`Bulk check request failed: ${response.status}`);
       }
       
       const results = await response.json();
@@ -2670,21 +2661,21 @@ async function checkAllProxies() {
       updateProxyStatusInList(results);
       
     } catch (error) {
-      console.error('批量代理检测失败:', error);
-      showNotification(`批量检测失败: ${error.message}`, "error");
+      console.error('Bulk proxy check failed:', error);
+      showNotification(`Bulk check failed: ${error.message}`, "error");
       if (resultsContainer) {
-        resultsContainer.innerHTML = `<div class="text-red-500 text-center py-4">检测失败: ${error.message}</div>`;
+        resultsContainer.innerHTML = `<div class="text-red-500 text-center py-4">Check failed: ${error.message}</div>`;
       }
     } finally {
-      // 隐藏进度
+      // Hide progress
       if (progressContainer) progressContainer.classList.add("hidden");
     }
   }
 }
 
 /**
- * 显示代理检测结果
- * @param {Array} results - 检测结果数组
+ * Display proxy check results
+ * @param {Array} results - The array of check results
  */
 function displayProxyCheckResults(results) {
   const summaryContainer = document.getElementById("proxyCheckSummary");
@@ -2695,16 +2686,16 @@ function displayProxyCheckResults(results) {
   
   if (!resultsContainer) return;
   
-  // 统计结果
+  // Count results
   const availableCount = results.filter(r => r.is_available).length;
   const unavailableCount = results.length - availableCount;
   
-  // 更新概览
+  // Update summary
   if (availableCountElement) availableCountElement.textContent = availableCount;
   if (unavailableCountElement) unavailableCountElement.textContent = unavailableCount;
   if (summaryContainer) summaryContainer.classList.remove("hidden");
   
-  // 显示重试按钮（如果有失败的代理）
+  // Show retry button (if there are failed proxies)
   if (retryButton) {
     if (unavailableCount > 0) {
       retryButton.classList.remove("hidden");
@@ -2713,7 +2704,7 @@ function displayProxyCheckResults(results) {
     }
   }
   
-  // 清空并填充结果
+  // Clear and populate results
   resultsContainer.innerHTML = "";
   
   results.forEach(result => {
@@ -2740,7 +2731,7 @@ function displayProxyCheckResults(results) {
       </div>
       <div class="flex items-center">
         <span class="text-sm ${result.is_available ? 'text-green-700' : 'text-red-700'}">
-          ${result.is_available ? '可用' : '不可用'}
+          ${result.is_available ? 'Available' : 'Unavailable'}
         </span>
         ${errorText}
       </div>
@@ -2751,8 +2742,8 @@ function displayProxyCheckResults(results) {
 }
 
 /**
- * 根据检测结果更新代理列表中的状态图标
- * @param {Array} results - 检测结果数组
+ * Update the status icons in the proxy list based on the check results
+ * @param {Array} results - The array of check results
  */
 function updateProxyStatusInList(results) {
   const proxyContainer = document.getElementById("PROXIES_container");

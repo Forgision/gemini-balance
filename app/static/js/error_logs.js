@@ -1,6 +1,6 @@
-// 错误日志页面JavaScript (Updated for new structure, no Bootstrap)
+// Error Logs Page JavaScript (Updated for new structure, no Bootstrap)
 
-// 页面滚动功能
+// Page scrolling functionality
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -9,7 +9,7 @@ function scrollToBottom() {
   window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
 }
 
-// API 调用辅助函数
+// API call helper function
 async function fetchAPI(url, options = {}) {
   try {
     const response = await fetch(url, options);
@@ -63,14 +63,14 @@ async function fetchAPI(url, options = {}) {
 // Refresh function removed as the buttons are gone.
 // If refresh functionality is needed elsewhere, it can be triggered directly by calling loadErrorLogs().
 
-// 全局状态管理
+// Global state management
 let errorLogState = {
   currentPage: 1,
   pageSize: 10,
-  logs: [], // 存储获取的日志
+  logs: [], // Stores fetched logs
   sort: {
-    field: "id", // 默认按 ID 排序
-    order: "desc", // 默认降序
+    field: "id", // Default sort by ID
+    order: "desc", // Default descending order
   },
   search: {
     key: "",
@@ -99,20 +99,20 @@ let endDateInput;
 let searchBtn;
 let pageInput;
 let goToPageBtn;
-let selectAllCheckbox; // 新增：全选复选框
-let copySelectedKeysBtn; // 新增：复制选中按钮
-let deleteSelectedBtn; // 新增：批量删除按钮
-let sortByIdHeader; // 新增：ID 排序表头
-let sortIcon; // 新增：排序图标
-let selectedCountSpan; // 新增：选中计数显示
-let deleteConfirmModal; // 新增：删除确认模态框
-let closeDeleteConfirmModalBtn; // 新增：关闭删除模态框按钮
-let cancelDeleteBtn; // 新增：取消删除按钮
-let confirmDeleteBtn; // 新增：确认删除按钮
-let deleteConfirmMessage; // 新增：删除确认消息元素
-let idsToDeleteGlobally = []; // 新增：存储待删除的ID
-let currentConfirmCallback = null; // 新增：存储当前的确认回调
-let deleteAllLogsBtn; // 新增：清空全部按钮
+let selectAllCheckbox; // Added: Select all checkbox
+let copySelectedKeysBtn; // Added: Copy selected button
+let deleteSelectedBtn; // Added: Bulk delete button
+let sortByIdHeader; // Added: ID sort table header
+let sortIcon; // Added: Sort icon
+let selectedCountSpan; // Added: Selected count display
+let deleteConfirmModal; // Added: Delete confirmation modal
+let closeDeleteConfirmModalBtn; // Added: Close delete modal button
+let cancelDeleteBtn; // Added: Cancel delete button
+let confirmDeleteBtn; // Added: Confirm delete button
+let deleteConfirmMessage; // Added: Delete confirmation message element
+let idsToDeleteGlobally; // Added: Store IDs to be deleted
+let currentConfirmCallback = null; // Added: Store the current confirmation callback
+let deleteAllLogsBtn; // Added: Clear all button
 
 // Helper functions for initialization
 function cacheDOMElements() {
@@ -149,7 +149,7 @@ function cacheDOMElements() {
   cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
   confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
   deleteConfirmMessage = document.getElementById("deleteConfirmMessage");
-  deleteAllLogsBtn = document.getElementById("deleteAllLogsBtn"); // 缓存清空全部按钮
+  deleteAllLogsBtn = document.getElementById("deleteAllLogsBtn"); // Cache the clear all button
  }
   
  function initializePageSizeControls() {
@@ -229,7 +229,7 @@ function initializePaginationJumpControls() {
         loadErrorLogs();
         pageInput.value = "";
       } else {
-        showNotification("请输入有效的页码", "error", 2000);
+        showNotification("Please enter a valid page number", "error", 2000);
         pageInput.value = "";
       }
     });
@@ -251,16 +251,16 @@ function initializeActionControls() {
   // Bulk selection listeners are closely related to actions
   setupBulkSelectionListeners();
   
-   // 为 "清空全部" 按钮添加事件监听器
+   // Add event listener for the "Clear All" button
    if (deleteAllLogsBtn) {
      deleteAllLogsBtn.addEventListener("click", function() {
-       const message = "您确定要清空所有错误日志吗？此操作不可恢复！";
-       showDeleteConfirmModal(message, handleDeleteAllLogs); // 传入回调
+       const message = "Are you sure you want to clear all error logs? This action cannot be undone!";
+       showDeleteConfirmModal(message, handleDeleteAllLogs); // Pass callback
      });
    }
  }
   
- // 新增：处理 "清空全部" 逻辑的函数
+ // Added: Function to handle the "Clear All" logic
  async function handleDeleteAllLogs() {
    const url = "/api/logs/errors/all";
    const options = {
@@ -269,16 +269,16 @@ function initializeActionControls() {
  
    try {
      await fetchAPI(url, options);
-     showNotification("所有错误日志已成功清空", "success");
-     if (selectAllCheckbox) selectAllCheckbox.checked = false; // 取消全选
-     loadErrorLogs(); // 重新加载日志
+     showNotification("All error logs have been cleared successfully", "success");
+     if (selectAllCheckbox) selectAllCheckbox.checked = false; // Deselect all
+     loadErrorLogs(); // Reload logs
    } catch (error) {
-     console.error("清空所有错误日志失败:", error);
-     showNotification(`清空失败: ${error.message}`, "error", 5000);
+     console.error("Failed to clear all error logs:", error);
+     showNotification(`Clear failed: ${error.message}`, "error", 5000);
    }
  }
   
- // 页面加载完成后执行
+ // Execute after the page is loaded
 document.addEventListener("DOMContentLoaded", function () {
   cacheDOMElements();
   initializePageSizeControls();
@@ -295,32 +295,32 @@ document.addEventListener("DOMContentLoaded", function () {
   setupCopyButtons();
 });
 
-// 新增：显示删除确认模态框
+// Added: Display delete confirmation modal
 function showDeleteConfirmModal(message, confirmCallback) {
   if (deleteConfirmModal && deleteConfirmMessage) {
     deleteConfirmMessage.textContent = message;
-    currentConfirmCallback = confirmCallback; // 存储回调
+    currentConfirmCallback = confirmCallback; // Store callback
     deleteConfirmModal.classList.add("show");
     document.body.style.overflow = "hidden"; // Prevent body scrolling
   }
 }
  
-// 新增：隐藏删除确认模态框
+// Added: Hide delete confirmation modal
 function hideDeleteConfirmModal() {
   if (deleteConfirmModal) {
     deleteConfirmModal.classList.remove("show");
     document.body.style.overflow = ""; // Restore body scrolling
-    idsToDeleteGlobally = []; // 清空待删除ID
-    currentConfirmCallback = null; // 清除回调
+    idsToDeleteGlobally = []; // Clear IDs to be deleted
+    currentConfirmCallback = null; // Clear callback
   }
 }
  
-// 新增：处理确认删除按钮点击
+// Added: Handle confirm delete button click
 function handleConfirmDelete() {
   if (typeof currentConfirmCallback === 'function') {
-    currentConfirmCallback(); // 调用存储的回调
+    currentConfirmCallback(); // Invoke the stored callback
   }
-  hideDeleteConfirmModal(); // 关闭模态框
+  hideDeleteConfirmModal(); // Close the modal
 }
  
 // Fallback copy function using document.execCommand
@@ -355,10 +355,10 @@ function handleCopyResult(buttonElement, success) {
   const iconElement = buttonElement.querySelector("i");
   if (success) {
     iconElement.className = "fas fa-check text-success-500"; // Use checkmark icon class
-    showNotification("已复制到剪贴板", "success", 2000);
+    showNotification("Copied to clipboard", "success", 2000);
   } else {
     iconElement.className = "fas fa-times text-danger-500"; // Use error icon class
-    showNotification("复制失败", "error", 3000);
+    showNotification("Copy failed", "error", 3000);
   }
   setTimeout(
     () => {
@@ -368,7 +368,7 @@ function handleCopyResult(buttonElement, success) {
   ); // Restore original icon class
 }
 
-// 新的内部辅助函数，封装实际的复制操作和反馈
+// New internal helper function to encapsulate the actual copy operation and feedback
 function _performCopy(text, buttonElement) {
   let copySuccess = false;
   if (navigator.clipboard && window.isSecureContext) {
@@ -378,7 +378,7 @@ function _performCopy(text, buttonElement) {
         if (buttonElement) {
           handleCopyResult(buttonElement, true);
         } else {
-          showNotification("已复制到剪贴板", "success");
+          showNotification("Copied to clipboard", "success");
         }
       })
       .catch((err) => {
@@ -388,7 +388,7 @@ function _performCopy(text, buttonElement) {
           handleCopyResult(buttonElement, copySuccess);
         } else {
           showNotification(
-            copySuccess ? "已复制到剪贴板" : "复制失败",
+            copySuccess ? "Copied to clipboard" : "Copy failed",
             copySuccess ? "success" : "error"
           );
         }
@@ -402,7 +402,7 @@ function _performCopy(text, buttonElement) {
       handleCopyResult(buttonElement, copySuccess);
     } else {
       showNotification(
-        copySuccess ? "已复制到剪贴板" : "复制失败",
+        copySuccess ? "Copied to clipboard" : "Copy failed",
         copySuccess ? "success" : "error"
       );
     }
@@ -439,7 +439,7 @@ function handleCopyButtonClick() {
       textToCopy = targetElement.textContent;
     } else {
       console.error("Target element not found:", targetId);
-      showNotification("复制出错：找不到目标元素", "error");
+      showNotification("Copy error: Target element not found", "error");
       return; // Exit if target element not found
     }
   } else {
@@ -447,29 +447,29 @@ function handleCopyButtonClick() {
       "No data-target or data-copy-text attribute found on button:",
       button
     );
-    showNotification("复制出错：未指定复制内容", "error");
+    showNotification("Copy error: No content specified to copy", "error");
     return; // Exit if no source specified
   }
 
   if (textToCopy) {
-    _performCopy(textToCopy, button); // 使用新的辅助函数
+    _performCopy(textToCopy, button); // Use the new helper function
   } else {
     console.warn(
       "No text found to copy for target:",
       targetId || "direct text"
     );
-    showNotification("没有内容可复制", "warning");
+    showNotification("No content to copy", "warning");
   }
 } // End of handleCopyButtonClick function
 
-// 新增：设置批量选择相关的事件监听器
+// Added: Set up event listeners related to bulk selection
 function setupBulkSelectionListeners() {
   if (selectAllCheckbox) {
     selectAllCheckbox.addEventListener("change", handleSelectAllChange);
   }
 
   if (tableBody) {
-    // 使用事件委托处理行复选框的点击
+    // Use event delegation to handle clicks on row checkboxes
     tableBody.addEventListener("change", handleRowCheckboxChange);
   }
 
@@ -477,15 +477,15 @@ function setupBulkSelectionListeners() {
     copySelectedKeysBtn.addEventListener("click", handleCopySelectedKeys);
   }
 
-  // 新增：为批量删除按钮添加事件监听器 (如果尚未添加)
-  // 通常在 DOMContentLoaded 中添加一次即可
+  // Added: Add event listener for the bulk delete button (if not already added)
+  // Usually added once in DOMContentLoaded
   // if (deleteSelectedBtn && !deleteSelectedBtn.hasListener) {
   //     deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
-  //     deleteSelectedBtn.hasListener = true; // 标记已添加
+  //     deleteSelectedBtn.hasListener = true; // Mark as added
   // }
 }
 
-// 新增：处理"全选"复选框变化的函数
+// Added: Function to handle "Select All" checkbox change
 function handleSelectAllChange() {
   const isChecked = selectAllCheckbox.checked;
   const rowCheckboxes = tableBody.querySelectorAll(".row-checkbox");
@@ -495,14 +495,14 @@ function handleSelectAllChange() {
   updateSelectedState();
 }
 
-// 新增：处理行复选框变化的函数 (事件委托)
+// Added: Function to handle row checkbox change (event delegation)
 function handleRowCheckboxChange(event) {
   if (event.target.classList.contains("row-checkbox")) {
     updateSelectedState();
   }
 }
 
-// 新增：更新选中状态（计数、按钮状态、全选框状态）
+// Added: Update the selected state (count, button states, select all checkbox state)
 function updateSelectedState() {
   const rowCheckboxes = tableBody.querySelectorAll(".row-checkbox");
   const selectedCheckboxes = tableBody.querySelectorAll(
@@ -510,28 +510,28 @@ function updateSelectedState() {
   );
   const selectedCount = selectedCheckboxes.length;
 
-  // 移除了数字显示，不再更新selectedCountSpan
-  // 仍然更新复制按钮的禁用状态
+  // Removed the number display, no longer updating selectedCountSpan
+  // Still update the disabled state of the copy button
   if (copySelectedKeysBtn) {
     copySelectedKeysBtn.disabled = selectedCount === 0;
 
-    // 可选：根据选中项数量更新按钮标题属性
-    copySelectedKeysBtn.setAttribute("title", `复制${selectedCount}项选中密钥`);
+    // Optional: Update the button title attribute based on the number of selected items
+    copySelectedKeysBtn.setAttribute("title", `Copy ${selectedCount} selected keys`);
   }
-  // 新增：更新批量删除按钮的禁用状态
+  // Added: Update the disabled state of the bulk delete button
   if (deleteSelectedBtn) {
     deleteSelectedBtn.disabled = selectedCount === 0;
-    deleteSelectedBtn.setAttribute("title", `删除${selectedCount}项选中日志`);
+    deleteSelectedBtn.setAttribute("title", `Delete ${selectedCount} selected logs`);
   }
 
-  // 更新"全选"复选框的状态
+  // Update the state of the "Select All" checkbox
   if (selectAllCheckbox) {
     if (rowCheckboxes.length > 0 && selectedCount === rowCheckboxes.length) {
       selectAllCheckbox.checked = true;
       selectAllCheckbox.indeterminate = false;
     } else if (selectedCount > 0) {
       selectAllCheckbox.checked = false;
-      selectAllCheckbox.indeterminate = true; // 部分选中状态
+      selectAllCheckbox.indeterminate = true; // Partially selected state
     } else {
       selectAllCheckbox.checked = false;
       selectAllCheckbox.indeterminate = false;
@@ -539,7 +539,7 @@ function updateSelectedState() {
   }
 }
 
-// 新增：处理"复制选中密钥"按钮点击的函数
+// Added: Function to handle the "Copy Selected Keys" button click
 function handleCopySelectedKeys() {
   const selectedCheckboxes = tableBody.querySelectorAll(
     ".row-checkbox:checked"
@@ -553,45 +553,45 @@ function handleCopySelectedKeys() {
   });
 
   if (keysToCopy.length > 0) {
-    const textToCopy = keysToCopy.join("\n"); // 每行一个密钥
-    _performCopy(textToCopy, copySelectedKeysBtn); // 使用新的辅助函数
+    const textToCopy = keysToCopy.join("\n"); // One key per line
+    _performCopy(textToCopy, copySelectedKeysBtn); // Use the new helper function
   } else {
-    showNotification("没有选中的密钥可复制", "warning");
+    showNotification("No selected keys to copy", "warning");
   }
 }
 
-// 修改：处理批量删除按钮点击的函数 - 改为显示模态框
+// Modified: Function to handle the bulk delete button click - now shows the modal
 function handleDeleteSelected() {
   const selectedCheckboxes = tableBody.querySelectorAll(
     ".row-checkbox:checked"
   );
   const logIdsToDelete = [];
   selectedCheckboxes.forEach((checkbox) => {
-    const logId = checkbox.getAttribute("data-log-id"); // 需要在渲染时添加 data-log-id
+    const logId = checkbox.getAttribute("data-log-id"); // Need to add data-log-id during rendering
     if (logId) {
       logIdsToDelete.push(parseInt(logId));
     }
   });
 
   if (logIdsToDelete.length === 0) {
-    showNotification("没有选中的日志可删除", "warning");
+    showNotification("No selected logs to delete", "warning");
     return;
   }
 
   if (logIdsToDelete.length === 0) {
-    showNotification("没有选中的日志可删除", "warning");
+    showNotification("No selected logs to delete", "warning");
     return;
   }
 
-  // 存储待删除ID并显示模态框
-  idsToDeleteGlobally = logIdsToDelete; // 仍然需要设置，因为 performActualDelete 会用到
-  const message = `确定要删除选中的 ${logIdsToDelete.length} 条日志吗？此操作不可恢复！`;
-  showDeleteConfirmModal(message, function() { // 传入匿名回调
+  // Store IDs to be deleted and show the modal
+  idsToDeleteGlobally = logIdsToDelete; // Still need to set this, as performActualDelete will use it
+  const message = `Are you sure you want to delete the selected ${logIdsToDelete.length} logs? This action cannot be undone!`;
+  showDeleteConfirmModal(message, function() { // Pass anonymous callback
     performActualDelete(idsToDeleteGlobally);
   });
 }
  
-// 新增：执行实际的删除操作（提取自原 handleDeleteSelected 和 handleDeleteLogRow）
+// Added: Perform the actual delete operation (extracted from the original handleDeleteSelected and handleDeleteLogRow)
 async function performActualDelete(logIds) {
   if (!logIds || logIds.length === 0) return;
 
@@ -614,54 +614,54 @@ async function performActualDelete(logIds) {
 
     // If fetchAPI doesn't throw, the request was successful
     const successMessage = isSingleDelete
-      ? `成功删除该日志`
-      : `成功删除 ${logIds.length} 条日志`;
+      ? `Successfully deleted the log`
+      : `Successfully deleted ${logIds.length} logs`;
     showNotification(successMessage, "success");
-    // 取消全选
+    // Deselect all
     if (selectAllCheckbox) selectAllCheckbox.checked = false;
-    // 重新加载当前页数据
+    // Reload the current page data
     loadErrorLogs();
   } catch (error) {
-    console.error("批量删除错误日志失败:", error);
-    showNotification(`批量删除失败: ${error.message}`, "error", 5000);
+    console.error("Failed to delete error logs in bulk:", error);
+    showNotification(`Bulk delete failed: ${error.message}`, "error", 5000);
   }
 }
 
-// 修改：处理单行删除按钮点击的函数 - 改为显示模态框
+// Modified: Function to handle single row delete button click - now shows the modal
 function handleDeleteLogRow(logId) {
   if (!logId) return;
 
-  // 存储待删除ID并显示模态框
-  idsToDeleteGlobally = [parseInt(logId)]; // 存储为数组 // 仍然需要设置，因为 performActualDelete 会用到
-  // 使用通用确认消息，不显示具体ID
-  const message = `确定要删除这条日志吗？此操作不可恢复！`;
-  showDeleteConfirmModal(message, function() { // 传入匿名回调
-    performActualDelete([parseInt(logId)]); // 确保传递的是数组
+  // Store the ID to be deleted and show the modal
+  idsToDeleteGlobally = [parseInt(logId)]; // Store as an array // Still need to set this, as performActualDelete will use it
+  // Use a generic confirmation message, without showing the specific ID
+  const message = `Are you sure you want to delete this log? This action cannot be undone!`;
+  showDeleteConfirmModal(message, function() { // Pass anonymous callback
+    performActualDelete([parseInt(logId)]); // Ensure it's passed as an array
   });
 }
  
-// 新增：处理 ID 排序点击的函数
+// Added: Function to handle ID sort click
 function handleSortById() {
   if (errorLogState.sort.field === "id") {
-    // 如果当前是按 ID 排序，切换顺序
+    // If currently sorting by ID, toggle the order
     errorLogState.sort.order =
       errorLogState.sort.order === "asc" ? "desc" : "asc";
   } else {
-    // 如果当前不是按 ID 排序，切换到按 ID 排序，默认为降序
+    // If not currently sorting by ID, switch to sorting by ID, default to descending
     errorLogState.sort.field = "id";
     errorLogState.sort.order = "desc";
   }
-  // 更新图标
+  // Update the icon
   updateSortIcon();
-  // 重新加载第一页数据
+  // Reload the first page of data
   errorLogState.currentPage = 1;
   loadErrorLogs();
 }
 
-// 新增：更新排序图标的函数
+// Added: Function to update the sort icon
 function updateSortIcon() {
   if (!sortIcon) return;
-  // 移除所有可能的排序类
+  // Remove all possible sort classes
   sortIcon.classList.remove(
     "fa-sort",
     "fa-sort-up",
@@ -674,19 +674,19 @@ function updateSortIcon() {
     sortIcon.classList.add(
       errorLogState.sort.order === "asc" ? "fa-sort-up" : "fa-sort-down"
     );
-    sortIcon.classList.add("text-primary-600"); // 高亮显示
+    sortIcon.classList.add("text-primary-600"); // Highlight
   } else {
-    // 如果不是按 ID 排序，显示默认图标
+    // If not sorting by ID, show the default icon
     sortIcon.classList.add("fa-sort", "text-gray-400");
   }
 }
 
-// 加载错误日志数据
+// Load error log data
 async function loadErrorLogs() {
-  // 重置选择状态
+  // Reset selection state
   if (selectAllCheckbox) selectAllCheckbox.checked = false;
   if (selectAllCheckbox) selectAllCheckbox.indeterminate = false;
-  updateSelectedState(); // 更新按钮状态和计数
+  updateSelectedState(); // Update button states and counts
 
   showLoading(true);
   showError(false);
@@ -697,10 +697,10 @@ async function loadErrorLogs() {
   try {
     // Construct the API URL with search and sort parameters
     let apiUrl = `/api/logs/errors?limit=${errorLogState.pageSize}&offset=${offset}`;
-    // 添加排序参数
+    // Add sort parameters
     apiUrl += `&sort_by=${errorLogState.sort.field}&sort_order=${errorLogState.sort.order}`;
 
-    // 添加搜索参数
+    // Add search parameters
     if (errorLogState.search.key) {
       apiUrl += `&key_search=${encodeURIComponent(errorLogState.search.key)}`;
     }
@@ -727,7 +727,7 @@ async function loadErrorLogs() {
     // Use fetchAPI to get logs
     const data = await fetchAPI(apiUrl);
 
-    // API 现在返回 { logs: [], total: count }
+    // The API now returns { logs: [], total: count }
     // fetchAPI already parsed JSON
     if (data && Array.isArray(data.logs)) {
       errorLogState.logs = data.logs; // Store the list data (contains error_code)
@@ -736,7 +736,7 @@ async function loadErrorLogs() {
     } else {
       // Handle unexpected data format even after successful fetch
       console.error("Unexpected API response format:", data);
-      throw new Error("无法识别的API响应格式");
+      throw new Error("Unrecognized API response format");
     }
 
     showLoading(false);
@@ -745,7 +745,7 @@ async function loadErrorLogs() {
       showNoData(true);
     }
   } catch (error) {
-    console.error("获取错误日志失败:", error);
+    console.error("Failed to fetch error logs:", error);
     showLoading(false);
     showError(true, error.message); // Show specific error message
   }
@@ -772,10 +772,10 @@ function _createLogRowHtml(log, sequentialId) {
     console.error("Error formatting date:", e);
   }
 
-  const errorCodeContent = log.error_code || "无";
+  const errorCodeContent = log.error_code || "None";
 
   const maskKey = (key) => {
-    if (!key || key.length < 8) return key || "无";
+    if (!key || key.length < 8) return key || "None";
     return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
   };
   const maskedKey = maskKey(log.gemini_key);
@@ -790,35 +790,35 @@ function _createLogRowHtml(log, sequentialId) {
         <td class="text-gray-700">${sequentialId}</td>
         <td class="relative group text-gray-700" title="${fullKey}">
             ${maskedKey}
-            <button class="copy-btn absolute top-1/2 right-2 transform -translate-y-1/2 bg-gray-200 hover:bg-gray-300 text-gray-600 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-xs" data-copy-text="${fullKey}" title="复制完整密钥">
+            <button class="copy-btn absolute top-1/2 right-2 transform -translate-y-1/2 bg-gray-200 hover:bg-gray-300 text-gray-600 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-xs" data-copy-text="${fullKey}" title="Copy full key">
                 <i class="far fa-copy"></i>
             </button>
         </td>
-        <td class="text-gray-700">${log.error_type || "未知"}</td>
+        <td class="text-gray-700">${log.error_type || "Unknown"}</td>
         <td class="error-code-content text-gray-700" title="${
           log.error_code || ""
         }">${errorCodeContent}</td>
-        <td class="text-gray-700">${log.model_name || "未知"}</td>
+        <td class="text-gray-700">${log.model_name || "Unknown"}</td>
         <td class="text-gray-700">${formattedTime}</td>
         <td>
             <button class="btn-view-details mr-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-all duration-200" data-log-id="${log.id}">
-                <i class="fas fa-eye mr-1"></i>详情
+                <i class="fas fa-eye mr-1"></i>Details
             </button>
             <button class="btn-delete-row bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm transition-all duration-200" data-log-id="${
               log.id
-            }" title="删除此日志">
+            }" title="Delete this log">
                 <i class="fas fa-trash-alt"></i>
             </button>
         </td>
     `;
 }
 
-// 渲染错误日志表格
+// Render the error log table
 function renderErrorLogs(logs) {
   if (!tableBody) return;
   tableBody.innerHTML = ""; // Clear previous entries
 
-  // 重置全选复选框状态（在清空表格后）
+  // Reset the state of the select all checkbox (after clearing the table)
   if (selectAllCheckbox) {
     selectAllCheckbox.checked = false;
     selectAllCheckbox.indeterminate = false;
@@ -846,7 +846,7 @@ function renderErrorLogs(logs) {
     });
   });
 
-  // 新增：为新渲染的删除按钮添加事件监听器
+  // Added: Add event listeners for the newly rendered delete buttons
   document.querySelectorAll(".btn-delete-row").forEach((button) => {
     button.addEventListener("click", function () {
       const logId = this.getAttribute("data-log-id");
@@ -860,18 +860,18 @@ function renderErrorLogs(logs) {
   updateSelectedState();
 }
 
-// 显示错误日志详情 (从 API 获取)
+// Display error log details (fetched from API)
 async function showLogDetails(logId) {
   if (!logDetailModal) return;
 
   // Show loading state in modal (optional)
   // Clear previous content and show a spinner or message
-  document.getElementById("modalGeminiKey").textContent = "加载中...";
-  document.getElementById("modalErrorType").textContent = "加载中...";
-  document.getElementById("modalErrorLog").textContent = "加载中...";
-  document.getElementById("modalRequestMsg").textContent = "加载中...";
-  document.getElementById("modalModelName").textContent = "加载中...";
-  document.getElementById("modalRequestTime").textContent = "加载中...";
+  document.getElementById("modalGeminiKey").textContent = "Loading...";
+  document.getElementById("modalErrorType").textContent = "Loading...";
+  document.getElementById("modalErrorLog").textContent = "Loading...";
+  document.getElementById("modalRequestMsg").textContent = "Loading...";
+  document.getElementById("modalModelName").textContent = "Loading...";
+  document.getElementById("modalRequestTime").textContent = "Loading...";
 
   logDetailModal.classList.add("show");
   document.body.style.overflow = "hidden"; // Prevent body scrolling
@@ -883,7 +883,7 @@ async function showLogDetails(logId) {
     // fetchAPI handles response.ok check and JSON parsing
     if (!logDetails) {
       // Handle case where API returns success but no data (if possible)
-      throw new Error("未找到日志详情");
+      throw new Error("Log details not found");
     }
 
     // Format date
@@ -906,7 +906,7 @@ async function showLogDetails(logId) {
     }
 
     // Format request message (handle potential JSON)
-    let formattedRequestMsg = "无";
+    let formattedRequestMsg = "None";
     if (logDetails.request_msg) {
       try {
         if (
@@ -937,32 +937,32 @@ async function showLogDetails(logId) {
 
     // Populate modal content with fetched details
     document.getElementById("modalGeminiKey").textContent =
-      logDetails.gemini_key || "无";
+      logDetails.gemini_key || "None";
     document.getElementById("modalErrorType").textContent =
-      logDetails.error_type || "未知";
+      logDetails.error_type || "Unknown";
     document.getElementById("modalErrorLog").textContent =
-      logDetails.error_log || "无"; // Full error log
+      logDetails.error_log || "None"; // Full error log
     document.getElementById("modalRequestMsg").textContent =
       formattedRequestMsg; // Full request message
     document.getElementById("modalModelName").textContent =
-      logDetails.model_name || "未知";
+      logDetails.model_name || "Unknown";
     document.getElementById("modalRequestTime").textContent = formattedTime;
 
     // Re-initialize copy buttons specifically for the modal after content is loaded
     setupCopyButtons("#logDetailModal");
   } catch (error) {
-    console.error("获取日志详情失败:", error);
+    console.error("Failed to fetch log details:", error);
     // Show error in modal
-    document.getElementById("modalGeminiKey").textContent = "错误";
-    document.getElementById("modalErrorType").textContent = "错误";
+    document.getElementById("modalGeminiKey").textContent = "Error";
+    document.getElementById("modalErrorType").textContent = "Error";
     document.getElementById(
       "modalErrorLog"
-    ).textContent = `加载失败: ${error.message}`;
-    document.getElementById("modalRequestMsg").textContent = "错误";
-    document.getElementById("modalModelName").textContent = "错误";
-    document.getElementById("modalRequestTime").textContent = "错误";
+    ).textContent = `Failed to load: ${error.message}`;
+    document.getElementById("modalRequestMsg").textContent = "Error";
+    document.getElementById("modalModelName").textContent = "Error";
+    document.getElementById("modalRequestTime").textContent = "Error";
     // Optionally show a notification
-    showNotification(`加载日志详情失败: ${error.message}`, "error", 5000);
+    showNotification(`Failed to load log details: ${error.message}`, "error", 5000);
   }
 }
 
@@ -975,7 +975,7 @@ function closeLogDetailModal() {
   }
 }
 
-// 更新分页控件
+// Update pagination controls
 function updatePagination(currentItemCount, totalItems) {
   if (!paginationElement) return;
   paginationElement.innerHTML = ""; // Clear existing pagination
@@ -1178,5 +1178,5 @@ function showNotification(message, type = "success", duration = 3000) {
 }
 
 // Example Usage (if copy functionality is added later):
-// showNotification('密钥已复制!', 'success');
-// showNotification('复制失败!', 'error');
+// showNotification('Key copied!', 'success');
+// showNotification('Copy failed!', 'error');

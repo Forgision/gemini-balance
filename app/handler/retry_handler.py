@@ -11,7 +11,7 @@ logger = get_retry_logger()
 
 
 class RetryHandler:
-    """重试处理装饰器"""
+    """Retry handler decorator."""
 
     def __init__(self, key_arg: str = "api_key"):
         self.key_arg = key_arg
@@ -31,7 +31,7 @@ class RetryHandler:
                         f"API call failed with error: {str(e)}. Attempt {retries} of {settings.MAX_RETRIES}"
                     )
 
-                    # 从函数参数中获取 key_manager
+                    # Get key_manager from function arguments
                     key_manager = kwargs.get("key_manager")
                     if key_manager:
                         old_key = kwargs.get(self.key_arg)

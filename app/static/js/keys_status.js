@@ -1,4 +1,4 @@
-// 统计数据可视化交互效果
+// Visualization and interaction effects for statistics
 
 function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -17,7 +17,7 @@ function copyToClipboard(text) {
         if (successful) {
           resolve();
         } else {
-          reject(new Error("复制失败"));
+          reject(new Error("Copy failed"));
         }
       } catch (err) {
         document.body.removeChild(textArea);
@@ -27,7 +27,7 @@ function copyToClipboard(text) {
   }
 }
 
-// API 调用辅助函数 (与 error_logs.js 中的版本类似)
+// API call helper function (similar to the version in error_logs.js)
 async function fetchAPI(url, options = {}) {
   try {
     const response = await fetch(url, options);
@@ -78,11 +78,11 @@ async function fetchAPI(url, options = {}) {
     );
     // Re-throw the error so the calling function knows the operation failed
     // Add more context if possible
-    throw new Error(`API请求失败: ${error.message}`);
+    throw new Error(`API request failed: ${error.message}`);
   }
 }
 
-// 添加统计项动画效果
+// Add animation effect to stat items
 function initStatItemAnimations() {
   const statItems = document.querySelectorAll(".stat-item");
   statItems.forEach((item) => {
@@ -106,7 +106,7 @@ function initStatItemAnimations() {
   });
 }
 
-// 获取指定类型区域内选中的密钥
+// Get selected keys in a specified type area
 function getSelectedKeys(type) {
   let selectorRoot;
   if (type === 'attention') {
@@ -120,7 +120,7 @@ function getSelectedKeys(type) {
   return Array.from(checkboxes).map((cb) => cb.value);
 }
 
-// 更新指定类型区域的批量操作按钮状态和计数
+// Update the status and count of batch operation buttons for a specified type area
 function updateBatchActions(type) {
   const selectedKeys = getSelectedKeys(type);
   const count = selectedKeys.length;
@@ -139,11 +139,11 @@ function updateBatchActions(type) {
     buttons.forEach((button) => (button.disabled = true));
   }
 
-  // 更新全选复选框状态
+  // Update select all checkbox status
   const selectAllId = `selectAll${type.charAt(0).toUpperCase() + type.slice(1)}`;
   const selectAllCheckbox = document.getElementById(selectAllId);
   const rootId = type === 'attention' ? 'attentionKeysList' : `${type}Keys`;
-  // 只有在有可见的 key 时才考虑全选状态
+  // Only consider select all status if there are visible keys
   const visibleCheckboxes = document.querySelectorAll(
     `#${rootId} li:not([style*="display: none"]) .key-checkbox`
   );
@@ -157,7 +157,7 @@ function updateBatchActions(type) {
   }
 }
 
-// 全选/取消全选指定类型的密钥
+// Select/Deselect all keys of a specified type
 function toggleSelectAll(type, isChecked) {
   const rootId = type === 'attention' ? 'attentionKeysList' : `${type}Keys`;
   const listElement = document.getElementById(rootId);
@@ -189,12 +189,12 @@ function toggleSelectAll(type, isChecked) {
   updateBatchActions(type);
 }
 
-// 复制选中的密钥
+// Copy selected keys
 function copySelectedKeys(type) {
   const selectedKeys = getSelectedKeys(type);
 
   if (selectedKeys.length === 0) {
-    showNotification("没有选中的密钥可复制", "warning");
+    showNotification("No selected keys to copy", "warning");
     return;
   }
 
@@ -203,64 +203,64 @@ function copySelectedKeys(type) {
   copyToClipboard(keysText)
     .then(() => {
       showNotification(
-        `已成功复制 ${selectedKeys.length} 个选中的${
-          type === "valid" ? "有效" : "无效"
-        }密钥`
+        `Successfully copied ${selectedKeys.length} selected ${
+          type === "valid" ? "valid" : "invalid"
+        } keys`
       );
     })
     .catch((err) => {
-      console.error("无法复制文本: ", err);
-      showNotification("复制失败，请重试", "error");
+      console.error("Could not copy text: ", err);
+      showNotification("Copy failed, please try again", "error");
     });
 }
 
-// 单个复制保持不变
+// Single copy remains unchanged
 function copyKey(key) {
   copyToClipboard(key)
     .then(() => {
-      showNotification(`已成功复制密钥`);
+      showNotification(`Key copied successfully`);
     })
     .catch((err) => {
-      console.error("无法复制文本: ", err);
-      showNotification("复制失败，请重试", "error");
+      console.error("Could not copy text: ", err);
+      showNotification("Copy failed, please try again", "error");
     });
 }
 
-// showCopyStatus 函数已废弃。
+// The showCopyStatus function has been deprecated.
 
 async function verifyKey(key, button) {
   try {
-    // 禁用按钮并显示加载状态
+    // Disable the button and show loading status
     button.disabled = true;
     const originalHtml = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 验证中';
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying';
 
     try {
       const data = await fetchAPI(`/gemini/v1beta/verify-key/${key}`, {
         method: "POST",
       });
 
-      // 根据验证结果更新UI并显示模态提示框
+      // Update UI and show modal prompt based on verification result
       if (data && (data.success || data.status === "valid")) {
-        // 验证成功，显示成功结果
+        // Verification successful, show success result
         button.style.backgroundColor = "#27ae60";
-        // 使用结果模态框显示成功消息
-        showResultModal(true, "密钥验证成功");
-        // 模态框关闭时会自动刷新页面
+        // Use the result modal to show success message
+        showResultModal(true, "Key verification successful");
+        // The modal will automatically refresh the page when closed
       } else {
-        // 验证失败，显示失败结果
-        const errorMsg = data.error || "密钥无效";
+        // Verification failed, show failure result
+        const errorMsg = data.error || "Invalid key";
         button.style.backgroundColor = "#e74c3c";
-        // 使用结果模态框显示失败消息，改为true以在关闭时刷新
-        showResultModal(false, "密钥验证失败: " + errorMsg, true);
+        // Use the result modal to show failure message, changed to true to refresh on close
+        showResultModal(false, "Key verification failed: " + errorMsg, true);
       }
     } catch (apiError) {
-      console.error("密钥验证 API 请求失败:", apiError);
-      showResultModal(false, `验证请求失败: ${apiError.message}`, true);
+      console.error("Key verification API request failed:", apiError);
+      showResultModal(false, `Verification request failed: ${apiError.message}`, true);
     } finally {
-      // 1秒后恢复按钮原始状态 (如果页面不刷新)
-      // 由于现在成功和失败都会刷新，这部分逻辑可以简化或移除
-      // 但为了防止未来修改刷新逻辑，暂时保留，但可能不会执行
+      // Restore the button to its original state after 1 second (if the page does not refresh)
+      // Since success and failure will now refresh, this part of the logic can be simplified or removed
+      // But for now, it is kept in case the refresh logic is modified in the future, but it may not be executed
       setTimeout(() => {
         if (
           !document.getElementById("resultModal") ||
@@ -273,38 +273,38 @@ async function verifyKey(key, button) {
       }, 1000);
     }
   } catch (error) {
-    console.error("验证失败:", error);
-    // 确保在捕获到错误时恢复按钮状态 (如果页面不刷新)
-    // button.disabled = false; // 由 finally 处理或因刷新而无需处理
-    // button.innerHTML = '<i class="fas fa-check-circle"></i> 验证';
-    showResultModal(false, "验证处理失败: " + error.message, true); // 改为true以在关闭时刷新
+    console.error("Verification failed:", error);
+    // Ensure that the button state is restored when an error is caught (if the page does not refresh)
+    // button.disabled = false; // Handled by finally or unnecessary due to refresh
+    // button.innerHTML = '<i class="fas fa-check-circle"></i> Verify';
+    showResultModal(false, "Verification process failed: " + error.message, true); // Changed to true to refresh on close
   }
 }
 
 async function resetKeyFailCount(key, button) {
   try {
-    // 禁用按钮并显示加载状态
+    // Disable the button and show loading status
     button.disabled = true;
     const originalHtml = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 重置中';
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting';
 
     const data = await fetchAPI(`/gemini/v1beta/reset-fail-count/${key}`, {
       method: "POST",
     });
 
-    // 根据重置结果更新UI
+    // Update UI based on reset result
     if (data.success) {
-      showNotification("失败计数重置成功");
-      // 成功时保留绿色背景一会儿
+      showNotification("Failure count reset successfully");
+      // Keep the green background for a while on success
       button.style.backgroundColor = "#27ae60";
-      // 稍后刷新页面
+      // Refresh the page later
       setTimeout(() => location.reload(), 1000);
     } else {
-      const errorMsg = data.message || "重置失败";
-      showNotification("重置失败: " + errorMsg, "error");
-      // 失败时保留红色背景一会儿
+      const errorMsg = data.message || "Reset failed";
+      showNotification("Reset failed: " + errorMsg, "error");
+      // Keep the red background for a while on failure
       button.style.backgroundColor = "#e74c3c";
-      // 如果失败，1秒后恢复按钮
+      // If failed, restore the button after 1 second
       setTimeout(() => {
         button.innerHTML = originalHtml;
         button.disabled = false;
@@ -312,18 +312,18 @@ async function resetKeyFailCount(key, button) {
       }, 1000);
     }
 
-    // 恢复按钮状态逻辑已移至成功/失败分支内
+    // The logic to restore the button state has been moved into the success/failure branches
   } catch (apiError) {
-    console.error("重置失败:", apiError);
-    showNotification(`重置请求失败: ${apiError.message}`, "error");
-    // 确保在捕获到错误时恢复按钮状态
+    console.error("Reset failed:", apiError);
+    showNotification(`Reset request failed: ${apiError.message}`, "error");
+    // Ensure that the button state is restored when an error is caught
     button.disabled = false;
-    button.innerHTML = '<i class="fas fa-redo-alt"></i> 重置'; // 恢复原始图标和文本
-    button.style.backgroundColor = ""; // 清除可能设置的背景色
+    button.innerHTML = '<i class="fas fa-redo-alt"></i> Reset'; // Restore original icon and text
+    button.style.backgroundColor = ""; // Clear any background color that may have been set
   }
 }
 
-// 显示重置确认模态框 (基于选中的密钥)
+// Show reset confirmation modal (based on selected keys)
 function showResetModal(type) {
   const modalElement = document.getElementById("resetModal");
   const titleElement = document.getElementById("resetModalTitle");
@@ -333,25 +333,25 @@ function showResetModal(type) {
   const selectedKeys = getSelectedKeys(type);
   const count = selectedKeys.length;
 
-  // 设置标题和消息
-  titleElement.textContent = "批量重置失败次数";
+  // Set title and message
+  titleElement.textContent = "Bulk Reset Failure Counts";
   if (count > 0) {
-    messageElement.textContent = `确定要批量重置选中的 ${count} 个${
-      type === "valid" ? "有效" : "无效"
-    }密钥的失败次数吗？`;
-    confirmButton.disabled = false; // 确保按钮可用
+    messageElement.textContent = `Are you sure you want to bulk reset the failure count for the ${count} selected ${
+      type === "valid" ? "valid" : "invalid"
+    } keys?`;
+    confirmButton.disabled = false; // Ensure the button is enabled
   } else {
-    // 这个情况理论上不会发生，因为按钮在未选中时是禁用的
-    messageElement.textContent = `请先选择要重置的${
-      type === "valid" ? "有效" : "无效"
-    }密钥。`;
+    // This case should theoretically not happen because the button is disabled when nothing is selected
+    messageElement.textContent = `Please select the ${
+      type === "valid" ? "valid" : "invalid"
+    } keys to reset first.`;
     confirmButton.disabled = true;
   }
 
-  // 设置确认按钮事件
+  // Set confirm button event
   confirmButton.onclick = () => executeResetAll(type);
 
-  // 显示模态框，确保位于最上层
+  // Show the modal, ensuring it is on top
   modalElement.style.zIndex = '1001';
   modalElement.classList.remove("hidden");
 }
@@ -360,26 +360,26 @@ function closeResetModal() {
   document.getElementById("resetModal").classList.add("hidden");
 }
 
-// 触发显示模态框
+// Trigger show modal
 function resetAllKeysFailCount(type, event) {
-  // 阻止事件冒泡
+  // Prevent event bubbling
   if (event) {
     event.stopPropagation();
   }
 
-  // 显示模态确认框
+  // Show modal confirmation
   showResetModal(type);
 }
 
-// 关闭模态框并根据参数决定是否刷新页面
+// Close the modal and decide whether to refresh the page based on the parameter
 function closeResultModal(reload = true) {
   document.getElementById("resultModal").classList.add("hidden");
   if (reload) {
-    location.reload(); // 操作完成后刷新页面
+    location.reload(); // Refresh the page after the operation is complete
   }
 }
 
-// 显示操作结果模态框 (通用版本)
+// Show operation result modal (generic version)
 function showResultModal(success, message, autoReload = true) {
   const modalElement = document.getElementById("resultModal");
   const titleElement = document.getElementById("resultModalTitle");
@@ -387,45 +387,45 @@ function showResultModal(success, message, autoReload = true) {
   const iconElement = document.getElementById("resultIcon");
   const confirmButton = document.getElementById("resultModalConfirmBtn");
 
-  // 设置标题
-  titleElement.textContent = success ? "操作成功" : "操作失败";
+  // Set title
+  titleElement.textContent = success ? "Operation Successful" : "Operation Failed";
 
-  // 设置图标
+  // Set icon
   if (success) {
     iconElement.innerHTML =
       '<i class="fas fa-check-circle text-success-500"></i>';
-    iconElement.className = "text-6xl mb-3 text-success-500"; // 稍微增大图标
+    iconElement.className = "text-6xl mb-3 text-success-500"; // Slightly larger icon
   } else {
     iconElement.innerHTML =
       '<i class="fas fa-times-circle text-danger-500"></i>';
-    iconElement.className = "text-6xl mb-3 text-danger-500"; // 稍微增大图标
+    iconElement.className = "text-6xl mb-3 text-danger-500"; // Slightly larger icon
   }
 
-  // 清空现有内容并设置新消息
-  messageElement.innerHTML = ""; // 清空
+  // Clear existing content and set new message
+  messageElement.innerHTML = ""; // Clear
   if (typeof message === "string") {
-    // 对于普通字符串消息，保持原有逻辑
+    // For normal string messages, keep the original logic
     const messageDiv = document.createElement("div");
-    messageDiv.innerText = message; // 使用 innerText 防止 XSS
+    messageDiv.innerText = message; // Use innerText to prevent XSS
     messageElement.appendChild(messageDiv);
   } else if (message instanceof Node) {
-    // 如果传入的是 DOM 节点，直接添加
+    // If a DOM node is passed in, add it directly
     messageElement.appendChild(message);
   } else {
-    // 其他类型转为字符串
+    // Other types are converted to strings
     const messageDiv = document.createElement("div");
     messageDiv.innerText = String(message);
     messageElement.appendChild(messageDiv);
   }
 
-  // 设置确认按钮点击事件
+  // Set confirm button click event
   confirmButton.onclick = () => closeResultModal(autoReload);
 
-  // 显示模态框
+  // Show modal
   modalElement.classList.remove("hidden");
 }
 
-// 显示批量验证结果的专用模态框
+// Show dedicated modal for bulk verification results
 function showVerificationResultModal(data) {
   const modalElement = document.getElementById("resultModal");
   const titleElement = document.getElementById("resultModalTitle");
@@ -438,8 +438,8 @@ function showVerificationResultModal(data) {
   const validCount = data.valid_count || 0;
   const invalidCount = data.invalid_count || 0;
 
-  // 设置标题和图标
-  titleElement.textContent = "批量验证结果";
+  // Set title and icon
+  titleElement.textContent = "Bulk Verification Results";
   if (invalidCount === 0 && validCount > 0) {
     iconElement.innerHTML =
       '<i class="fas fa-check-double text-success-500"></i>';
@@ -453,41 +453,41 @@ function showVerificationResultModal(data) {
       '<i class="fas fa-times-circle text-danger-500"></i>';
     iconElement.className = "text-6xl mb-3 text-danger-500";
   } else {
-    // 都为 0 或其他情况
+    // Both are 0 or other cases
     iconElement.innerHTML = '<i class="fas fa-info-circle text-gray-500"></i>';
     iconElement.className = "text-6xl mb-3 text-gray-500";
   }
 
-  // 构建详细内容
-  messageElement.innerHTML = ""; // 清空
+  // Build detailed content
+  messageElement.innerHTML = ""; // Clear
 
   const summaryDiv = document.createElement("div");
   summaryDiv.className = "text-center mb-4 text-lg";
-  summaryDiv.innerHTML = `验证完成：<span class="font-semibold text-success-600">${validCount}</span> 个成功，<span class="font-semibold text-danger-600">${invalidCount}</span> 个失败。`;
+  summaryDiv.innerHTML = `Verification complete: <span class="font-semibold text-success-600">${validCount}</span> successful, <span class="font-semibold text-danger-600">${invalidCount}</span> failed.`;
   messageElement.appendChild(summaryDiv);
 
-  // 成功列表
+  // Success list
   if (successfulKeys.length > 0) {
     const successDiv = document.createElement("div");
     successDiv.className = "mb-3";
     const successHeader = document.createElement("div");
     successHeader.className = "flex justify-between items-center mb-1";
-    successHeader.innerHTML = `<h4 class="font-semibold text-success-700">成功密钥 (${successfulKeys.length}):</h4>`;
+    successHeader.innerHTML = `<h4 class="font-semibold text-success-700">Successful Keys (${successfulKeys.length}):</h4>`;
 
     const copySuccessBtn = document.createElement("button");
     copySuccessBtn.className =
       "px-2 py-0.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs rounded transition-colors";
-    copySuccessBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>复制全部';
+    copySuccessBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy All';
     copySuccessBtn.onclick = (e) => {
       e.stopPropagation();
       copyToClipboard(successfulKeys.join("\n"))
         .then(() =>
           showNotification(
-            `已复制 ${successfulKeys.length} 个成功密钥`,
+            `Copied ${successfulKeys.length} successful keys`,
             "success"
           )
         )
-        .catch(() => showNotification("复制失败", "error"));
+        .catch(() => showNotification("Copy failed", "error"));
     };
     successHeader.appendChild(copySuccessBtn);
     successDiv.appendChild(successHeader);
@@ -508,39 +508,39 @@ function showVerificationResultModal(data) {
     messageElement.appendChild(successDiv);
   }
 
-  // 失败列表 - 按错误码分组展示
+  // Failure list - grouped by error code
   if (Object.keys(failedKeys).length > 0) {
     const failDiv = document.createElement("div");
-    failDiv.className = "mb-1"; // 减少底部边距
+    failDiv.className = "mb-1"; // Reduce bottom margin
     const failHeader = document.createElement("div");
     failHeader.className = "flex justify-between items-center mb-1";
-    failHeader.innerHTML = `<h4 class="font-semibold text-danger-700">失败密钥 (${
+    failHeader.innerHTML = `<h4 class="font-semibold text-danger-700">Failed Keys (${
       Object.keys(failedKeys).length
     }):</h4>`;
 
     const copyFailBtn = document.createElement("button");
     copyFailBtn.className =
       "px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded transition-colors";
-    copyFailBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>复制全部';
+    copyFailBtn.innerHTML = '<i class="fas fa-copy mr-1"></i>Copy All';
     const failedKeysArray = Object.keys(failedKeys); // Get array of failed keys
     copyFailBtn.onclick = (e) => {
       e.stopPropagation();
       copyToClipboard(failedKeysArray.join("\n"))
         .then(() =>
           showNotification(
-            `已复制 ${failedKeysArray.length} 个失败密钥`,
+            `Copied ${failedKeysArray.length} failed keys`,
             "success"
           )
         )
-        .catch(() => showNotification("复制失败", "error"));
+        .catch(() => showNotification("Copy failed", "error"));
     };
     failHeader.appendChild(copyFailBtn);
     failDiv.appendChild(failHeader);
 
-    // 按错误码分组失败的密钥
+    // Group failed keys by error code
     const errorGroups = {};
     Object.entries(failedKeys).forEach(([key, error]) => {
-      // 提取错误码或使用完整错误信息作为分组键
+      // Extract error code or use full error message as group key
       let errorCode = error["error_code"];
       let errorMessage = error["error_message"];
       
@@ -550,30 +550,30 @@ function showVerificationResultModal(data) {
       errorGroups[errorCode].push({ key, errorMessage });
     });
 
-    // 创建分组展示容器
+    // Create container for group display
     const groupsContainer = document.createElement("div");
     groupsContainer.className = "space-y-3 max-h-64 overflow-y-auto bg-red-50 p-2 rounded border border-red-200";
 
-    // 按错误码分组展示
+    // Group display by error code
     Object.entries(errorGroups).forEach(([errorCode, keyErrorPairs]) => {
       const groupDiv = document.createElement("div");
       groupDiv.className = "border border-red-300 rounded-lg bg-white p-2";
 
-      // 错误码标题
+      // Error code title
       const groupHeader = document.createElement("div");
       groupHeader.className = "flex justify-between items-center mb-2 cursor-pointer";
       groupHeader.innerHTML = `
         <div class="flex items-center gap-2">
           <i class="fas fa-chevron-down group-toggle-icon text-red-600 transition-transform duration-200"></i>
-          <h5 class="font-semibold text-red-700 text-sm">错误码: ${errorCode}</h5>
-          <span class="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-medium">${keyErrorPairs.length} 个密钥</span>
+          <h5 class="font-semibold text-red-700 text-sm">Error Code: ${errorCode}</h5>
+          <span class="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-medium">${keyErrorPairs.length} keys</span>
         </div>
         <button class="px-2 py-0.5 bg-red-200 hover:bg-red-300 text-red-700 text-xs rounded transition-colors group-copy-btn">
-          <i class="fas fa-copy mr-1"></i>复制组内密钥
+          <i class="fas fa-copy mr-1"></i>Copy Keys in Group
         </button>
       `;
 
-      // 复制组内密钥功能
+      // Copy keys in group functionality
       const groupCopyBtn = groupHeader.querySelector('.group-copy-btn');
       groupCopyBtn.onclick = (e) => {
         e.stopPropagation();
@@ -581,14 +581,14 @@ function showVerificationResultModal(data) {
         copyToClipboard(groupKeys.join("\n"))
           .then(() =>
             showNotification(
-              `已复制 ${groupKeys.length} 个密钥 (错误码: ${errorCode})`,
+              `Copied ${groupKeys.length} keys (error code: ${errorCode})`,
               "success"
             )
           )
-          .catch(() => showNotification("复制失败", "error"));
+          .catch(() => showNotification("Copy failed", "error"));
       };
 
-      // 密钥列表容器
+      // Key list container
       const keysList = document.createElement("div");
       keysList.className = "group-keys-list space-y-1";
 
@@ -606,7 +606,7 @@ function showVerificationResultModal(data) {
 
         const detailsButton = document.createElement("button");
         detailsButton.className = "ml-2 px-2 py-0.5 bg-red-200 hover:bg-red-300 text-red-700 text-xs rounded transition-colors";
-        detailsButton.innerHTML = '<i class="fas fa-info-circle mr-1"></i>详情';
+        detailsButton.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Details';
         detailsButton.dataset.error = errorMessage;
         detailsButton.onclick = (e) => {
           e.stopPropagation();
@@ -618,14 +618,14 @@ function showVerificationResultModal(data) {
 
           if (errorDiv) {
             errorDiv.remove();
-            button.innerHTML = '<i class="fas fa-info-circle mr-1"></i>详情';
+            button.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Details';
           } else {
             errorDiv = document.createElement("div");
             errorDiv.id = errorDetailsId;
             errorDiv.className = "w-full mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 whitespace-pre-wrap break-words";
             errorDiv.textContent = errorMsg;
             keyItem.appendChild(errorDiv);
-            button.innerHTML = '<i class="fas fa-chevron-up mr-1"></i>收起';
+            button.innerHTML = '<i class="fas fa-chevron-up mr-1"></i>Collapse';
           }
         };
 
@@ -635,9 +635,9 @@ function showVerificationResultModal(data) {
         keysList.appendChild(keyItem);
       });
 
-      // 分组折叠/展开功能
+      // Group collapse/expand functionality
       groupHeader.onclick = (e) => {
-        if (e.target.closest('.group-copy-btn')) return; // 避免复制按钮触发折叠
+        if (e.target.closest('.group-copy-btn')) return; // Avoid triggering collapse when copying
         
         const toggleIcon = groupHeader.querySelector('.group-toggle-icon');
         const isCollapsed = keysList.style.display === 'none';
@@ -660,10 +660,10 @@ function showVerificationResultModal(data) {
     messageElement.appendChild(failDiv);
   }
 
-  // 设置确认按钮点击事件 - 总是自动刷新
+  // Set confirm button click event - always auto-refresh
   confirmButton.onclick = () => closeResultModal(true); // Always reload
 
-  // 显示模态框
+  // Show modal
   modalElement.classList.remove("hidden");
 }
 
@@ -671,11 +671,11 @@ async function executeResetAll(type) {
   closeResetModal();
   const keysToReset = getSelectedKeys(type);
   if (keysToReset.length === 0) {
-    showNotification("没有选中的密钥可重置", "warning");
+    showNotification("No selected keys to reset", "warning");
     return;
   }
 
-  showProgressModal(`批量重置 ${keysToReset.length} 个密钥的失败计数`);
+  showProgressModal(`Bulk resetting failure count for ${keysToReset.length} keys`);
 
   let successCount = 0;
   let failCount = 0;
@@ -685,7 +685,7 @@ async function executeResetAll(type) {
     const keyDisplay = `${key.substring(0, 4)}...${key.substring(
       key.length - 4
     )}`;
-    updateProgress(i, keysToReset.length, `正在重置: ${keyDisplay}`);
+    updateProgress(i, keysToReset.length, `Resetting: ${keyDisplay}`);
 
     try {
       const data = await fetchAPI(`/gemini/v1beta/reset-fail-count/${key}`, {
@@ -693,24 +693,24 @@ async function executeResetAll(type) {
       });
       if (data.success) {
         successCount++;
-        addProgressLog(`✅ ${keyDisplay}: 重置成功`);
+        addProgressLog(`✅ ${keyDisplay}: Reset successful`);
       } else {
         failCount++;
         addProgressLog(
-          `❌ ${keyDisplay}: 重置失败 - ${data.message || "未知错误"}`,
+          `❌ ${keyDisplay}: Reset failed - ${data.message || "Unknown error"}`,
           true
         );
       }
     } catch (apiError) {
       failCount++;
-      addProgressLog(`❌ ${keyDisplay}: 请求失败 - ${apiError.message}`, true);
+      addProgressLog(`❌ ${keyDisplay}: Request failed - ${apiError.message}`, true);
     }
   }
 
   updateProgress(
     keysToReset.length,
     keysToReset.length,
-    `重置完成！成功: ${successCount}, 失败: ${failCount}`
+    `Reset complete! Success: ${successCount}, Failed: ${failCount}`
   );
 }
 
@@ -722,10 +722,10 @@ function scrollToBottom() {
   window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
 }
 
-// 移除这个函数，因为它可能正在干扰按钮的显示
-// HTML中已经设置了滚动按钮为flex显示，不需要JavaScript额外控制
+// Removed this function as it might interfere with button display
+// The scroll buttons are already set to flex display in HTML, no extra JavaScript control needed
 // function updateScrollButtons() {
-//     // 不执行任何操作
+//     // Do nothing
 // }
 
 function refreshPage(button) {
@@ -740,16 +740,16 @@ function refreshPage(button) {
   }, 300);
 }
 
-// 展开/收起区块内容的函数，带有平滑动画效果。
-// @param {HTMLElement} header - 被点击的区块头部元素。
-// @param {string} sectionId - (当前未使用，但可用于更精确的目标定位) 关联内容区块的ID。
+// Function to expand/collapse block content with smooth animation.
+// @param {HTMLElement} header - The clicked block header element.
+// @param {string} sectionId - (Currently unused, but can be used for more precise targeting) The ID of the associated content block.
 function toggleSection(header, sectionId) {
   const toggleIcon = header.querySelector(".toggle-icon");
-  // 内容元素是卡片内的 .key-content div
+  // The content element is the .key-content div inside the card
   const card = header.closest(".stats-card");
   const content = card ? card.querySelector(".key-content") : null;
 
-  // 批量操作栏和分页控件也可能影响内容区域的动画高度计算
+  // Batch action bar and pagination controls can also affect the height calculation of the content area for animation
   const batchActions = card ? card.querySelector('[id$="BatchActions"]') : null;
   const pagination = card
     ? card.querySelector('[id$="PaginationControls"]')
@@ -766,64 +766,64 @@ function toggleSection(header, sectionId) {
   }
 
   const isCollapsed = content.classList.contains("collapsed");
-  toggleIcon.classList.toggle("collapsed", !isCollapsed); // 更新箭头图标方向
+  toggleIcon.classList.toggle("collapsed", !isCollapsed); // Update arrow icon direction
 
   if (isCollapsed) {
-    // --- 准备展开动画 ---
-    content.classList.remove("collapsed"); // 移除 collapsed 类以应用展开的样式
+    // --- Prepare for expansion animation ---
+    content.classList.remove("collapsed"); // Remove collapsed class to apply expanded styles
 
-    // 步骤 1: 重置内联样式，让CSS控制初始的"隐藏"状态 (通常是 maxHeight: 0, opacity: 0)。
-    //         同时，确保 overflow 在动画开始前是 hidden。
-    content.style.maxHeight = ""; // 清除可能存在的内联 maxHeight
-    content.style.opacity = ""; // 清除可能存在的内联 opacity
-    content.style.paddingTop = ""; // 清除内联 padding
+    // Step 1: Reset inline styles to let CSS control the initial "hidden" state (usually maxHeight: 0, opacity: 0).
+    //         Also, ensure overflow is hidden before the animation starts.
+    content.style.maxHeight = ""; // Clear any existing inline maxHeight
+    content.style.opacity = ""; // Clear any existing inline opacity
+    content.style.paddingTop = ""; // Clear inline padding
     content.style.paddingBottom = "";
-    content.style.overflow = "hidden"; // 动画过程中隐藏溢出内容
+    content.style.overflow = "hidden"; // Hide overflow content during animation
 
-    // 步骤 2: 使用 requestAnimationFrame (rAF) 确保浏览器在计算 scrollHeight 之前
-    //         已经应用了上一步的样式重置（特别是如果CSS中有过渡效果）。
+    // Step 2: Use requestAnimationFrame (rAF) to ensure the browser has applied the style resets from the previous step
+    //         before calculating scrollHeight (especially if there are transition effects in CSS).
     requestAnimationFrame(() => {
-      // 步骤 3: 计算内容区的目标高度。
-      //         这包括内容本身的 scrollHeight，以及任何可见的批量操作栏和分页控件的高度。
+      // Step 3: Calculate the target height of the content area.
+      //         This includes the scrollHeight of the content itself, as well as the height of any visible batch action bars and pagination controls.
       let targetHeight = content.scrollHeight;
 
       if (batchActions && !batchActions.classList.contains("hidden")) {
         targetHeight += batchActions.offsetHeight;
       }
       if (pagination && pagination.offsetHeight > 0) {
-        // 尝试获取分页控件的 margin-top，以获得更精确的高度
+        // Try to get the margin-top of the pagination controls for more accurate height
         const paginationStyle = getComputedStyle(pagination);
         const paginationMarginTop = parseFloat(paginationStyle.marginTop) || 0;
         targetHeight += pagination.offsetHeight + paginationMarginTop;
       }
 
-      // 步骤 4: 设置 maxHeight 和 opacity 以触发CSS过渡到展开状态。
+      // Step 4: Set maxHeight and opacity to trigger the CSS transition to the expanded state.
       content.style.maxHeight = targetHeight + "px";
       content.style.opacity = "1";
-      // 假设展开后的 padding 为 1rem (p-4 in Tailwind). 根据实际情况调整。
+      // Assume the expanded padding is 1rem (p-4 in Tailwind). Adjust according to the actual situation.
       content.style.paddingTop = "1rem";
       content.style.paddingBottom = "1rem";
 
-      // 步骤 5: 监听 transitionend 事件。动画结束后，移除 maxHeight 以允许内容动态调整，
-      //         并将 overflow 设置为 visible，以防内容变化后被裁剪。
+      // Step 5: Listen for the transitionend event. After the animation ends, remove maxHeight to allow the content to adjust dynamically,
+      //         and set overflow to visible to prevent content from being clipped if it changes.
       content.addEventListener(
         "transitionend",
         function onExpansionEnd() {
-          content.removeEventListener("transitionend", onExpansionEnd); // 清理监听器
-          // 再次检查确保是在展开状态 (避免在快速连续点击时出错)
+          content.removeEventListener("transitionend", onExpansionEnd); // Clean up listener
+          // Re-check to ensure it is in the expanded state (to avoid errors on rapid consecutive clicks)
           if (!content.classList.contains("collapsed")) {
-            content.style.maxHeight = ""; // 允许内容自适应高度
-            content.style.overflow = "visible"; // 允许内容溢出（如果需要）
+            content.style.maxHeight = ""; // Allow content to have adaptive height
+            content.style.overflow = "visible"; // Allow content to overflow (if needed)
           }
         },
         { once: true }
-      ); // 确保监听器只执行一次
+      ); // Ensure the listener is executed only once
     });
   } else {
-    // --- 准备收起动画 ---
-    // 步骤 1: 获取当前内容区的可见高度。
-    //         这对于从当前渲染高度平滑过渡到0是必要的。
-    let currentVisibleHeight = content.scrollHeight; // scrollHeight 应该已经是包括padding的内部高度
+    // --- Prepare for collapse animation ---
+    // Step 1: Get the current visible height of the content area.
+    //         This is necessary for a smooth transition from the current rendered height to 0.
+    let currentVisibleHeight = content.scrollHeight; // scrollHeight should already be the internal height including padding
     if (batchActions && !batchActions.classList.contains("hidden")) {
       currentVisibleHeight += batchActions.offsetHeight;
     }
@@ -833,25 +833,25 @@ function toggleSection(header, sectionId) {
       currentVisibleHeight += pagination.offsetHeight + paginationMarginTop;
     }
 
-    // 步骤 2: 将 maxHeight 设置为当前计算的可见高度，以确保过渡从当前高度开始。
-    //         同时，确保 overflow 在动画开始前是 hidden。
+    // Step 2: Set maxHeight to the current calculated visible height to ensure the transition starts from the current height.
+    //         Also, ensure overflow is hidden before the animation starts.
     content.style.maxHeight = currentVisibleHeight + "px";
     content.style.overflow = "hidden";
 
-    // 步骤 3: 使用 requestAnimationFrame (rAF) 确保浏览器应用了上述 maxHeight。
+    // Step 3: Use requestAnimationFrame (rAF) to ensure the browser has applied the above maxHeight.
     requestAnimationFrame(() => {
-      // 步骤 4: 过渡到目标状态 (收起): maxHeight 和 padding 设为0，opacity 设为0。
+      // Step 4: Transition to the target state (collapsed): maxHeight and padding are set to 0, opacity is set to 0.
       content.style.maxHeight = "0px";
       content.style.opacity = "0";
       content.style.paddingTop = "0";
       content.style.paddingBottom = "0";
-      // 在动画开始（或即将开始）后添加 collapsed 类，以便CSS可以应用最终的折叠样式。
+      // Add the collapsed class after the animation starts (or is about to start), so that CSS can apply the final collapsed styles.
       content.classList.add("collapsed");
     });
   }
 }
 
-// filterValidKeys 函数已被 filterAndSearchValidKeys 替代，此函数保留为空或可移除
+// The filterValidKeys function has been replaced by filterAndSearchValidKeys, this function is kept empty or can be removed
 function filterValidKeys() {
   // This function is now handled by filterAndSearchValidKeys
   // Kept for now to avoid breaking any potential legacy calls, but should be removed later.
@@ -929,7 +929,7 @@ function initializeKeyFilterControls() {
     thresholdInput.addEventListener("input", filterValidKeys);
   }
   
-  // 为无效密钥添加筛选控件监听器
+  // Add listener for invalid key filter control
   const invalidThresholdInput = document.getElementById("invalidFailCountThreshold");
   if (invalidThresholdInput) {
     invalidThresholdInput.addEventListener("input", () => fetchAndDisplayKeys('invalid', 1));
@@ -947,16 +947,16 @@ function initializeGlobalBatchVerificationHandlers() {
     const confirmButton = document.getElementById("confirmVerifyBtn");
     const selectedKeys = getSelectedKeys(type);
     const count = selectedKeys.length;
-    titleElement.textContent = "批量验证密钥";
+    titleElement.textContent = "Bulk Verify Keys";
     if (count > 0) {
-      messageElement.textContent = `确定要批量验证选中的 ${count} 个${
-        type === "valid" ? "有效" : "无效"
-      }密钥吗？此操作可能需要一些时间。`;
+      messageElement.textContent = `Are you sure you want to bulk verify the ${count} selected ${
+        type === "valid" ? "valid" : "invalid"
+      } keys? This operation may take some time.`;
       confirmButton.disabled = false;
     } else {
-      messageElement.textContent = `请先选择要验证的${
-        type === "valid" ? "有效" : "无效"
-      }密钥。`;
+      messageElement.textContent = `Please select the ${
+        type === "valid" ? "valid" : "invalid"
+      } keys to verify first.`;
       confirmButton.disabled = true;
     }
     confirmButton.onclick = () => executeVerifyAll(type);
@@ -971,14 +971,14 @@ function initializeGlobalBatchVerificationHandlers() {
     closeVerifyModal();
     const keysToVerify = getSelectedKeys(type);
     if (keysToVerify.length === 0) {
-      showNotification("没有选中的密钥可验证", "warning");
+      showNotification("No selected keys to verify", "warning");
       return;
     }
 
     const batchSizeInput = document.getElementById("batchSize");
     const batchSize = parseInt(batchSizeInput.value, 10) || 10;
 
-    showProgressModal(`批量验证 ${keysToVerify.length} 个密钥`);
+    showProgressModal(`Bulk verifying ${keysToVerify.length} keys`);
 
     let allSuccessfulKeys = [];
     let allFailedKeys = {};
@@ -986,10 +986,10 @@ function initializeGlobalBatchVerificationHandlers() {
 
     for (let i = 0; i < keysToVerify.length; i += batchSize) {
       const batch = keysToVerify.slice(i, i + batchSize);
-      const progressText = `正在验证批次 ${Math.floor(i / batchSize) + 1} / ${Math.ceil(keysToVerify.length / batchSize)} (密钥 ${i + 1}-${Math.min(i + batchSize, keysToVerify.length)})`;
+      const progressText = `Verifying batch ${Math.floor(i / batchSize) + 1} / ${Math.ceil(keysToVerify.length / batchSize)} (keys ${i + 1}-${Math.min(i + batchSize, keysToVerify.length)})`;
       
       updateProgress(i, keysToVerify.length, progressText);
-      addProgressLog(`处理批次: ${batch.length}个密钥...`);
+      addProgressLog(`Processing batch: ${batch.length} keys...`);
 
       try {
         const options = {
@@ -1002,17 +1002,17 @@ function initializeGlobalBatchVerificationHandlers() {
         if (data) {
           if (data.successful_keys && data.successful_keys.length > 0) {
             allSuccessfulKeys = allSuccessfulKeys.concat(data.successful_keys);
-            addProgressLog(`✅ 批次成功: ${data.successful_keys.length} 个`);
+            addProgressLog(`✅ Batch success: ${data.successful_keys.length}`);
           }
           if (data.failed_keys && Object.keys(data.failed_keys).length > 0) {
             Object.assign(allFailedKeys, data.failed_keys);
-             addProgressLog(`❌ 批次失败: ${Object.keys(data.failed_keys).length} 个`, true);
+             addProgressLog(`❌ Batch failed: ${Object.keys(data.failed_keys).length}`, true);
           }
         } else {
-           addProgressLog(`- 批次返回空数据`, true);
+           addProgressLog(`- Batch returned empty data`, true);
         }
       } catch (apiError) {
-         addProgressLog(`❌ 批次请求失败: ${apiError.message}`, true);
+         addProgressLog(`❌ Batch request failed: ${apiError.message}`, true);
          // Mark all keys in this batch as failed due to API error
          batch.forEach(key => {
             allFailedKeys[key] = apiError.message;
@@ -1025,7 +1025,7 @@ function initializeGlobalBatchVerificationHandlers() {
     updateProgress(
       keysToVerify.length,
       keysToVerify.length,
-      `所有批次验证完成！`
+      `All batches verification complete!`
     );
     
     // Close progress modal and show final results
@@ -1039,7 +1039,7 @@ function initializeGlobalBatchVerificationHandlers() {
   }
 }
 
-// --- 进度条模态框函数 ---
+// --- Progress bar modal functions ---
 function showProgressModal(title) {
   const modal = document.getElementById("progressModal");
   const titleElement = document.getElementById("progressModalTitle");
@@ -1051,7 +1051,7 @@ function showProgressModal(title) {
   const closeIcon = document.getElementById("closeProgressModalBtn");
 
   titleElement.textContent = title;
-  statusText.textContent = "准备开始...";
+  statusText.textContent = "Preparing to start...";
   progressBar.style.width = "0%";
   progressPercentage.textContent = "0%";
   progressLog.innerHTML = "";
@@ -1203,7 +1203,7 @@ async function fetchAndDisplayKeys(type, page = 1) {
     // Show loading indicator
     listElement.innerHTML = `<li><div class="text-center py-4 col-span-full"><i class="fas fa-spinner fa-spin"></i> Loading...</div></li>`;
 
-    // 根据类型选择对应的控件
+    // Select corresponding controls based on type
     const itemsPerPageSelect = document.getElementById(type === 'valid' ? "itemsPerPageSelect" : "invalidItemsPerPageSelect");
     const limit = itemsPerPageSelect ? parseInt(itemsPerPageSelect.value, 10) : 10;
     
@@ -1264,8 +1264,8 @@ function createKeyListItem(key, fail_count, type) {
     li.dataset.failCount = fail_count;
 
     const statusBadge = type === 'valid'
-        ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600"><i class="fas fa-check mr-1"></i> 有效</span>`
-        : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-600"><i class="fas fa-times mr-1"></i> 无效</span>`;
+        ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600"><i class="fas fa-check mr-1"></i> Valid</span>`
+        : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-600"><i class="fas fa-times mr-1"></i> Invalid</span>`;
 
     li.innerHTML = `
         <input type="checkbox" class="form-checkbox h-5 w-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mt-1 key-checkbox" data-key-type="${type}" value="${key}">
@@ -1281,15 +1281,15 @@ function createKeyListItem(key, fail_count, type) {
                     </div>
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-600">
                         <i class="fas fa-exclamation-triangle mr-1"></i>
-                        失败: ${fail_count}
+                        Failures: ${fail_count}
                     </span>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <button class="flex items-center gap-1 bg-success-600 hover:bg-success-700 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="verifyKey('${key}', this)"><i class="fas fa-check-circle"></i> 验证</button>
-                    <button class="flex items-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="resetKeyFailCount('${key}', this)"><i class="fas fa-redo-alt"></i> 重置</button>
-                    <button class="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="copyKey('${key}')"><i class="fas fa-copy"></i> 复制</button>
-                    <button class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="showKeyUsageDetails('${key}')"><i class="fas fa-chart-pie"></i> 详情</button>
-                    <button class="flex items-center gap-1 bg-red-800 hover:bg-red-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="showSingleKeyDeleteConfirmModal('${key}', this)"><i class="fas fa-trash-alt"></i> 删除</button>
+                    <button class="flex items-center gap-1 bg-success-600 hover:bg-success-700 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="verifyKey('${key}', this)"><i class="fas fa-check-circle"></i> Verify</button>
+                    <button class="flex items-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="resetKeyFailCount('${key}', this)"><i class="fas fa-redo-alt"></i> Reset</button>
+                    <button class="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="copyKey('${key}')"><i class="fas fa-copy"></i> Copy</button>
+                    <button class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="showKeyUsageDetails('${key}')"><i class="fas fa-chart-pie"></i> Details</button>
+                    <button class="flex items-center gap-1 bg-red-800 hover:bg-red-900 text-white px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200" onclick="showSingleKeyDeleteConfirmModal('${key}', this)"><i class="fas fa-trash-alt"></i> Delete</button>
                 </div>
             </div>
         </div>
@@ -1349,7 +1349,7 @@ function initializeKeyPaginationAndSearch() {
     const debouncedFetchValidKeys = debounce(() => fetchAndDisplayKeys('valid', 1), 300);
     const debouncedFetchInvalidKeys = debounce(() => fetchAndDisplayKeys('invalid', 1), 300);
 
-    // 有效密钥的搜索和筛选控件
+    // Search and filter controls for valid keys
     const searchInput = document.getElementById("keySearchInput");
     if (searchInput) {
         searchInput.addEventListener("input", debouncedFetchValidKeys);
@@ -1367,7 +1367,7 @@ function initializeKeyPaginationAndSearch() {
         });
     }
 
-    // 无效密钥的搜索和筛选控件
+    // Search and filter controls for invalid keys
     const invalidSearchInput = document.getElementById("invalidKeySearchInput");
     if (invalidSearchInput) {
         invalidSearchInput.addEventListener("input", debouncedFetchInvalidKeys);
@@ -1396,18 +1396,18 @@ function registerServiceWorker() {
       navigator.serviceWorker
         .register("/static/service-worker.js")
         .then((registration) => {
-          console.log("ServiceWorker注册成功:", registration.scope);
+          console.log("ServiceWorker registration successful:", registration.scope);
         })
         .catch((error) => {
-          console.log("ServiceWorker注册失败:", error);
+          console.log("ServiceWorker registration failed:", error);
         });
     });
   }
 }
 
-// 初始化下拉菜单
+// Initialize dropdown menu
 function initializeDropdownMenu() {
-  // 阻止下拉菜单按钮的点击事件冒泡
+  // Prevent click event of dropdown menu button from bubbling up
   const dropdownButton = document.getElementById('dropdownMenuButton');
   if (dropdownButton) {
     dropdownButton.addEventListener('click', (event) => {
@@ -1415,7 +1415,7 @@ function initializeDropdownMenu() {
     });
   }
   
-  // 阻止下拉菜单内部点击事件冒泡
+  // Prevent click event inside dropdown menu from bubbling up
   const dropdownMenu = document.getElementById('dropdownMenu');
   if (dropdownMenu) {
     dropdownMenu.addEventListener('click', (event) => {
@@ -1434,7 +1434,7 @@ function buildChartConfig(labels, successData, failureData) {
       labels,
       datasets: [
         {
-          label: '成功',
+          label: 'Success',
           data: successData,
           borderColor: 'rgba(16,185,129,1)', // emerald-500
           backgroundColor: 'rgba(16,185,129,0.15)',
@@ -1443,7 +1443,7 @@ function buildChartConfig(labels, successData, failureData) {
           pointRadius: 2,
         },
         {
-          label: '失败',
+          label: 'Failure',
           data: failureData,
           borderColor: 'rgba(239,68,68,1)', // red-500
           backgroundColor: 'rgba(239,68,68,0.15)',
@@ -1462,8 +1462,8 @@ function buildChartConfig(labels, successData, failureData) {
       },
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       scales: {
-        x: { title: { display: true, text: '时间' } },
-        y: { title: { display: true, text: '调用次数' }, beginAtZero: true, ticks: { precision: 0 } },
+        x: { title: { display: true, text: 'Time' } },
+        y: { title: { display: true, text: 'Call Count' }, beginAtZero: true, ticks: { precision: 0 } },
       },
     },
   };
@@ -1565,7 +1565,7 @@ async function fetchAndRenderAttentionKeys(statusCode = 429, limit = 10) {
     const data = await fetchAPI(`/api/stats/attention-keys?status_code=${statusCode}&limit=${limit}`);
     listEl.innerHTML = '';
     if (!data || (Array.isArray(data) && data.length === 0) || data.error) {
-      listEl.innerHTML = '<li class="text-center text-gray-500 py-2">暂无需要注意的Key</li>';
+      listEl.innerHTML = '<li class="text-center text-gray-500 py-2">No keys require attention</li>';
       updateBatchActions('attention');
       return;
     }
@@ -1582,10 +1582,10 @@ async function fetchAndRenderAttentionKeys(statusCode = 429, limit = 10) {
           <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">${code}: ${item.count}</span>
         </div>
         <div class="flex items-center gap-2">
-          <button class="px-2 py-1 text-xs rounded bg-success-600 hover:bg-success-700 text-white" title="验证此Key">验证</button>
-          <button class="px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white" title="查看24小时详情">详情</button>
-          <button class="px-2 py-1 text-xs rounded bg-blue-500 hover:bg-blue-600 text-white" title="复制Key">复制</button>
-          <button class="px-2 py-1 text-xs rounded bg-red-800 hover:bg-red-900 text-white" title="删除此Key">删除</button>
+          <button class="px-2 py-1 text-xs rounded bg-success-600 hover:bg-success-700 text-white" title="Verify this key">Verify</button>
+          <button class="px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white" title="View 24h details">Details</button>
+          <button class="px-2 py-1 text-xs rounded bg-blue-500 hover:bg-blue-600 text-white" title="Copy Key">Copy</button>
+          <button class="px-2 py-1 text-xs rounded bg-red-800 hover:bg-red-900 text-white" title="Delete this key">Delete</button>
         </div>`;
       const [verifyBtn, detailBtn, copyBtn, deleteBtn] = li.querySelectorAll('button');
       verifyBtn.addEventListener('click', (e) => { e.stopPropagation(); verifyKey(item.key, e.currentTarget); });
@@ -1601,7 +1601,7 @@ async function fetchAndRenderAttentionKeys(statusCode = 429, limit = 10) {
     });
     updateBatchActions('attention');
   } catch (e) {
-    listEl.innerHTML = `<li class="text-center text-red-500 py-2">加载失败: ${e.message}</li>`;
+    listEl.innerHTML = `<li class="text-center text-red-500 py-2">Loading failed: ${e.message}</li>`;
     updateBatchActions('attention');
   }
 }
@@ -1636,7 +1636,7 @@ function initAttentionKeysControls() {
   const btn429 = document.getElementById('attentionErr429');
   const btn403 = document.getElementById('attentionErr403');
   const btn400 = document.getElementById('attentionErr400');
-  // 修复：补充获取数量输入框，避免未声明变量导致初始化报错
+  // Fixed: get the quantity input, avoid undeclared variable causing initialization error
   const limitInput = document.getElementById('attentionLimitInput');
   const setActive = (activeBtn) => {
     [btn429, btn403, btn400].forEach(btn => {
@@ -1653,7 +1653,7 @@ function initAttentionKeysControls() {
   if (btn429) btn429.addEventListener('click', () => { setActive(btn429); currentStatus = 429; fetchAndRenderAttentionKeys(429, getLimit()); });
   if (btn403) btn403.addEventListener('click', () => { setActive(btn403); currentStatus = 403; fetchAndRenderAttentionKeys(403, getLimit()); });
   if (btn400) btn400.addEventListener('click', () => { setActive(btn400); currentStatus = 400; fetchAndRenderAttentionKeys(400, getLimit()); });
-  // 自定义查询
+  // Custom query
   const input = document.getElementById('attentionErrCustom');
   const go = document.getElementById('attentionErrGo');
   const trigger = () => {
@@ -1665,13 +1665,13 @@ function initAttentionKeysControls() {
       currentStatus = val;
       fetchAndRenderAttentionKeys(val, getLimit());
     } else {
-      showNotification('请输入100-599之间的HTTP状态码', 'warning');
+      showNotification('Please enter an HTTP status code between 100-599', 'warning');
     }
   };
   if (go) go.addEventListener('click', trigger);
   if (input) input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ trigger(); }});
 
-  // limit变化实时刷新当前状态码
+  // limit changes refresh the current status code in real time
   if (limitInput) limitInput.addEventListener('change', () => {
     fetchAndRenderAttentionKeys(currentStatus, getLimit());
   });
@@ -1679,7 +1679,7 @@ function initAttentionKeysControls() {
   if (btn429) setActive(btn429); // default active
 }
 
-// 初始化
+// Initialization
 document.addEventListener("DOMContentLoaded", () => {
   initializePageAnimationsAndEffects();
   initializeSectionToggleListeners();
@@ -1688,19 +1688,19 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeKeySelectionListeners();
   initializeKeyPaginationAndSearch(); // This will also handle initial display
   registerServiceWorker();
-  initializeDropdownMenu(); // 初始化下拉菜单
-  initChartControls(); // 初始化图表与时间区间切换
-  initAttentionKeysControls(); // 初始化值得注意的Key错误码切换
-  fetchAndRenderAttentionKeys(429, 10); // 默认渲染429，数量10
+  initializeDropdownMenu(); // Initialize dropdown menu
+  initChartControls(); // Initialize chart and time interval switching
+  initAttentionKeysControls(); // Initialize switching of notable Key error codes
+  fetchAndRenderAttentionKeys(429, 10); // Default render 429, quantity 10
 
   // Initial batch actions update might be needed if not covered by displayPage
   // updateBatchActions('valid');
   // updateBatchActions('invalid');
 });
 
-// --- 新增：删除密钥相关功能 ---
+// --- Added: Key deletion related functions ---
 
-// 新版：显示单个密钥删除确认模态框
+// New version: Show single key deletion confirmation modal
 function showSingleKeyDeleteConfirmModal(key, button) {
   const modalElement = document.getElementById("singleKeyDeleteConfirmModal");
   const titleElement = document.getElementById(
@@ -1713,10 +1713,10 @@ function showSingleKeyDeleteConfirmModal(key, button) {
 
   const keyDisplay =
     key.substring(0, 4) + "..." + key.substring(key.length - 4);
-  titleElement.textContent = "确认删除密钥";
-  messageElement.innerHTML = `确定要删除密钥 <span class="font-mono text-amber-300 font-semibold">${keyDisplay}</span> 吗？<br>此操作无法撤销。`;
+  titleElement.textContent = "Confirm Key Deletion";
+  messageElement.innerHTML = `Are you sure you want to delete the key <span class="font-mono text-amber-300 font-semibold">${keyDisplay}</span>?<br>This action cannot be undone.`;
 
-  // 移除旧的监听器并重新附加，以确保 key 和 button 参数是最新的
+  // Remove old listeners and re-attach to ensure key and button parameters are up-to-date
   const newConfirmButton = confirmButton.cloneNode(true);
   confirmButton.parentNode.replaceChild(newConfirmButton, confirmButton);
 
@@ -1725,21 +1725,21 @@ function showSingleKeyDeleteConfirmModal(key, button) {
   modalElement.classList.remove("hidden");
 }
 
-// 新版：关闭单个密钥删除确认模态框
+// New version: Close single key deletion confirmation modal
 function closeSingleKeyDeleteConfirmModal() {
   document
     .getElementById("singleKeyDeleteConfirmModal")
     .classList.add("hidden");
 }
 
-// 新版：执行单个密钥删除
+// New version: Execute single key deletion
 async function executeSingleKeyDelete(key, button) {
   closeSingleKeyDeleteConfirmModal();
 
   button.disabled = true;
   const originalHtml = button.innerHTML;
-  // 使用字体图标，确保一致性
-  button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>删除中';
+  // Use font icon for consistency
+  button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Deleting';
 
   try {
     const response = await fetchAPI(`/api/config/keys/${key}`, {
@@ -1747,23 +1747,23 @@ async function executeSingleKeyDelete(key, button) {
     });
 
     if (response.success) {
-      // 使用 resultModal 并确保刷新
-      showResultModal(true, response.message || "密钥删除成功", true);
+      // Use resultModal and ensure refresh
+      showResultModal(true, response.message || "Key deleted successfully", true);
     } else {
-      // 使用 resultModal，失败时不刷新，以便用户看到错误信息
-      showResultModal(false, response.message || "密钥删除失败", false);
+      // Use resultModal, do not refresh on failure so the user can see the error message
+      showResultModal(false, response.message || "Key deletion failed", false);
       button.innerHTML = originalHtml;
       button.disabled = false;
     }
   } catch (error) {
-    console.error("删除密钥 API 请求失败:", error);
-    showResultModal(false, `删除密钥请求失败: ${error.message}`, false);
+    console.error("Delete key API request failed:", error);
+    showResultModal(false, `Delete key request failed: ${error.message}`, false);
     button.innerHTML = originalHtml;
     button.disabled = false;
   }
 }
 
-// 显示批量删除确认模态框
+// Show bulk delete confirmation modal
 function showDeleteConfirmationModal(type, event) {
   if (event) {
     event.stopPropagation();
@@ -1776,17 +1776,17 @@ function showDeleteConfirmationModal(type, event) {
   const selectedKeys = getSelectedKeys(type);
   const count = selectedKeys.length;
 
-  titleElement.textContent = "确认批量删除";
+  titleElement.textContent = "Confirm Bulk Deletion";
   if (count > 0) {
-    messageElement.textContent = `确定要批量删除选中的 ${count} 个${
-      type === "valid" ? "有效" : "无效"
-    }密钥吗？此操作无法撤销。`;
+    messageElement.textContent = `Are you sure you want to bulk delete the ${count} selected ${
+      type === "valid" ? "valid" : "invalid"
+    } keys? This action cannot be undone.`;
     confirmButton.disabled = false;
   } else {
-    // 此情况理论上不应发生，因为批量删除按钮在未选中时是禁用的
-    messageElement.textContent = `请先选择要删除的${
-      type === "valid" ? "有效" : "无效"
-    }密钥。`;
+    // This case should theoretically not happen because the bulk delete button is disabled when nothing is selected
+    messageElement.textContent = `Please select the ${
+      type === "valid" ? "valid" : "invalid"
+    } keys to delete first.`;
     confirmButton.disabled = true;
   }
 
@@ -1794,22 +1794,22 @@ function showDeleteConfirmationModal(type, event) {
   modalElement.classList.remove("hidden");
 }
 
-// 关闭批量删除确认模态框
+// Close bulk delete confirmation modal
 function closeDeleteConfirmationModal() {
   document.getElementById("deleteConfirmModal").classList.add("hidden");
 }
 
-// 执行批量删除
+// Execute bulk deletion
 async function executeDeleteSelectedKeys(type) {
   closeDeleteConfirmationModal();
 
   const selectedKeys = getSelectedKeys(type);
   if (selectedKeys.length === 0) {
-    showNotification("没有选中的密钥可删除", "warning");
+    showNotification("No selected keys to delete", "warning");
     return;
   }
 
-  // 找到批量删除按钮并显示加载状态 (假设它在对应类型的 batchActions 中是最后一个按钮)
+  // Find the bulk delete button and show loading status (assuming it is the last button in the corresponding type's batchActions)
   const batchActionsDiv = document.getElementById(`${type}BatchActions`);
   const deleteButton = batchActionsDiv
     ? batchActionsDiv.querySelector("button.bg-red-600")
@@ -1819,7 +1819,7 @@ async function executeDeleteSelectedKeys(type) {
   if (deleteButton) {
     originalDeleteBtnHtml = deleteButton.innerHTML;
     deleteButton.disabled = true;
-    deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 删除中';
+    deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting';
   }
 
   try {
@@ -1830,28 +1830,28 @@ async function executeDeleteSelectedKeys(type) {
     });
 
     if (response.success) {
-      // 使用 resultModal 显示更详细的结果
+      // Use resultModal to show more detailed results
       const message =
         response.message ||
-        `成功删除 ${response.deleted_count || selectedKeys.length} 个密钥。`;
-      showResultModal(true, message, true); // true 表示成功，message，true 表示关闭后刷新
+        `Successfully deleted ${response.deleted_count || selectedKeys.length} keys.`;
+      showResultModal(true, message, true); // true means success, message, true means refresh after closing
     } else {
-      showResultModal(false, response.message || "批量删除密钥失败", true); // false 表示失败，message，true 表示关闭后刷新
+      showResultModal(false, response.message || "Bulk key deletion failed", true); // false means failure, message, true means refresh after closing
     }
   } catch (error) {
-    console.error("批量删除 API 请求失败:", error);
-    showResultModal(false, `批量删除请求失败: ${error.message}`, true);
+    console.error("Bulk delete API request failed:", error);
+    showResultModal(false, `Bulk delete request failed: ${error.message}`, true);
   } finally {
-    // resultModal 关闭时会刷新页面，所以通常不需要在这里恢复按钮状态。
-    // 如果不刷新，则需要恢复按钮状态：
+    // The page will be refreshed when the resultModal is closed, so there is usually no need to restore the button state here.
+    // If you don't refresh, you need to restore the button state:
     // if (deleteButton && (!document.getElementById("resultModal") || document.getElementById("resultModal").classList.contains("hidden") || document.getElementById("resultModalTitle").textContent.includes("失败"))) {
     //   deleteButton.innerHTML = originalDeleteBtnHtml;
-    //   // 按钮的 disabled 状态会在 updateBatchActions 中处理，或者因页面刷新而重置
+    //   // The disabled state of the button will be handled in updateBatchActions, or reset due to page refresh
     // }
   }
 }
 
-// --- 结束：删除密钥相关功能 ---
+// --- End: Key deletion related functions ---
 
 function toggleKeyVisibility(button) {
   const keyContainer = button.closest(".flex.items-center.gap-1");
@@ -1865,18 +1865,18 @@ function toggleKeyVisibility(button) {
     keyTextSpan.textContent = fullKey;
     eyeIcon.classList.remove("fa-eye");
     eyeIcon.classList.add("fa-eye-slash");
-    button.title = "隐藏密钥";
+    button.title = "Hide Key";
   } else {
     keyTextSpan.textContent = maskedKey;
     eyeIcon.classList.remove("fa-eye-slash");
     eyeIcon.classList.add("fa-eye");
-    button.title = "显示密钥";
+    button.title = "Show Key";
   }
 }
 
-// --- API 调用详情模态框逻辑 ---
+// --- API call details modal logic ---
 
-// 显示 API 调用详情模态框
+// Show API call details modal
 async function showApiCallDetails(
   period,
   totalCalls,
@@ -1888,34 +1888,34 @@ async function showApiCallDetails(
   const titleElement = document.getElementById("apiCallDetailsModalTitle");
 
   if (!modal || !contentArea || !titleElement) {
-    console.error("无法找到 API 调用详情模态框元素");
-    showNotification("无法显示详情，页面元素缺失", "error");
+    console.error("Could not find API call details modal elements");
+    showNotification("Cannot show details, page elements are missing", "error");
     return;
   }
 
-  // 设置标题
+  // Set title
   let periodText = "";
   switch (period) {
     case "1m":
-      periodText = "最近 1 分钟";
+      periodText = "Last 1 minute";
       break;
     case "1h":
-      periodText = "最近 1 小时";
+      periodText = "Last 1 hour";
       break;
     case "24h":
-      periodText = "最近 24 小时";
+      periodText = "Last 24 hours";
       break;
     default:
-      periodText = "指定时间段";
+      periodText = "Specified time period";
   }
-  titleElement.textContent = `${periodText} API 调用详情`;
+  titleElement.textContent = `${periodText} API Call Details`;
 
-  // 显示模态框并设置加载状态
+  // Show modal and set loading state
   modal.classList.remove("hidden");
   contentArea.innerHTML = `
         <div class="text-center py-10">
              <i class="fas fa-spinner fa-spin text-primary-600 text-3xl"></i>
-             <p class="text-gray-500 mt-2">加载中...</p>
+             <p class="text-gray-500 mt-2">Loading...</p>
         </div>`;
 
   try {
@@ -1938,21 +1938,21 @@ async function showApiCallDetails(
       ); // Show empty state if no data
     }
   } catch (apiError) {
-    console.error("获取 API 调用详情失败:", apiError);
+    console.error("Failed to get API call details:", apiError);
     contentArea.innerHTML = `
             <div class="text-center py-10 text-danger-500">
                 <i class="fas fa-exclamation-triangle text-3xl"></i>
-                <p class="mt-2">加载失败: ${apiError.message}</p>
+                <p class="mt-2">Loading failed: ${apiError.message}</p>
             </div>`;
   }
 }
 
-// 获取并显示错误日志详情（通过日志ID）
+// Get and show error log details (by log ID)
 async function fetchAndShowErrorDetail(logId) {
   try {
     const detail = await fetchAPI(`/api/logs/errors/${logId}/details`);
     if (!detail) {
-      showResultModal(false, `未找到日志 ${logId}`, false);
+      showResultModal(false, `Log not found ${logId}`, false);
       return;
     }
     const container = document.createElement('div');
@@ -1960,13 +1960,13 @@ async function fetchAndShowErrorDetail(logId) {
     const basic = document.createElement('div');
     basic.innerHTML = `
       <div><span class="font-semibold">Key:</span> ${detail.gemini_key ? detail.gemini_key.substring(0,4)+'...'+detail.gemini_key.slice(-4) : 'N/A'}</div>
-      <div><span class="font-semibold">模型:</span> ${detail.model_name || 'N/A'}</div>
-      <div><span class="font-semibold">时间:</span> ${detail.request_time ? new Date(detail.request_time).toLocaleString() : 'N/A'}</div>
-      <div><span class="font-semibold">错误类型:</span> ${detail.error_type || 'N/A'}</div>
+      <div><span class="font-semibold">Model:</span> ${detail.model_name || 'N/A'}</div>
+      <div><span class="font-semibold">Time:</span> ${detail.request_time ? new Date(detail.request_time).toLocaleString() : 'N/A'}</div>
+      <div><span class="font-semibold">Error Type:</span> ${detail.error_type || 'N/A'}</div>
     `;
     const codeBlock = document.createElement('pre');
     codeBlock.className = 'bg-red-50 border border-red-200 rounded p-3 whitespace-pre-wrap break-words text-red-700';
-    codeBlock.textContent = detail.error_log || '无错误日志内容';
+    codeBlock.textContent = detail.error_log || 'No error log content';
     const reqBlock = document.createElement('pre');
     reqBlock.className = 'bg-gray-50 border border-gray-200 rounded p-3 whitespace-pre-wrap break-words';
     reqBlock.textContent = detail.request_msg || '';
@@ -1975,15 +1975,15 @@ async function fetchAndShowErrorDetail(logId) {
     if (detail.request_msg) container.appendChild(reqBlock);
     showResultModal(false, container, false);
   } catch (e) {
-    showResultModal(false, `加载日志详情失败: ${e.message}`, false);
+    showResultModal(false, `Failed to load log details: ${e.message}`, false);
   }
 }
 
-// 新增：根据 key / 状态码 / 时间窗口(±100秒) 查询并显示错误日志详情
+// Added: Query and show error log details by key / status code / time window (±100s)
 async function fetchAndShowErrorDetailByInfo(geminiKey, statusCode, timestampISO) {
   try {
     if (!geminiKey || !timestampISO) {
-      showResultModal(false, '缺少必要参数，无法查询错误详情', false);
+      showResultModal(false, 'Missing necessary parameters, cannot query error details', false);
       return;
     }
     const params = new URLSearchParams();
@@ -1995,7 +1995,7 @@ async function fetchAndShowErrorDetailByInfo(geminiKey, statusCode, timestampISO
     params.set('window_seconds', '100');
     const detail = await fetchAPI(`/api/logs/errors/lookup?${params.toString()}`);
     if (!detail) {
-      showResultModal(false, '未找到匹配的错误日志', false);
+      showResultModal(false, 'No matching error log found', false);
       return;
     }
     const container = document.createElement('div');
@@ -2003,14 +2003,14 @@ async function fetchAndShowErrorDetailByInfo(geminiKey, statusCode, timestampISO
     const basic = document.createElement('div');
     basic.innerHTML = `
       <div><span class="font-semibold">Key:</span> ${detail.gemini_key ? detail.gemini_key.substring(0,4)+'...'+detail.gemini_key.slice(-4) : 'N/A'}</div>
-      <div><span class="font-semibold">模型:</span> ${detail.model_name || 'N/A'}</div>
-      <div><span class="font-semibold">时间:</span> ${detail.request_time ? new Date(detail.request_time).toLocaleString() : 'N/A'}</div>
-      <div><span class="font-semibold">错误码:</span> ${detail.error_code ?? 'N/A'}</div>
-      <div><span class="font-semibold">错误类型:</span> ${detail.error_type || 'N/A'}</div>
+      <div><span class="font-semibold">Model:</span> ${detail.model_name || 'N/A'}</div>
+      <div><span class="font-semibold">Time:</span> ${detail.request_time ? new Date(detail.request_time).toLocaleString() : 'N/A'}</div>
+      <div><span class="font-semibold">Error Code:</span> ${detail.error_code ?? 'N/A'}</div>
+      <div><span class="font-semibold">Error Type:</span> ${detail.error_type || 'N/A'}</div>
     `;
     const codeBlock = document.createElement('pre');
     codeBlock.className = 'bg-red-50 border border-red-200 rounded p-3 whitespace-pre-wrap break-words text-red-700';
-    codeBlock.textContent = detail.error_log || '无错误日志内容';
+    codeBlock.textContent = detail.error_log || 'No error log content';
     const reqBlock = document.createElement('pre');
     reqBlock.className = 'bg-gray-50 border border-gray-200 rounded p-3 whitespace-pre-wrap break-words';
     reqBlock.textContent = detail.request_msg || '';
@@ -2019,11 +2019,11 @@ async function fetchAndShowErrorDetailByInfo(geminiKey, statusCode, timestampISO
     if (detail.request_msg) container.appendChild(reqBlock);
     showResultModal(false, container, false);
   } catch (e) {
-    showResultModal(false, `加载日志详情失败: ${e.message}`, false);
+    showResultModal(false, `Failed to load log details: ${e.message}`, false);
   }
 }
 
-// 关闭 API 调用详情模态框
+// Close API call details modal
 function closeApiCallDetailsModal() {
   const modal = document.getElementById("apiCallDetailsModal");
   if (modal) {
@@ -2031,7 +2031,7 @@ function closeApiCallDetailsModal() {
   }
 }
 
-// 渲染 API 调用详情到模态框
+// Render API call details to the modal
 function renderApiCallDetails(
   data,
   container,
@@ -2040,7 +2040,7 @@ function renderApiCallDetails(
   failureCalls
 ) {
   let summaryHtml = "";
-  // 只有在提供了这些统计数据时才显示概览
+  // Only show summary if these statistics are provided
   if (
     totalCalls !== undefined &&
     successCalls !== undefined &&
@@ -2058,10 +2058,10 @@ function renderApiCallDetails(
           <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 rounded-lg overflow-hidden">
             <thead class="bg-gray-50 dark:bg-gray-700/50">
               <tr>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">总计</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">成功</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">失败</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">成功率</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Success</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Failure</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Success Rate</th>
               </tr>
             </thead>
             <tbody class="bg-white dark:bg-gray-800">
@@ -2083,29 +2083,29 @@ function renderApiCallDetails(
       `
             <div class="text-center py-10 text-gray-500 dark:text-gray-400">
                 <i class="fas fa-info-circle text-3xl"></i>
-                <p class="mt-2">该时间段内没有 API 调用记录。</p>
+                <p class="mt-2">No API call records in this time period.</p>
             </div>`;
     return;
   }
 
-  // 创建表格
+  // Create table
   let tableHtml = `
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
-                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">时间</th>
-                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">密钥 (部分)</th>
-                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">模型</th>
-                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">状态码</th>
-                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">耗时(ms)</th>
-                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">状态</th>
-                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">详情</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Time</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Key (Partial)</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Model</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status Code</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Latency(ms)</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Details</th>
                 </tr>
             </thead>
             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
     `;
 
-  // 填充表格行
+  // Populate table rows
   data.forEach((call) => {
     const timestamp = new Date(call.timestamp).toLocaleString();
     const keyDisplay = call.key
@@ -2123,7 +2123,7 @@ function renderApiCallDetails(
 const detailsBtn =
       call.status === "failure"
         ? `<button class="px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-xs" onclick="fetchAndShowErrorDetailByInfo('${call.key}', ${call.status_code ?? 'null'}, '${call.timestamp}')">
-             <i class="fas fa-info-circle mr-1"></i>详情
+             <i class="fas fa-info-circle mr-1"></i>Details
            </button>`
         : "-";
 
@@ -2151,9 +2151,9 @@ const detailsBtn =
   container.innerHTML = summaryHtml + tableHtml; // Prepend summary
 }
 
-// --- 密钥使用详情模态框逻辑 ---
+// --- Key usage details modal logic ---
 
-// 显示密钥使用详情模态框
+// Show key usage details modal
 window.showKeyUsageDetails = async function (key) {
   const modal = document.getElementById("keyUsageDetailsModal");
   const contentArea = document.getElementById("keyUsageDetailsContent");
@@ -2162,17 +2162,17 @@ window.showKeyUsageDetails = async function (key) {
     key.substring(0, 4) + "..." + key.substring(key.length - 4);
 
   if (!modal || !contentArea || !titleElement) {
-    console.error("无法找到密钥使用详情模态框元素");
-    showNotification("无法显示详情，页面元素缺失", "error");
+    console.error("Could not find key usage details modal elements");
+    showNotification("Cannot show details, page elements are missing", "error");
     return;
   }
 
-  // 构建内容框架（时间范围按钮 + 图表 + 表格容器）
+  // Build content framework (time range buttons + chart + table container)
   const controlsHtml = `
     <div class="flex items-center gap-2 mb-3 text-xs">
-      <button id="keyBtn1h" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700">1小时</button>
-      <button id="keyBtn8h" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700">8小时</button>
-      <button id="keyBtn24h" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700">24小时</button>
+      <button id="keyBtn1h" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700">1 Hour</button>
+      <button id="keyBtn8h" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700">8 Hours</button>
+      <button id="keyBtn24h" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700">24 Hours</button>
     </div>
     <div class="h-48 mb-4">
       <canvas id="keyUsageChart"></canvas>
@@ -2180,10 +2180,10 @@ window.showKeyUsageDetails = async function (key) {
     <div id="keyUsageTable"></div>`;
   contentArea.innerHTML = controlsHtml;
 
-  // 设置标题
-  titleElement.textContent = `密钥 ${keyDisplay} - 请求详情`;
+  // Set title
+  titleElement.textContent = `Key ${keyDisplay} - Request Details`;
 
-  // 显示模态框
+  // Show modal
   modal.classList.remove("hidden");
 
   let keyUsageChart = null;
@@ -2200,7 +2200,7 @@ window.showKeyUsageDetails = async function (key) {
       container.innerHTML = `
                 <div class="text-center py-10 text-gray-500">
                     <i class="fas fa-info-circle text-3xl"></i>
-                    <p class="mt-2">该时间段内没有 API 调用记录。</p>
+                    <p class="mt-2">No API call records in this time period.</p>
                 </div>`;
       return;
     }
@@ -2208,12 +2208,12 @@ window.showKeyUsageDetails = async function (key) {
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">模型</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态码</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">耗时(ms)</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">详情</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Code</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latency(ms)</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">`;
@@ -2223,7 +2223,7 @@ window.showKeyUsageDetails = async function (key) {
       const statusIcon = row.status === 'success' ? 'fa-check-circle' : 'fa-times-circle';
       const detailsBtn = row.status === 'failure'
         ? `<button class="px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-xs" onclick="fetchAndShowErrorDetailByInfo('${row.key}', ${row.status_code ?? 'null'}, '${row.timestamp}')">
-             <i class="fas fa-info-circle mr-1"></i>详情
+             <i class="fas fa-info-circle mr-1"></i>Details
            </button>`
         : '-';
       tableHtml += `
@@ -2251,18 +2251,18 @@ window.showKeyUsageDetails = async function (key) {
       }
       renderKeyUsageTable(details || []);
     } catch (e) {
-      console.error('加载密钥期内详情失败:', e);
+      console.error('Failed to load key details for the period:', e);
       const tableContainer = document.getElementById('keyUsageTable');
       if (tableContainer) {
         tableContainer.innerHTML = `<div class="text-center py-10 text-danger-500">
                 <i class="fas fa-exclamation-triangle text-3xl"></i>
-                <p class="mt-2">加载失败: ${e.message}</p>
+                <p class="mt-2">Loading failed: ${e.message}</p>
             </div>`;
       }
     }
   }
 
-  // 绑定按钮事件与默认加载
+  // Bind button events and default load
   const btn1h = document.getElementById('keyBtn1h');
   const btn8h = document.getElementById('keyBtn8h');
   const btn24h = document.getElementById('keyBtn24h');
@@ -2285,7 +2285,7 @@ window.showKeyUsageDetails = async function (key) {
   renderForPeriod('1h');
 };
 
-// 关闭密钥使用详情模态框
+// Close key usage details modal
 window.closeKeyUsageDetailsModal = function () {
   const modal = document.getElementById("keyUsageDetailsModal");
   if (modal) {
@@ -2293,7 +2293,7 @@ window.closeKeyUsageDetailsModal = function () {
   }
 };
 
-// window.renderKeyUsageDetails 函数已被移入 showKeyUsageDetails 内部, 此处残留代码已删除。
+// window.renderKeyUsageDetails function has been moved inside showKeyUsageDetails, remaining code here has been deleted.
 
 // --- Key List Display & Pagination ---
 
@@ -2423,9 +2423,9 @@ function filterAndSearchValidKeys() {
     fetchAndDisplayKeys('valid', 1);
 }
 
-// --- 下拉菜单功能 ---
+// --- Dropdown Menu Functionality ---
 
-// 切换下拉菜单显示/隐藏
+// Toggle dropdown menu display/hide
 window.toggleDropdownMenu = function() {
   const dropdownMenu = document.getElementById('dropdownMenu');
   const isVisible = dropdownMenu.classList.contains('show');
@@ -2437,25 +2437,25 @@ window.toggleDropdownMenu = function() {
   }
 }
 
-// 显示下拉菜单
+// Show dropdown menu
 function showDropdownMenu() {
   const dropdownMenu = document.getElementById('dropdownMenu');
   dropdownMenu.classList.add('show');
   
-  // 点击其他地方时隐藏菜单
+  // Hide menu when clicking elsewhere
   document.addEventListener('click', handleOutsideClick);
 }
 
-// 隐藏下拉菜单
+// Hide dropdown menu
 function hideDropdownMenu() {
   const dropdownMenu = document.getElementById('dropdownMenu');
   dropdownMenu.classList.remove('show');
   
-  // 移除事件监听器
+  // Remove event listener
   document.removeEventListener('click', handleOutsideClick);
 }
 
-// 处理点击菜单外部区域
+// Handle clicks outside the menu area
 function handleOutsideClick(event) {
   const dropdownToggle = document.querySelector('.dropdown-toggle');
   if (!dropdownToggle.contains(event.target)) {
@@ -2463,84 +2463,84 @@ function handleOutsideClick(event) {
   }
 }
 
-// 复制全部密钥
+// Copy all keys
 async function copyAllKeys() {
   hideDropdownMenu();
   
   try {
-    // 获取所有密钥（有效和无效）
+    // Get all keys (valid and invalid)
     const response = await fetchAPI('/api/keys/all');
     
     const allKeys = [...response.valid_keys, ...response.invalid_keys];
     
     if (allKeys.length === 0) {
-      showNotification("没有找到任何密钥", "warning");
+      showNotification("No keys found", "warning");
       return;
     }
     
     const keysText = allKeys.join('\n');
     await copyToClipboard(keysText);
-    showNotification(`已成功复制 ${allKeys.length} 个密钥到剪贴板`);
+    showNotification(`Successfully copied ${allKeys.length} keys to clipboard`);
     
   } catch (error) {
-    console.error('复制全部密钥失败:', error);
-    showNotification(`复制失败: ${error.message}`, "error");
+    console.error('Failed to copy all keys:', error);
+    showNotification(`Copy failed: ${error.message}`, "error");
   }
 }
 
-// 验证所有密钥
+// Verify all keys
 window.verifyAllKeys = async function() {
   hideDropdownMenu();
   
   try {
-    // 获取所有密钥（有效和无效）
+    // Get all keys (valid and invalid)
     const response = await fetchAPI('/api/keys/all');
     
     const allKeys = [...response.valid_keys, ...response.invalid_keys];
     
     if (allKeys.length === 0) {
-      showNotification("没有找到任何密钥可验证", "warning");
+      showNotification("No keys found to verify", "warning");
       return;
     }
     
-    // 使用验证模态框显示确认对话框
+    // Use the verification modal to show a confirmation dialog
     showVerifyModalForAllKeys(allKeys);
     
   } catch (error) {
-    console.error('获取所有密钥失败:', error);
-    showNotification(`获取密钥失败: ${error.message}`, "error");
+    console.error('Failed to get all keys:', error);
+    showNotification(`Failed to get keys: ${error.message}`, "error");
   }
 }
 
-// 显示验证所有密钥的模态框
+// Show modal for verifying all keys
 function showVerifyModalForAllKeys(allKeys) {
   const modalElement = document.getElementById("verifyModal");
   const titleElement = document.getElementById("verifyModalTitle");
   const messageElement = document.getElementById("verifyModalMessage");
   const confirmButton = document.getElementById("confirmVerifyBtn");
   
-  titleElement.textContent = "批量验证所有密钥";
-  messageElement.textContent = `确定要验证所有 ${allKeys.length} 个密钥吗？此操作可能需要较长时间。`;
+  titleElement.textContent = "Bulk Verify All Keys";
+  messageElement.textContent = `Are you sure you want to verify all ${allKeys.length} keys? This operation may take a long time.`;
   confirmButton.disabled = false;
   
-  // 设置确认按钮事件
+  // Set confirm button event
   confirmButton.onclick = () => executeVerifyAllKeys(allKeys);
   
-  // 显示模态框
+  // Show modal
   modalElement.classList.remove("hidden");
 }
 
 
-// 执行验证所有密钥
+// Execute verification of all keys
 async function executeVerifyAllKeys(allKeys) {
   closeVerifyModal();
   
-  // 获取批次大小
+  // Get batch size
   const batchSizeInput = document.getElementById("batchSize");
   const batchSize = parseInt(batchSizeInput.value, 10) || 10;
   
-  // 开始批量验证
-  showProgressModal(`批量验证所有 ${allKeys.length} 个密钥`);
+  // Start bulk verification
+  showProgressModal(`Bulk verifying all ${allKeys.length} keys`);
   
   let allSuccessfulKeys = [];
   let allFailedKeys = {};
@@ -2548,10 +2548,10 @@ async function executeVerifyAllKeys(allKeys) {
   
   for (let i = 0; i < allKeys.length; i += batchSize) {
     const batch = allKeys.slice(i, i + batchSize);
-    const progressText = `正在验证批次 ${Math.floor(i / batchSize) + 1} / ${Math.ceil(allKeys.length / batchSize)} (密钥 ${i + 1}-${Math.min(i + batchSize, allKeys.length)})`;
+    const progressText = `Verifying batch ${Math.floor(i / batchSize) + 1} / ${Math.ceil(allKeys.length / batchSize)} (keys ${i + 1}-${Math.min(i + batchSize, allKeys.length)})`;
     
     updateProgress(i, allKeys.length, progressText);
-    addProgressLog(`处理批次: ${batch.length}个密钥...`);
+    addProgressLog(`Processing batch: ${batch.length} keys...`);
     
     try {
       const options = {
@@ -2564,18 +2564,18 @@ async function executeVerifyAllKeys(allKeys) {
       if (data) {
         if (data.successful_keys && data.successful_keys.length > 0) {
           allSuccessfulKeys = allSuccessfulKeys.concat(data.successful_keys);
-          addProgressLog(`✅ 批次成功: ${data.successful_keys.length} 个`);
+          addProgressLog(`✅ Batch success: ${data.successful_keys.length}`);
         }
         if (data.failed_keys && Object.keys(data.failed_keys).length > 0) {
           Object.assign(allFailedKeys, data.failed_keys);
-          addProgressLog(`❌ 批次失败: ${Object.keys(data.failed_keys).length} 个`, true);
+          addProgressLog(`❌ Batch failed: ${Object.keys(data.failed_keys).length}`, true);
         }
       } else {
-        addProgressLog(`- 批次返回空数据`, true);
+        addProgressLog(`- Batch returned empty data`, true);
       }
     } catch (apiError) {
-      addProgressLog(`❌ 批次请求失败: ${apiError.message}`, true);
-      // 将此批次的所有密钥标记为失败
+      addProgressLog(`❌ Batch request failed: ${apiError.message}`, true);
+      // Mark all keys in this batch as failed
       batch.forEach(key => {
         allFailedKeys[key] = apiError.message;
       });
@@ -2587,10 +2587,10 @@ async function executeVerifyAllKeys(allKeys) {
   updateProgress(
     allKeys.length,
     allKeys.length,
-    `所有批次验证完成！`
+    `All batches verification complete!`
   );
   
-  // 关闭进度模态框并显示最终结果
+  // Close progress modal and show final results
   closeProgressModal(false);
   showVerificationResultModal({
     successful_keys: allSuccessfulKeys,

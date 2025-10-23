@@ -1,5 +1,5 @@
 """
-配置服务模块
+Configuration service module
 """
 
 import datetime
@@ -26,7 +26,7 @@ logger = get_config_routes_logger()
 
 
 class ConfigService:
-    """配置服务类，用于管理应用程序配置"""
+    """Configuration service class for managing application configuration"""
 
     @staticmethod
     async def get_config() -> Dict[str, Any]:
@@ -39,7 +39,7 @@ class ConfigService:
                 setattr(settings, key, value)
                 logger.debug(f"Updated setting in memory: {key}")
 
-        # 获取现有设置
+        # Get existing settings
         existing_settings_raw: List[Dict[str, Any]] = await get_all_settings()
         existing_settings_map: Dict[str, Dict[str, Any]] = {
             s["key"]: s for s in existing_settings_raw
@@ -50,9 +50,9 @@ class ConfigService:
         settings_to_insert: List[Dict[str, Any]] = []
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
 
-        # 准备要更新或插入的数据
+        # Prepare data for update or insertion
         for key, value in config_data.items():
-            # 处理不同类型的值
+            # Handle different value types
             if isinstance(value, list):
                 db_value = json.dumps(value)
             elif isinstance(value, dict):
@@ -62,11 +62,11 @@ class ConfigService:
             else:
                 db_value = str(value)
 
-            # 仅当值发生变化时才更新
+            # Only update if the value has changed
             if key in existing_keys and existing_settings_map[key]["value"] == db_value:
                 continue
 
-            description = f"{key}配置项"
+            description = f"{key} configuration item"
 
             data = {
                 "key": key,
@@ -84,7 +84,7 @@ class ConfigService:
                 data["created_at"] = now
                 settings_to_insert.append(data)
 
-        # 在事务中执行批量插入和更新
+        # Execute bulk insert and update in a transaction
         if settings_to_insert or settings_to_update:
             try:
                 async with database.transaction():
@@ -112,7 +112,7 @@ class ConfigService:
                 logger.error(f"Failed to bulk update/insert settings: {str(e)}")
                 raise
 
-        # 重置并重新初始化 KeyManager
+        # Reset and reinitialize KeyManager
         try:
             await reset_key_manager_instance()
             await get_key_manager_instance(settings.API_KEYS, settings.VERTEX_API_KEYS)
@@ -124,30 +124,30 @@ class ConfigService:
 
     @staticmethod
     async def delete_key(key_to_delete: str) -> Dict[str, Any]:
-        """删除单个API密钥"""
-        # 确保 settings.API_KEYS 是一个列表
+        """Delete a single API key"""
+        # Ensure settings.API_KEYS is a list
         if not isinstance(settings.API_KEYS, list):
             settings.API_KEYS = []
 
         original_keys_count = len(settings.API_KEYS)
-        # 创建一个不包含待删除密钥的新列表
+        # Create a new list without the key to be deleted
         updated_api_keys = [k for k in settings.API_KEYS if k != key_to_delete]
 
         if len(updated_api_keys) < original_keys_count:
-            # 密钥已找到并从列表中移除
-            settings.API_KEYS = updated_api_keys  # 首先更新内存中的 settings
-            # 使用 update_config 持久化更改，它同时处理数据库和 KeyManager
+            # The key was found and removed from the list
+            settings.API_KEYS = updated_api_keys  # First, update the settings in memory
+            # Use update_config to persist the changes, it handles both the database and KeyManager
             await ConfigService.update_config({"API_KEYS": settings.API_KEYS})
-            logger.info(f"密钥 '{key_to_delete}' 已成功删除。")
-            return {"success": True, "message": f"密钥 '{key_to_delete}' 已成功删除。"}
+            logger.info(f"Key '{key_to_delete}' has been successfully deleted.")
+            return {"success": True, "message": f"Key '{key_to_delete}' has been successfully deleted."}
         else:
-            # 未找到密钥
-            logger.warning(f"尝试删除密钥 '{key_to_delete}'，但未找到该密钥。")
-            return {"success": False, "message": f"未找到密钥 '{key_to_delete}'。"}
+            # The key was not found
+            logger.warning(f"Attempted to delete key '{key_to_delete}', but it was not found.")
+            return {"success": False, "message": f"Key '{key_to_delete}' not found."}
 
     @staticmethod
     async def delete_selected_keys(keys_to_delete: List[str]) -> Dict[str, Any]:
-        """批量删除选定的API密钥"""
+        """Bulk delete selected API keys"""
         if not isinstance(settings.API_KEYS, list):
             settings.API_KEYS = []
 
@@ -169,11 +169,11 @@ class ConfigService:
             settings.API_KEYS = current_api_keys
             await ConfigService.update_config({"API_KEYS": settings.API_KEYS})
             logger.info(
-                f"成功删除 {deleted_count} 个密钥。密钥: {keys_actually_removed}"
+                f"Successfully deleted {deleted_count} keys. Keys: {keys_actually_removed}"
             )
-            message = f"成功删除 {deleted_count} 个密钥。"
+            message = f"Successfully deleted {deleted_count} keys."
             if not_found_keys:
-                message += f" {len(not_found_keys)} 个密钥未找到: {not_found_keys}。"
+                message += f" {len(not_found_keys)} keys not found: {not_found_keys}."
             return {
                 "success": True,
                 "message": message,
@@ -181,11 +181,11 @@ class ConfigService:
                 "not_found_keys": not_found_keys,
             }
         else:
-            message = "没有密钥被删除。"
+            message = "No keys were deleted."
             if not_found_keys:
-                message = f"所有 {len(not_found_keys)} 个指定的密钥均未找到: {not_found_keys}。"
+                message = f"All {len(not_found_keys)} specified keys were not found: {not_found_keys}."
             elif not keys_to_delete:
-                message = "未指定要删除的密钥。"
+                message = "No keys were specified for deletion."
             logger.warning(message)
             return {
                 "success": False,
@@ -197,35 +197,35 @@ class ConfigService:
     @staticmethod
     async def reset_config() -> Dict[str, Any]:
         """
-        重置配置：优先从系统环境变量加载，然后从 .env 文件加载，
-        更新内存中的 settings 对象，并刷新 KeyManager。
+        Reset the configuration: load from system environment variables first, then from the .env file,
+        update the in-memory settings object, and refresh the KeyManager.
 
         Returns:
-            Dict[str, Any]: 重置后的配置字典
+            Dict[str, Any]: The reset configuration dictionary
         """
-        # 1. 重新加载配置对象，它应该处理环境变量和 .env 的优先级
+        # 1. Reload the configuration object, it should handle the priority of environment variables and .env
         _reload_settings()
         logger.info(
             "Settings object reloaded, prioritizing system environment variables then .env file."
         )
 
-        # 2. 重置并重新初始化 KeyManager
+        # 2. Reset and reinitialize KeyManager
         try:
             await reset_key_manager_instance()
-            # 确保使用更新后的 settings 中的 API_KEYS
+            # Ensure to use the API_KEYS from the updated settings
             await get_key_manager_instance(settings.API_KEYS)
             logger.info("KeyManager instance re-initialized with reloaded settings.")
         except Exception as e:
             logger.error(f"Failed to re-initialize KeyManager during reset: {str(e)}")
-            # 根据需要决定是否抛出异常或继续
-            # 这里选择记录错误并继续
+            # Decide whether to raise an exception or continue based on requirements
+            # Here, we choose to log the error and continue
 
-        # 3. 返回更新后的配置
+        # 3. Return the updated configuration
         return await ConfigService.get_config()
 
     @staticmethod
     async def fetch_ui_models() -> List[Dict[str, Any]]:
-        """获取用于UI显示的模型列表"""
+        """Get the list of models for UI display"""
         try:
             key_manager = await get_key_manager_instance()
             model_service = ModelService()
@@ -251,11 +251,11 @@ class ConfigService:
             )
 
 
-# 重新加载配置的函数
+# Function to reload the configuration
 def _reload_settings():
-    """重新加载环境变量并更新配置"""
-    # 显式加载 .env 文件，覆盖现有环境变量
+    """Reload environment variables and update the configuration"""
+    # Explicitly load the .env file, overriding existing environment variables
     load_dotenv(find_dotenv(), override=True)
-    # 更新现有 settings 对象的属性，而不是新建实例
+    # Update the attributes of the existing settings object instead of creating a new instance
     for key, value in ConfigSettings().model_dump().items():
         setattr(settings, key, value)

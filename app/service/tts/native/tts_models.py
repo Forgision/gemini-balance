@@ -1,6 +1,6 @@
 """
-原生Gemini TTS扩展数据模型
-继承自原始模型，添加原生Gemini TTS相关字段，保持向后兼容
+Native Gemini TTS extension data models
+Inherits from original models, adding native Gemini TTS-related fields while maintaining backward compatibility
 """
 
 from typing import Any, Dict, List, Optional
@@ -11,26 +11,26 @@ from app.domain.gemini_models import GenerationConfig as BaseGenerationConfig
 
 class TTSGenerationConfig(BaseGenerationConfig):
     """
-    支持TTS的生成配置类
-    继承自原始的GenerationConfig，添加TTS相关字段
+    Generation configuration class with TTS support
+    Inherits from the original GenerationConfig, adding TTS-related fields
     """
-    # TTS 相关配置
+    # TTS-related configuration
     responseModalities: Optional[List[str]] = None
     speechConfig: Optional[Dict[str, Any]] = None
 
 
 class MultiSpeakerVoiceConfig(BaseModel):
-    """多人语音配置"""
+    """Multi-speaker voice configuration"""
     speakerVoiceConfigs: List[Dict[str, Any]]
 
 
 class SpeechConfig(BaseModel):
-    """语音配置"""
+    """Speech configuration"""
     multiSpeakerVoiceConfig: Optional[MultiSpeakerVoiceConfig] = None
     voiceConfig: Optional[Dict[str, Any]] = None
 
 
 class TTSRequest(BaseModel):
-    """TTS请求模型"""
+    """TTS request model"""
     contents: List[Dict[str, Any]]
     generationConfig: TTSGenerationConfig

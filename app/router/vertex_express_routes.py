@@ -23,17 +23,17 @@ model_service = ModelService()
 
 
 async def get_key_manager():
-    """获取密钥管理器实例"""
+    """Get the key manager instance."""
     return await get_key_manager_instance()
 
 
 async def get_next_working_key(key_manager: KeyManager = Depends(get_key_manager)):
-    """获取下一个可用的API密钥"""
+    """Get the next available API key."""
     return await key_manager.get_next_working_vertex_key()
 
 
 async def get_chat_service(key_manager: KeyManager = Depends(get_key_manager)):
-    """获取Gemini聊天服务实例"""
+    """Get the Gemini chat service instance."""
     return GeminiChatService(settings.VERTEX_EXPRESS_BASE_URL, key_manager)
 
 
@@ -42,7 +42,7 @@ async def list_models(
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
     key_manager: KeyManager = Depends(get_key_manager),
 ):
-    """获取可用的 Gemini 模型列表，并根据配置添加衍生模型（搜索、图像、非思考）。"""
+    """Get the list of available Gemini models and add derived models (search, image, non-thinking) based on configuration."""
     operation_name = "list_gemini_models"
     logger.info("-" * 50 + operation_name + "-" * 50)
     logger.info("Handling Gemini models list request")
@@ -114,7 +114,7 @@ async def generate_content(
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
 ):
-    """处理 Gemini 非流式内容生成请求。"""
+    """Handles Gemini non-streaming content generation requests."""
     operation_name = "gemini_generate_content"
     async with handle_route_errors(
         logger, operation_name, failure_message="Content generation failed"
@@ -147,7 +147,7 @@ async def stream_generate_content(
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
 ):
-    """处理 Gemini 流式内容生成请求。"""
+    """Handles Gemini streaming content generation requests."""
     operation_name = "gemini_stream_generate_content"
     async with handle_route_errors(
         logger, operation_name, failure_message="Streaming request initiation failed"
@@ -168,19 +168,19 @@ async def stream_generate_content(
             model=model_name, request=request, api_key=api_key
         )
         try:
-            # 尝试获取第一条数据，判断是正常 SSE（data: 前缀）还是错误 JSON
+            # Try to get the first piece of data to determine if it's a normal SSE (data: prefix) or an error JSON
             first_chunk = await raw_stream.__anext__()
         except StopAsyncIteration:
-            # 如果流直接结束，退回标准 SSE 输出
+            # If the stream ends directly, return standard SSE output
             return StreamingResponse(raw_stream, media_type="text/event-stream")
         except Exception as e:
-            # 初始化流异常，直接返回 500 错误
+            # If stream initialization fails, return a 500 error directly
             return JSONResponse(
                 content={"error": {"code": e.args[0], "message": e.args[1]}},
                 status_code=e.args[0],
             )
 
-        # 如果以 "data:" 开头，代表正常 SSE，将首块和后续块一起发送
+        # If it starts with "data:", it's a normal SSE, send the first chunk and subsequent chunks together
         if isinstance(first_chunk, str) and first_chunk.startswith("data:"):
 
             async def combined():

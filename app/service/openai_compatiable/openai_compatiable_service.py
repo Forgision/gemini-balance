@@ -31,11 +31,11 @@ class OpenAICompatiableService:
         request: ChatRequest,
         api_key: str,
     ) -> Union[Dict[str, Any], AsyncGenerator[str, None]]:
-        """创建聊天完成"""
+        """Create chat completion"""
         request_dict = request.model_dump()
-        # 移除值为null的
+        # Remove null values
         request_dict = {k: v for k, v in request_dict.items() if v is not None}
-        del request_dict["top_k"]  # 删除top_k参数，目前不支持该参数
+        del request_dict["top_k"]  # Delete the top_k parameter, as it is not currently supported
         if request.stream:
             return self._handle_stream_completion(request.model, request_dict, api_key)
         return await self._handle_normal_completion(
@@ -46,9 +46,9 @@ class OpenAICompatiableService:
         self,
         request: ImageGenerationRequest,
     ) -> Dict[str, Any]:
-        """生成图片"""
+        """Generate images"""
         request_dict = request.model_dump()
-        # 移除值为null的
+        # Remove null values
         request_dict = {k: v for k, v in request_dict.items() if v is not None}
         api_key = settings.PAID_KEY
         return await self.api_client.generate_images(request_dict, api_key)
@@ -59,13 +59,13 @@ class OpenAICompatiableService:
         model: str,
         api_key: str,
     ) -> Dict[str, Any]:
-        """创建嵌入"""
+        """Create embeddings"""
         return await self.api_client.create_embeddings(input_text, model, api_key)
 
     async def _handle_normal_completion(
         self, model: str, request: dict, api_key: str
     ) -> Dict[str, Any]:
-        """处理普通聊天完成"""
+        """Handle normal chat completion"""
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()
         is_success = False
@@ -106,7 +106,7 @@ class OpenAICompatiableService:
     async def _handle_stream_completion(
         self, model: str, payload: dict, api_key: str
     ) -> AsyncGenerator[str, None]:
-        """处理流式聊天完成，添加重试逻辑"""
+        """Handle streaming chat completion, adding retry logic"""
         retries = 0
         max_retries = settings.MAX_RETRIES
         is_success = False

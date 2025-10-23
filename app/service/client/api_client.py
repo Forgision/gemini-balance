@@ -14,7 +14,7 @@ logger = get_api_client_logger()
 
 
 class ApiClient(ABC):
-    """API客户端基类"""
+    """API client base class"""
 
     @abstractmethod
     async def generate_content(
@@ -30,7 +30,7 @@ class ApiClient(ABC):
 
 
 class GeminiApiClient(ApiClient):
-    """Gemini API客户端"""
+    """Gemini API client"""
 
     def __init__(self, base_url: str, timeout: int = DEFAULT_TIMEOUT):
         self.base_url = base_url
@@ -55,7 +55,7 @@ class GeminiApiClient(ApiClient):
         return headers
 
     async def get_models(self, api_key: str) -> Optional[Dict[str, Any]]:
-        """获取可用的 Gemini 模型列表"""
+        """Get the list of available Gemini models"""
         timeout = httpx.Timeout(timeout=5)
 
         proxy_to_use = None
@@ -74,11 +74,11 @@ class GeminiApiClient(ApiClient):
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
-                logger.error(f"获取模型列表失败: {e.response.status_code}")
+                logger.error(f"Failed to get model list: {e.response.status_code}")
                 logger.error(e.response.text)
                 return None
             except httpx.RequestError as e:
-                logger.error(f"请求模型列表失败: {e}")
+                logger.error(f"Failed to request model list: {e}")
                 return None
 
     async def generate_content(
@@ -109,7 +109,7 @@ class GeminiApiClient(ApiClient):
                 raise Exception(response.status_code, error_content)
             response_data = response.json()
 
-            # 检查响应结构的基本信息
+            # Check the basic information of the response structure
             if not response_data.get("candidates"):
                 logger.warning("No candidates found in API response")
 
@@ -168,7 +168,7 @@ class GeminiApiClient(ApiClient):
     async def embed_content(
         self, payload: Dict[str, Any], model: str, api_key: str
     ) -> Dict[str, Any]:
-        """单一嵌入内容生成"""
+        """Generate single embedding content"""
         timeout = httpx.Timeout(self.timeout, read=self.timeout)
         model = self._get_real_model(model)
 
@@ -195,7 +195,7 @@ class GeminiApiClient(ApiClient):
     async def batch_embed_contents(
         self, payload: Dict[str, Any], model: str, api_key: str
     ) -> Dict[str, Any]:
-        """批量嵌入内容生成"""
+        """Generate batch embedding content"""
         timeout = httpx.Timeout(self.timeout, read=self.timeout)
         model = self._get_real_model(model)
 
@@ -221,7 +221,7 @@ class GeminiApiClient(ApiClient):
 
 
 class OpenaiApiClient(ApiClient):
-    """OpenAI API客户端"""
+    """OpenAI API client"""
 
     def __init__(self, base_url: str, timeout: int = DEFAULT_TIMEOUT):
         self.base_url = base_url

@@ -4,17 +4,17 @@ import re
 import sys
 from typing import Dict, Optional
 
-# ANSI转义序列颜色代码
+# ANSI escape sequence color codes
 COLORS = {
-    "DEBUG": "\033[34m",  # 蓝色
-    "INFO": "\033[32m",  # 绿色
-    "WARNING": "\033[33m",  # 黄色
-    "ERROR": "\033[31m",  # 红色
-    "CRITICAL": "\033[1;31m",  # 红色加粗
+    "DEBUG": "\033[34m",  # Blue
+    "INFO": "\033[32m",  # Green
+    "WARNING": "\033[33m",  # Yellow
+    "ERROR": "\033[31m",  # Red
+    "CRITICAL": "\033[1;31m",  # Red bold
 }
 
 
-# Windows系统启用ANSI支持
+# Enable ANSI support on Windows systems
 if platform.system() == "Windows":
     import ctypes
 
@@ -24,15 +24,15 @@ if platform.system() == "Windows":
 
 class ColoredFormatter(logging.Formatter):
     """
-    自定义的日志格式化器,添加颜色支持
+    Custom log formatter, adds color support
     """
 
     def format(self, record):
-        # 获取对应级别的颜色代码
+        # Get the color code for the corresponding level
         color = COLORS.get(record.levelname, "")
-        # 添加颜色代码和重置代码
+        # Add color code and reset code
         record.levelname = f"{color}{record.levelname}\033[0m"
-        # 创建包含文件名和行号的固定宽度字符串
+        # Create a fixed-width string containing the file name and line number
         record.fileloc = f"[{record.filename}:{record.lineno}]"
         return super().format(record)
 
@@ -104,12 +104,12 @@ def redact_key_for_logging(key: str) -> str:
         return f"{key[:6]}...{key[-6:]}"
 
 
-# 日志格式 - 使用 fileloc 并设置固定宽度 (例如 30)
+# Log format - use fileloc and set a fixed width (e.g., 30)
 FORMATTER = ColoredFormatter(
     "%(asctime)s | %(levelname)-17s | %(fileloc)-30s | %(message)s"
 )
 
-# 日志级别映射
+# Log level mapping
 LOG_LEVELS = {
     "debug": logging.DEBUG,
     "info": logging.INFO,
@@ -128,19 +128,19 @@ class Logger:
     @staticmethod
     def setup_logger(name: str) -> logging.Logger:
         """
-        设置并获取logger
-        :param name: logger名称
-        :return: logger实例
+        Set up and get a logger
+        :param name: logger name
+        :return: logger instance
         """
-        # 导入 settings 对象
+        # Import the settings object
         from app.config.config import settings
 
-        # 从全局配置获取日志级别
+        # Get the log level from the global configuration
         log_level_str = settings.LOG_LEVEL.lower()
         level = LOG_LEVELS.get(log_level_str, logging.INFO)
 
         if name in Logger._loggers:
-            # 如果 logger 已存在，检查并更新其级别（如果需要）
+            # If the logger already exists, check and update its level (if necessary)
             existing_logger = Logger._loggers[name]
             if existing_logger.level != level:
                 existing_logger.setLevel(level)
@@ -150,7 +150,7 @@ class Logger:
         logger.setLevel(level)
         logger.propagate = False
 
-        # 添加控制台输出
+        # Add console output
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(FORMATTER)
         logger.addHandler(console_handler)
@@ -161,16 +161,16 @@ class Logger:
     @staticmethod
     def get_logger(name: str) -> Optional[logging.Logger]:
         """
-        获取已存在的logger
-        :param name: logger名称
-        :return: logger实例或None
+        Get an existing logger
+        :param name: logger name
+        :return: logger instance or None
         """
         return Logger._loggers.get(name)
 
     @staticmethod
     def update_log_levels(log_level: str):
         """
-        根据当前的全局配置更新所有已创建 logger 的日志级别。
+        Update the log level of all created loggers based on the current global configuration.
         """
         log_level_str = log_level.lower()
         new_level = LOG_LEVELS.get(log_level_str, logging.INFO)
@@ -179,12 +179,12 @@ class Logger:
         for logger_name, logger_instance in Logger._loggers.items():
             if logger_instance.level != new_level:
                 logger_instance.setLevel(new_level)
-                # 可选：记录级别变更日志，但注意避免在日志模块内部产生过多日志
+                # Optional: log level change log, but be careful to avoid generating too much log inside the log module
                 # print(f"Updated log level for logger '{logger_name}' to {log_level_str.upper()}")
                 updated_count += 1
 
 
-# 预定义的loggers
+# Predefined loggers
 def get_openai_logger():
     return Logger.setup_logger("openai")
 

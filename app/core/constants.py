@@ -1,13 +1,13 @@
 """
-常量定义模块
+Constants definition module
 """
 
-# API相关常量
+# API related constants
 API_VERSION = "v1beta"
-DEFAULT_TIMEOUT = 300  # 秒
-MAX_RETRIES = 3  # 最大重试次数
+DEFAULT_TIMEOUT = 300  # seconds
+MAX_RETRIES = 3  # Maximum number of retries
 
-# 模型相关常量
+# Model related constants
 SUPPORTED_ROLES = ["user", "model", "system"]
 DEFAULT_MODEL = "gemini-2.5-flash-lite"
 DEFAULT_TEMPERATURE = 0.7
@@ -23,21 +23,21 @@ DEFAULT_FILTER_MODELS = [
 ]
 DEFAULT_CREATE_IMAGE_MODEL = "imagen-3.0-generate-002"
 
-# 图像生成相关常量
+# Image generation related constants
 VALID_IMAGE_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"]
 
-# 上传提供商
+# Upload providers
 UPLOAD_PROVIDERS = ["smms", "picgo", "cloudflare_imgbed", "aliyun_oss"]
 DEFAULT_UPLOAD_PROVIDER = "smms"
 
-# 流式输出相关常量
+# Streaming output related constants
 DEFAULT_STREAM_MIN_DELAY = 0.016
 DEFAULT_STREAM_MAX_DELAY = 0.024
 DEFAULT_STREAM_SHORT_TEXT_THRESHOLD = 10
 DEFAULT_STREAM_LONG_TEXT_THRESHOLD = 50
 DEFAULT_STREAM_CHUNK_SIZE = 5
 
-# 正则表达式模式
+# Regular expression patterns
 IMAGE_URL_PATTERN = r"!\[(.*?)\]\((.*?)\)"
 DATA_URL_PATTERN = r"data:([^;]+);base64,(.+)"
 

@@ -1,5 +1,5 @@
 """
-Files API 路由
+Files API routes
 """
 from typing import Optional
 from fastapi import APIRouter, Request, Query, Depends, Header, HTTPException
@@ -32,10 +32,10 @@ async def upload_file_init(
     x_goog_upload_header_content_length: Optional[str] = Header(None),
     x_goog_upload_header_content_type: Optional[str] = Header(None),
 ):
-    """初始化文件上传"""
+    """Initialize file upload"""
     logger.debug(f"Upload file request: {request.method=}, {request.url=}, {auth_token=}, {x_goog_upload_protocol=}, {x_goog_upload_command=}, {x_goog_upload_header_content_length=}, {x_goog_upload_header_content_type=}")
     
-    # 檢查是否是實際的上傳請求（有 upload_id）
+    # Check if it is an actual upload request (with upload_id)
     if request.query_params.get("upload_id") and x_goog_upload_command in ["upload", "upload, finalize"]:
         logger.debug("This is an upload request, not initialization. Redirecting to handle_upload.")
         return await handle_upload(
@@ -46,16 +46,16 @@ async def upload_file_init(
         )
     
     try:
-        # 使用认证 token 作为 user_token
+        # Use the authentication token as user_token
         user_token = auth_token
-        # 获取请求体
+        # Get the request body
         body = await request.body()
         
-        # 构建请求主机 URL
+        # Build the request host URL
         request_host = f"{request.url.scheme}://{request.url.netloc}"
         logger.info(f"Request host: {request_host}")
         
-        # 准备请求头
+        # Prepare request headers
         headers = {
             "x-goog-upload-protocol": x_goog_upload_protocol or "resumable",
             "x-goog-upload-command": x_goog_upload_command or "start",
@@ -66,20 +66,20 @@ async def upload_file_init(
         if x_goog_upload_header_content_type:
             headers["x-goog-upload-header-content-type"] = x_goog_upload_header_content_type
         
-        # 调用服务
+        # Call the service
         files_service = await get_files_service()
         response_data, response_headers = await files_service.initialize_upload(
             headers=headers,
             body=body,
             user_token=user_token,
-            request_host=request_host  # 傳遞請求主機
+            request_host=request_host  # Pass the request host
         )
 
         logger.info(f"Upload initialization response: {response_data}")
         logger.info(f"Upload initialization response headers: {response_headers}")
         
         logger.info(f"Upload initialization response headers: {response_data}")
-        # 返回响应
+        # Return the response
         return JSONResponse(
             content=response_data,
             headers=response_headers
@@ -101,16 +101,16 @@ async def upload_file_init(
 
 @router.get("/v1beta/files")
 async def list_files(
-    page_size: int = Query(10, ge=1, le=100, description="每页大小", alias="pageSize"),
-    page_token: Optional[str] = Query(None, description="分页标记", alias="pageToken"),
+    page_size: int = Query(10, ge=1, le=100, description="Page size", alias="pageSize"),
+    page_token: Optional[str] = Query(None, description="Page token", alias="pageToken"),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> ListFilesResponse:
-    """列出文件"""
+    """List files"""
     logger.debug(f"List files: {page_size=}, {page_token=}, {auth_token=}")
     try:
-        # 使用认证 token 作为 user_token（如果启用用户隔离）
+        # Use the authentication token as user_token (if user isolation is enabled)
         user_token = auth_token if settings.FILES_USER_ISOLATION_ENABLED else None
-        # 调用服务
+        # Call the service
         files_service = await get_files_service()
         return await files_service.list_files(
             page_size=page_size,
@@ -137,12 +137,12 @@ async def get_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> FileMetadata:
-    """获取文件信息"""
+    """Get file information"""
     logger.debug(f"Get file request: {file_id=}, {auth_token=}")
     try:
-        # 使用认证 token 作为 user_token
+        # Use the authentication token as user_token
         user_token = auth_token
-        # 调用服务
+        # Call the service
         files_service = await get_files_service()
         return await files_service.get_file(f"files/{file_id}", user_token)
         
@@ -165,12 +165,12 @@ async def delete_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> DeleteFileResponse:
-    """删除文件"""
+    """Delete file"""
     logger.info(f"Delete file: {file_id=}, {auth_token=}")
     try:
-        # 使用认证 token 作为 user_token
+        # Use the authentication token as user_token
         user_token = auth_token
-        # 调用服务
+        # Call the service
         files_service = await get_files_service()
         success = await files_service.delete_file(f"files/{file_id}", user_token)
         
@@ -193,24 +193,24 @@ async def delete_file(
         )
 
 
-# 处理上传请求的通配符路由
+# Wildcard route for handling upload requests
 @router.api_route("/upload/{upload_path:path}", methods=["GET", "POST", "PUT"])
 async def handle_upload(
     upload_path: str,
     request: Request,
-    key: Optional[str] = Query(None),  # 從查詢參數獲取 key
+    key: Optional[str] = Query(None),  # Get key from query parameters
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ):
-    """处理文件上传请求"""
+    """Handle file upload requests"""
     try:
         logger.info(f"Handling upload request: {request.method} {upload_path}, key={redact_key_for_logging(key)}")
         
-        # 從查詢參數獲取 upload_id
+        # Get upload_id from query parameters
         upload_id = request.query_params.get("upload_id")
         if not upload_id:
             raise HTTPException(status_code=400, detail="Missing upload_id")
         
-        # 從 session 獲取真實的 API key
+        # Get the real API key from the session
         files_service = await get_files_service()
         session_info = await files_service.get_upload_session(upload_id)
         if not session_info:
@@ -220,12 +220,12 @@ async def handle_upload(
         real_api_key = session_info["api_key"]
         original_upload_url = session_info["upload_url"]
         
-        # 使用真實的 API key 構建完整的 Google 上傳 URL
-        # 保留原始 URL 的所有參數，但使用真實的 API key
+        # Use the real API key to build the complete Google upload URL
+        # Keep all parameters of the original URL, but use the real API key
         upload_url = original_upload_url
         logger.info(f"Using real API key for upload: {redact_key_for_logging(real_api_key)}")
         
-        # 代理上传请求
+        # Proxy the upload request
         upload_handler = get_upload_handler()
         return await upload_handler.proxy_upload_request(
             request=request,
@@ -247,7 +247,7 @@ async def handle_upload(
         )
 
 
-# 为兼容性添加 /gemini 前缀的路由
+# Add /gemini prefix route for compatibility
 @router.post("/gemini/upload/v1beta/files")
 async def gemini_upload_file_init(
     request: Request,
@@ -257,7 +257,7 @@ async def gemini_upload_file_init(
     x_goog_upload_header_content_length: Optional[str] = Header(None),
     x_goog_upload_header_content_type: Optional[str] = Header(None),
 ):
-    """初始化文件上传（Gemini 前缀）"""
+    """Initialize file upload (Gemini prefix)"""
     return await upload_file_init(
         request,
         auth_token,
@@ -274,7 +274,7 @@ async def gemini_list_files(
     page_token: Optional[str] = Query(None, alias="pageToken"),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> ListFilesResponse:
-    """列出文件（Gemini 前缀）"""
+    """List files (Gemini prefix)"""
     return await list_files(page_size, page_token, auth_token)
 
 
@@ -283,7 +283,7 @@ async def gemini_get_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> FileMetadata:
-    """获取文件信息（Gemini 前缀）"""
+    """Get file information (Gemini prefix)"""
     return await get_file(file_id, auth_token)
 
 
@@ -292,5 +292,5 @@ async def gemini_delete_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> DeleteFileResponse:
-    """删除文件（Gemini 前缀）"""
+    """Delete file (Gemini prefix)"""
     return await delete_file(file_id, auth_token)

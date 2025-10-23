@@ -1,6 +1,6 @@
 """
-TTS扩展配置
-控制是否启用TTS功能
+TTS Extension Configuration
+Controls whether to enable TTS functionality
 """
 
 import os
@@ -10,20 +10,20 @@ from app.service.tts.native.tts_chat_service import TTSGeminiChatService
 
 
 class TTSConfig:
-    """TTS配置管理"""
+    """TTS Configuration Management"""
     
     @staticmethod
     def is_tts_enabled() -> bool:
         """
-        检查是否启用TTS功能
-        通过环境变量 ENABLE_TTS 控制，默认为 False
+        Check if TTS functionality is enabled
+        Controlled by the environment variable ENABLE_TTS, defaults to False
         """
         return os.getenv("ENABLE_TTS", "false").lower() in ("true", "1", "yes", "on")
     
     @staticmethod
     def get_chat_service(base_url: str, key_manager) -> Union[GeminiChatService, TTSGeminiChatService]:
         """
-        工厂方法：根据配置返回合适的聊天服务
+        Factory method: returns the appropriate chat service based on the configuration
         """
         if TTSConfig.is_tts_enabled():
             return TTSGeminiChatService(base_url, key_manager)
@@ -31,7 +31,7 @@ class TTSConfig:
             return GeminiChatService(base_url, key_manager)
 
 
-# 便捷函数
+# Convenience function
 def create_chat_service(base_url: str, key_manager) -> Union[GeminiChatService, TTSGeminiChatService]:
-    """创建聊天服务实例"""
+    """Create a chat service instance"""
     return TTSConfig.get_chat_service(base_url, key_manager)
