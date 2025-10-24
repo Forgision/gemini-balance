@@ -36,7 +36,7 @@ class FilesService:
         """Get KeyManager instance"""
         if not self.key_manager:
             self.key_manager = await get_key_manager_instance(
-                settings.GEMINI_API_KEYS, settings.VERTEX_API_KEYS
+                settings.API_KEYS, settings.VERTEX_API_KEYS
             )
         return self.key_manager
 

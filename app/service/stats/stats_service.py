@@ -36,15 +36,13 @@ class StatsService:
                 func.sum(
                     case(
                         (
-                            (
-                                or_(
-                                    RequestLog.status_code < 200,
-                                    RequestLog.status_code >= 300,
-                                ),
-                                1,
+                            or_(
+                                RequestLog.status_code < 200,
+                                RequestLog.status_code >= 300,
                             ),
-                            (RequestLog.status_code.is_(None), 1),
+                            1,
                         ),
+                        (RequestLog.status_code.is_(None), 1),
                         else_=0,
                     )
                 ).label("failure"),
@@ -93,15 +91,13 @@ class StatsService:
                 func.sum(
                     case(
                         (
-                            (
-                                or_(
-                                    RequestLog.status_code < 200,
-                                    RequestLog.status_code >= 300,
-                                ),
-                                1,
+                            or_(
+                                RequestLog.status_code < 200,
+                                RequestLog.status_code >= 300,
                             ),
-                            (RequestLog.status_code.is_(None), 1),
+                            1,
                         ),
+                        (RequestLog.status_code.is_(None), 1),
                         else_=0,
                     )
                 ).label("failure"),

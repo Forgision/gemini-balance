@@ -154,7 +154,7 @@ class ImageCreateService:
 
                     images_data.append(
                         {
-                            "url": f"{upload_response.data.url}",
+                            "url": f"{upload_response.data.url}" if upload_response else "",
                             "revised_prompt": request.prompt,
                         }
                     )
