@@ -35,3 +35,8 @@ exclude_also = [
     # 3. A pragma comment that excludes an entire file:
     '\A(?s:.*# pragma: exclude file.*)\Z',
 ]
+
+[dependency-groups]
+dev = [
+    "playwright>=1.55.0",
+]

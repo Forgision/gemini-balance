@@ -102,7 +102,7 @@ async def upload_file_init(
         )
 
 
-@router.get("/v1beta/files")
+@router.get("/v1beta/files", response_model=ListFilesResponse)
 async def list_files(
     page_size: int = Query(10, ge=1, le=100, description="Page size", alias="pageSize"),
     page_token: Optional[str] = Query(
@@ -133,7 +133,7 @@ async def list_files(
         )
 
 
-@router.get("/v1beta/files/{file_id:path}")
+@router.get("/v1beta/files/{file_id:path}", response_model=FileMetadata)
 async def get_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> Union[FileMetadata, JSONResponse]:
@@ -158,7 +158,7 @@ async def get_file(
         )
 
 
-@router.delete("/v1beta/files/{file_id:path}")
+@router.delete("/v1beta/files/{file_id:path}", response_model=DeleteFileResponse)
 async def delete_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> Union[DeleteFileResponse, JSONResponse]:
@@ -263,7 +263,7 @@ async def gemini_upload_file_init(
     )
 
 
-@router.get("/gemini/v1beta/files")
+@router.get("/gemini/v1beta/files", response_model=ListFilesResponse)
 async def gemini_list_files(
     page_size: int = Query(10, ge=1, le=100, alias="pageSize"),
     page_token: Optional[str] = Query(None, alias="pageToken"),
@@ -273,7 +273,7 @@ async def gemini_list_files(
     return await list_files(page_size, page_token, auth_token)
 
 
-@router.get("/gemini/v1beta/files/{file_id:path}")
+@router.get("/gemini/v1beta/files/{file_id:path}", response_model=FileMetadata)
 async def gemini_get_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> Union[FileMetadata, JSONResponse]:
@@ -281,7 +281,7 @@ async def gemini_get_file(
     return await get_file(file_id, auth_token)
 
 
-@router.delete("/gemini/v1beta/files/{file_id:path}")
+@router.delete("/gemini/v1beta/files/{file_id:path}", response_model=DeleteFileResponse)
 async def gemini_delete_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
 ) -> Union[DeleteFileResponse, JSONResponse]:
