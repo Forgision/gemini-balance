@@ -30,7 +30,7 @@ async def get_key_manager():
 async def get_next_working_key_wrapper(
     key_manager: KeyManager = Depends(get_key_manager),
 ):
-    return await key_manager.get_next_working_key()
+    return await key_manager.get_next_working_key(model_name="gemini-pro")
 
 
 async def get_openai_service(key_manager: KeyManager = Depends(get_key_manager)):
@@ -78,7 +78,7 @@ async def chat_completion(
 
         raw_response = None
         if is_image_chat:
-            raw_response = await openai_service.create_image_chat_completion(
+            raw_response = openai_service.create_image_chat_completion(
                 request, current_api_key
             )
         else:
@@ -86,12 +86,14 @@ async def chat_completion(
                 request, current_api_key
             )
         if request.stream:
+            if not hasattr(raw_response, "__anext__"):
+                return JSONResponse(content=raw_response, status_code=500)
             try:
                 # Try to get the first piece of data to determine if it is a normal SSE (data: prefix) or an error JSON
                 first_chunk = await raw_response.__anext__()
             except StopAsyncIteration:
                 # If the stream ends directly, return a standard SSE output
-                return StreamingResponse(raw_response, media_type="text/event-stream")
+                return StreamingResponse(None, media_type="text/event-stream")
             except Exception as e:
                 # Initialization stream exception, return a 500 error directly
                 return JSONResponse(
@@ -138,9 +140,10 @@ async def embedding(
     operation_name = "embedding"
     async with handle_route_errors(logger, operation_name):
         logger.info(f"Handling embedding request for model: {request.model}")
-        api_key = await key_manager.get_next_working_key()
+        api_key = await key_manager.get_next_working_key(model_name=request.model)
         logger.info(f"Using allowed token: {allowed_token}")
         logger.info(f"Using API key: {redact_key_for_logging(api_key)}")
+        input_text = request.input if isinstance(request.input, str) else " ".join(request.input)
         return await openai_service.create_embeddings(
-            input_text=request.input, model=request.model, api_key=api_key
+            input_text=input_text, model=request.model, api_key=api_key
         )

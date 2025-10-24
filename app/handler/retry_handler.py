@@ -1,5 +1,6 @@
+import asyncio
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import Callable, TypeVar, cast
 
 from app.config.config import settings
 from app.log.logger import get_retry_logger
@@ -23,7 +24,10 @@ class RetryHandler:
             for attempt in range(settings.MAX_RETRIES):
                 retries = attempt + 1
                 try:
-                    return await func(*args, **kwargs)
+                    if asyncio.iscoroutinefunction(func):
+                        return await func(*args, **kwargs)
+                    else:
+                        return func(*args, **kwargs)
                 except Exception as e:
                     last_exception = e
                     logger.warning(
@@ -46,9 +50,12 @@ class RetryHandler:
                             )
                             break
 
+            if last_exception is None:
+                # This should not happen if MAX_RETRIES > 0
+                last_exception = RuntimeError("Retry handler failed without an exception.")
             logger.error(
                 f"All retry attempts failed, raising final exception: {str(last_exception)}"
             )
             raise last_exception
 
-        return wrapper
+        return cast(Callable[..., T], wrapper)

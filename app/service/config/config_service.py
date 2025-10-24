@@ -232,10 +232,10 @@ class ConfigService:
     async def fetch_ui_models() -> List[Dict[str, Any]]:
         """Get the list of models for UI display"""
         try:
-            key_manager = await get_key_manager_instance()
+            key_manager = await get_key_manager_instance(settings.API_KEYS, settings.VERTEX_API_KEYS)
             model_service = ModelService()
 
-            api_key = await key_manager.get_random_valid_key()
+            api_key = await key_manager.get_random_valid_key(model_name="gemini-pro")
             if not api_key:
                 logger.error("No valid API keys available to fetch model list for UI.")
                 raise HTTPException(
@@ -244,7 +244,7 @@ class ConfigService:
                 )
 
             models = await model_service.get_gemini_openai_models(api_key)
-            return models
+            return models or []
         except HTTPException as e:
             raise e
         except Exception as e:

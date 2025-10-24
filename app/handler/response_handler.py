@@ -114,17 +114,22 @@ def _handle_openai_normal_response(
         }
         choices.append(choice)
 
+    usage = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    }
+    if usage_metadata:
+        usage["prompt_tokens"] = usage_metadata.get("promptTokenCount", 0)
+        usage["completion_tokens"] = usage_metadata.get("candidatesTokenCount", 0)
+        usage["total_tokens"] = usage_metadata.get("totalTokenCount", 0)
     return {
         "id": f"chatcmpl-{uuid.uuid4()}",
         "object": "chat.completion",
         "created": int(time.time()),
         "model": model,
         "choices": choices,
-        "usage": {
-            "prompt_tokens": usage_metadata.get("promptTokenCount", 0),
-            "completion_tokens": usage_metadata.get("candidatesTokenCount", 0),
-            "total_tokens": usage_metadata.get("totalTokenCount", 0),
-        },
+        "usage": usage,
     }
 
 
@@ -141,13 +146,14 @@ class OpenAIResponseHandler(ResponseHandler):
         response: Dict[str, Any],
         model: str,
         stream: bool = False,
-        finish_reason: str = None,
+        finish_reason: str = "stop",
         usage_metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         if stream:
-            return _handle_openai_stream_response(
+            result = _handle_openai_stream_response(
                 response, model, finish_reason, usage_metadata
             )
+            return result if result is not None else {}
         return _handle_openai_normal_response(
             response, model, finish_reason, usage_metadata
         )
@@ -320,11 +326,11 @@ def _extract_image_data(part: dict) -> str:
     mime_type = part["inlineData"]["mimeType"]
     # Convert base64_data to a bytes array
     # Return empty string if no uploader is configured
-    if not is_image_upload_configured(settings):
+    if not is_image_upload_configured(settings) or image_uploader is None:
         return f"\n\n![image](data:{mime_type};base64,{base64_data})\n\n"
     bytes_data = base64.b64decode(base64_data)
     upload_response = image_uploader.upload(bytes_data, filename)
-    if upload_response.success:
+    if upload_response and upload_response.success:
         text = f"\n\n![image]({upload_response.data.url})\n\n"
     else:
         text = f"\n\n![image](data:{mime_type};base64,{base64_data})\n\n"
@@ -384,7 +390,7 @@ def _handle_gemini_stream_response(
     else:
         part = {"text": text}
         if thought is not None:
-            part["thought"] = thought
+            part["thought"] = str(thought)
         content = {"parts": [part], "role": "model"}
     response["candidates"][0]["content"] = content
     return response

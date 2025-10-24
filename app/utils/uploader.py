@@ -147,7 +147,7 @@ class QiniuUploader(ImageUploader):
 
     def upload(self, file: bytes, filename: str) -> UploadResponse:
         # Implement the specific upload logic for Qiniu
-        pass
+        raise NotImplementedError("QiniuUploader is not implemented yet.")
 
 
 class PicGoUploader(ImageUploader):
@@ -196,7 +196,7 @@ class PicGoUploader(ImageUploader):
 
                 parsed_url = urlparse(request_url)
                 query_params = parse_qs(parsed_url.query)
-                query_params["key"] = self.api_key
+                query_params["key"] = [self.api_key]
                 new_query = urlencode(query_params, doseq=True)
                 request_url = urlunparse(parsed_url._replace(query=new_query))
 

@@ -1,4 +1,5 @@
 import base64
+import binascii
 import json
 import re
 from abc import ABC, abstractmethod
@@ -150,8 +151,8 @@ class OpenAIMessageConverter(MessageConverter):
                 raise ValueError(
                     f"Media data size exceeds limit of {max_size // 1024 // 1024}MB"
                 )
-            return data
-        except base64.binascii.Error as e:
+            return data, None
+        except binascii.Error as e:
             logger.error(f"Invalid Base64 data provided: {e}")
             raise ValueError("Invalid Base64 data")
         except Exception as e:
@@ -210,7 +211,7 @@ class OpenAIMessageConverter(MessageConverter):
                             continue
 
                         try:
-                            validated_data = self._validate_media_data(
+                            validated_data, _ = self._validate_media_data(
                                 audio_format,
                                 audio_data,
                                 SUPPORTED_AUDIO_FORMATS,
@@ -265,7 +266,7 @@ class OpenAIMessageConverter(MessageConverter):
                             continue
 
                         try:
-                            validated_data = self._validate_media_data(
+                            validated_data, _ = self._validate_media_data(
                                 video_format,
                                 video_data,
                                 SUPPORTED_VIDEO_FORMATS,

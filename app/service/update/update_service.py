@@ -54,7 +54,7 @@ async def check_for_updates() -> Tuple[bool, Optional[str], Optional[str]]:
 
     github_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO_OWNER}/{settings.GITHUB_REPO_NAME}/releases/latest"
     logger.debug(f"Checking for updates at URL: {github_api_url}")
-
+    latest_v_str = None
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             headers = {

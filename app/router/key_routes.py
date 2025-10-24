@@ -6,13 +6,15 @@ from fastapi.responses import JSONResponse
 router = APIRouter()
 
 
+from typing import Optional
+
 @router.get("/api/keys")
 async def get_keys_paginated(
     request: Request,
     page: int = 1,
     limit: int = 10,
-    search: str = None,
-    fail_count_threshold: int = None,
+    search: Optional[str] = None,
+    fail_count_threshold: Optional[int] = None,
     status: str = "all",  # 'valid', 'invalid', 'all'
     key_manager: KeyManager = Depends(get_key_manager_instance),
 ):

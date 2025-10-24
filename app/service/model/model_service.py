@@ -43,7 +43,8 @@ class ModelService:
     async def convert_to_openai_models_format(
         self, gemini_models: Dict[str, Any]
     ) -> Dict[str, Any]:
-        openai_format = {"object": "list", "data": [], "success": True}
+        openai_format: Dict[str, Any] = {"object": "list", "data": [], "success": True}
+        openai_model = None
 
         for model in gemini_models.get("models", []):
             model_id = model["name"].split("/")[-1]
@@ -71,7 +72,7 @@ class ModelService:
                 non_thinking_model["id"] = f"{model_id}-non-thinking"
                 openai_format["data"].append(non_thinking_model)
 
-        if settings.CREATE_IMAGE_MODEL:
+        if settings.CREATE_IMAGE_MODEL and openai_model:
             image_model = openai_model.copy()
             image_model["id"] = f"{settings.CREATE_IMAGE_MODEL}-chat"
             openai_format["data"].append(image_model)

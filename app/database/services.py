@@ -200,7 +200,7 @@ async def add_error_log(
             request_time=(request_datetime if request_datetime else datetime.now()),
         )
         await database.execute(query)
-        logger.info(f"Added error log for key: {redact_key_for_logging(gemini_key)}")
+        logger.info(f"Added error log for key: {redact_key_for_logging(gemini_key if gemini_key is not None else 'N/A')}")
         return True
     except Exception as e:
         logger.error(f"Failed to add error log: {str(e)}")
@@ -647,7 +647,10 @@ async def create_file_record(
         await database.execute(query)
 
         # Return the created record
-        return await get_file_record_by_name(name)
+        record = await get_file_record_by_name(name)
+        if record is None:
+            raise Exception(f"Failed to create or find file record: {name}")
+        return record
     except Exception as e:
         logger.error(f"Failed to create file record: {str(e)}")
         raise
@@ -693,7 +696,7 @@ async def update_file_record_state(
         bool: Whether the update was successful
     """
     try:
-        values = {"state": state}
+        values: Dict[str, Any] = {"state": state}
         if update_time:
             values["update_time"] = update_time
         if upload_completed:

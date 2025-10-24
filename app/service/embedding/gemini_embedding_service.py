@@ -16,7 +16,7 @@ logger = get_gemini_embedding_logger()
 
 def _build_embed_payload(request: GeminiEmbedRequest) -> Dict[str, Any]:
     """Build the embedding request payload."""
-    payload = {"content": request.content.model_dump()}
+    payload: Dict[str, Any] = {"content": request.content.model_dump()}
 
     if request.taskType:
         payload["taskType"] = request.taskType

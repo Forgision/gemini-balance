@@ -4,6 +4,7 @@ import uuid
 
 from google import genai
 from google.genai import types
+from google.genai.types import generation_types
 
 from app.config.config import settings
 from app.core.constants import VALID_IMAGE_RATIOS
@@ -87,14 +88,16 @@ class ImageCreateService:
                 number_of_images=request.n,
                 output_mime_type="image/png",
                 aspect_ratio=self.aspect_ratio,
-                safety_filter_level="BLOCK_LOW_AND_ABOVE",
-                person_generation="ALLOW_ADULT",
+                safety_filter_level=generation_types.SafetyFilterLevel.BLOCK_LOW_AND_ABOVE,
+                person_generation=generation_types.PersonGeneration.ALLOW_ADULT,
             ),
         )
 
         if response.generated_images:
             images_data = []
             for index, generated_image in enumerate(response.generated_images):
+                if generated_image.image is None:
+                    continue
                 image_data = generated_image.image.image_bytes
                 image_uploader = None
 
@@ -103,10 +106,11 @@ class ImageCreateService:
                     request.response_format == "b64_json"
                     or not is_image_upload_configured(settings)
                 ):
-                    base64_image = base64.b64encode(image_data).decode("utf-8")
-                    images_data.append(
-                        {"b64_json": base64_image, "revised_prompt": request.prompt}
-                    )
+                    if image_data:
+                        base64_image = base64.b64encode(image_data).decode("utf-8")
+                        images_data.append(
+                            {"b64_json": base64_image, "revised_prompt": request.prompt}
+                        )
                     continue
                 else:
                     # Upload to configured provider

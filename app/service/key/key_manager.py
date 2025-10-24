@@ -1,7 +1,7 @@
 import asyncio
 import random
 from itertools import cycle
-from typing import Dict, Union
+from typing import Any, Dict, Optional, Union
 
 from app.config.config import settings
 from app.database.services import get_usage_stats_by_key_and_model
@@ -91,7 +91,7 @@ class KeyManager:
             )
             return False
 
-    async def get_usage_stats(self, api_key: str, model_name: str) -> Dict[str, int]:
+    async def get_usage_stats(self, api_key: str, model_name: str) -> Optional[Dict[str, Any]]:
         """Get usage statistics for a given key and model."""
         return await get_usage_stats_by_key_and_model(api_key, model_name)
 
@@ -105,10 +105,12 @@ class KeyManager:
         key_usage = {}
         for key in valid_keys:
             usage = await self.get_usage_stats(key, model_name)
-            key_usage[key] = usage["rpm"] if usage else 0
+            key_usage[key] = usage["rpm"] if usage and "rpm" in usage else 0
 
         # Select the key with the lowest RPM
-        best_key = min(key_usage, key=key_usage.get)
+        if not key_usage:
+            return await self.get_next_key()
+        best_key = min(key_usage, key=lambda k: key_usage[k])
         return best_key
 
     async def get_next_working_vertex_key(self) -> str:
@@ -133,7 +135,7 @@ class KeyManager:
                     f"API key {redact_key_for_logging(api_key)} has failed {self.MAX_FAILURES} times"
                 )
         if retries < settings.MAX_RETRIES:
-            return await self.get_next_working_key()
+            return await self.get_random_valid_key()
         else:
             return ""
 

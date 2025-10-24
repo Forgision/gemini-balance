@@ -46,21 +46,21 @@ class TestKeyRedaction(unittest.TestCase):
         self.assertEqual(result, "[INVALID_KEY]")
 
         # Test None
-        result = redact_key_for_logging(None)
+        result = redact_key_for_logging(None)  # type: ignore
         self.assertEqual(result, "[INVALID_KEY]")
 
     def test_invalid_input_types(self):
         """Test handling of invalid input types"""
         # Test integer
-        result = redact_key_for_logging(123)
+        result = redact_key_for_logging(123)  # type: ignore
         self.assertEqual(result, "[INVALID_KEY]")
 
         # Test list
-        result = redact_key_for_logging(["key"])
+        result = redact_key_for_logging(["key"])  # type: ignore
         self.assertEqual(result, "[INVALID_KEY]")
 
         # Test dict
-        result = redact_key_for_logging({"key": "value"})
+        result = redact_key_for_logging({"key": "value"})  # type: ignore
         self.assertEqual(result, "[INVALID_KEY]")
 
     def test_boundary_cases(self):
@@ -129,7 +129,7 @@ class TestAccessLogFormatter(unittest.TestCase):
         # Create a mock pattern that will raise an exception
         mock_pattern = MagicMock()
         mock_pattern.sub.side_effect = Exception("Regex error")
-        self.formatter.compiled_patterns = [mock_pattern]
+        self.formatter.compiled_patterns = [mock_pattern]  # type: ignore
 
         try:
             log_message = (

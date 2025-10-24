@@ -155,7 +155,7 @@ class FileRecord(Base):
     upload_completed = Column(DateTime, nullable=True, comment="Upload completion time")
 
     def __repr__(self):
-        return f"<FileRecord(name='{self.name}', state='{self.state.value if self.state else 'None'}', api_key='{self.api_key[:8]}...')>"
+        return f"<FileRecord(name='{self.name}', state='{self.state.value if self.state is not None else 'None'}', api_key='{self.api_key[:8]}...')>"
 
     def to_dict(self):
         """Convert to dictionary format for API response"""
@@ -169,7 +169,7 @@ class FileRecord(Base):
             "expirationTime": self.expiration_time.isoformat() + "Z",
             "sha256Hash": self.sha256_hash,
             "uri": self.uri,
-            "state": self.state.value if self.state else "PROCESSING",
+            "state": self.state.value if self.state is not None else "PROCESSING",
         }
 
     def is_expired(self):

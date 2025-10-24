@@ -42,7 +42,7 @@ class ProxyCheckService:
         """Validate proxy format"""
         try:
             parsed = urlparse(proxy)
-            return parsed.scheme in ["http", "https", "socks5"] and parsed.hostname
+            return parsed.scheme in ["http", "https", "socks5"] and bool(parsed.hostname)
         except Exception:
             return False
 

@@ -58,17 +58,17 @@ class TTSService:
                     },
                 },
             )
+            content = response.candidates[0].content if response.candidates else None
             if (
-                response.candidates
-                and response.candidates[0].content.parts
-                and response.candidates[0].content.parts[0].inline_data
+                content
+                and content.parts
+                and content.parts[0].inline_data
             ):
-                raw_audio_data = (
-                    response.candidates[0].content.parts[0].inline_data.data
-                )
+                raw_audio_data = content.parts[0].inline_data.data
                 is_success = True
                 status_code = 200
-                return _create_wav_file(raw_audio_data)
+                if raw_audio_data:
+                    return _create_wav_file(raw_audio_data)
         except Exception as e:
             is_success = False
             error_log_msg = f"Generic error: {e}"

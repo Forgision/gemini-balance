@@ -13,7 +13,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Log request path
         logger.info(f"Request path: {request.url.path}")
-
+        body = b""
         # Get and log the request body
         try:
             body = await request.body()

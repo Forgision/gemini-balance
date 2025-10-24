@@ -2,7 +2,7 @@
 Files API routes
 """
 
-from typing import Optional
+from typing import Optional, Union
 from fastapi import APIRouter, Request, Query, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -109,7 +109,7 @@ async def list_files(
         None, description="Page token", alias="pageToken"
     ),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
-) -> ListFilesResponse:
+) -> Union[ListFilesResponse, JSONResponse]:
     """List files"""
     logger.debug(f"List files: {page_size=}, {page_token=}, {auth_token=}")
     try:
@@ -136,7 +136,7 @@ async def list_files(
 @router.get("/v1beta/files/{file_id:path}")
 async def get_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
-) -> FileMetadata:
+) -> Union[FileMetadata, JSONResponse]:
     """Get file information"""
     logger.debug(f"Get file request: {file_id=}, {auth_token=}")
     try:
@@ -161,7 +161,7 @@ async def get_file(
 @router.delete("/v1beta/files/{file_id:path}")
 async def delete_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
-) -> DeleteFileResponse:
+) -> Union[DeleteFileResponse, JSONResponse]:
     """Delete file"""
     logger.info(f"Delete file: {file_id=}, {auth_token=}")
     try:
@@ -199,7 +199,7 @@ async def handle_upload(
     """Handle file upload requests"""
     try:
         logger.info(
-            f"Handling upload request: {request.method} {upload_path}, key={redact_key_for_logging(key)}"
+            f"Handling upload request: {request.method} {upload_path}, key={redact_key_for_logging(key if key is not None else 'N/A')}"
         )
 
         # Get upload_id from query parameters

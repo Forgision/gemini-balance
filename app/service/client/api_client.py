@@ -255,7 +255,7 @@ class OpenaiApiClient(ApiClient):
             return response.json()
 
     async def generate_content(
-        self, payload: Dict[str, Any], api_key: str
+        self, payload: Dict[str, Any], model: str, api_key: str
     ) -> Dict[str, Any]:
         timeout = httpx.Timeout(self.timeout, read=self.timeout)
         logger.info(
@@ -279,7 +279,7 @@ class OpenaiApiClient(ApiClient):
             return response.json()
 
     async def stream_generate_content(
-        self, payload: Dict[str, Any], api_key: str
+        self, payload: Dict[str, Any], model: str, api_key: str
     ) -> AsyncGenerator[str, None]:
         timeout = httpx.Timeout(self.timeout, read=self.timeout)
         proxy_to_use = None

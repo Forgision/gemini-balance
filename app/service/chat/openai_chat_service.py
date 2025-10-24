@@ -116,14 +116,15 @@ def _build_tools(
 
             if item.get("type", "") == "function" and item.get("function"):
                 function = deepcopy(item.get("function"))
-                parameters = function.get("parameters", {})
-                if parameters.get("type") == "object" and not parameters.get(
-                    "properties", {}
-                ):
-                    function.pop("parameters", None)
+                if function:
+                    parameters = function.get("parameters", {})
+                    if parameters and parameters.get("type") == "object" and not parameters.get(
+                        "properties", {}
+                    ):
+                        function.pop("parameters", None)
 
-                # Clean up unsupported fields in the function
-                function = _clean_json_schema_properties(function)
+                    # Clean up unsupported fields in the function
+                    function = _clean_json_schema_properties(function)
                 function_declarations.append(function)
 
         if function_declarations:
@@ -252,22 +253,22 @@ def _build_payload(
 class OpenAIChatService:
     """Chat service."""
 
-    def __init__(self, base_url: str, key_manager: KeyManager = None):
+    def __init__(self, base_url: str, key_manager: Optional[KeyManager] = None):
         self.message_converter = OpenAIMessageConverter()
         self.response_handler = OpenAIResponseHandler(config=None)
         self.api_client = GeminiApiClient(base_url, settings.TIME_OUT)
         self.key_manager = key_manager
         self.image_create_service = ImageCreateService()
 
-    def _extract_text_from_openai_chunk(self, chunk: Dict[str, Any]) -> str:
+    def _extract_text_from_openai_chunk(self, chunk: Dict[str, Any]) -> Optional[str]:
         """Extract text content from the OpenAI response chunk."""
         if not chunk.get("choices"):
-            return ""
+            return None
 
         choice = chunk["choices"][0]
         if "delta" in choice and "content" in choice["delta"]:
             return choice["delta"]["content"]
-        return ""
+        return None
 
     def _create_char_openai_chunk(
         self, original_chunk: Dict[str, Any], text: str
@@ -460,11 +461,13 @@ class OpenAIChatService:
                         f"Failed to decode JSON from stream for model {model}: {chunk_str}"
                     )
                     continue
+
+                finish_reason = chunk.get("candidates", [{}])[0].get("finishReason")
                 openai_chunk = self.response_handler.handle_response(
                     chunk,
                     model,
                     stream=True,
-                    finish_reason=None,
+                    finish_reason=finish_reason or "stop",
                     usage_metadata=usage_metadata,
                 )
                 if openai_chunk:
@@ -474,7 +477,9 @@ class OpenAIChatService:
                             optimized_chunk_data
                         ) in openai_optimizer.optimize_stream_output(
                             text,
-                            lambda t: self._create_char_openai_chunk(openai_chunk, t),
+                            lambda t: self._create_char_openai_chunk(
+                                openai_chunk, t
+                            ),
                             lambda c: f"data: {json.dumps(c)}\n\n",
                         ):
                             yield optimized_chunk_data

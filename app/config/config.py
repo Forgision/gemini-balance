@@ -523,7 +523,9 @@ async def sync_initial_settings():
             )
 
         # Refresh log levels
-        Logger.update_log_levels(final_memory_settings.get("LOG_LEVEL"))
+        log_level = final_memory_settings.get("LOG_LEVEL")
+        if isinstance(log_level, str):
+            Logger.update_log_levels(log_level)
 
     except Exception as e:
         logger.error(f"An unexpected error occurred during initial settings sync: {e}")
