@@ -45,8 +45,8 @@ endblock %} {% block head_extra_styles %}
     .search-container {
       grid-template-columns: 1fr;
     }
-    
-    /* 移动端主容器布局 */
+
+    /* Mobile main container layout */
     .mobile-buttons-container {
       display: flex !important;
       flex-direction: column !important;
@@ -56,16 +56,16 @@ endblock %} {% block head_extra_styles %}
       padding: 0 !important;
       margin: 0 !important;
     }
-    
-    /* 移动端搜索控件布局优化 */
+
+    /* Mobile search controls layout optimization */
     .mobile-search-controls {
       grid-template-columns: 1fr !important;
       gap: 0.75rem !important;
       width: 100% !important;
       margin-bottom: 0.5rem !important;
     }
-    
-    /* 按钮容器在移动端的布局 */
+
+    /* Button container layout on mobile */
     .buttons-container-responsive {
       display: flex !important;
       flex-direction: column !important;
@@ -74,8 +74,8 @@ endblock %} {% block head_extra_styles %}
       align-items: stretch !important;
       justify-content: stretch !important;
     }
-    
-    /* 移动端所有按钮样式 */
+
+    /* All button styles on mobile */
     .buttons-container-responsive button {
       width: 100% !important;
       max-width: 100% !important;
@@ -91,14 +91,14 @@ endblock %} {% block head_extra_styles %}
       text-overflow: ellipsis !important;
     }
   }
-  
-  /* 中等屏幕优化 */
+
+  /* Medium screen optimization */
   @media (max-width: 1024px) and (min-width: 769px) {
     .buttons-container-responsive {
       flex-wrap: wrap !important;
       justify-content: center !important;
     }
-    
+
     .buttons-container-responsive button {
       flex-shrink: 1 !important;
       min-width: 0 !important;
@@ -106,10 +106,10 @@ endblock %} {% block head_extra_styles %}
       padding-right: 0.75rem !important;
     }
   }
-  
-  /* 小屏幕(手机)特殊优化 - 确保按钮在边框内 */
+
+  /* Small screen (mobile) special optimization - ensure buttons are within borders */
   @media (max-width: 640px) {
-    /* 强制重写主容器布局 */
+    /* Force override main container layout */
     .mobile-buttons-container {
       display: flex !important;
       flex-direction: column !important;
@@ -119,14 +119,14 @@ endblock %} {% block head_extra_styles %}
       gap: 1rem !important;
       overflow: visible !important;
     }
-    
-    /* 搜索区域在移动端占满宽度 */
+
+    /* Search area takes full width on mobile */
     .mobile-search-controls {
       width: 100% !important;
       box-sizing: border-box !important;
     }
-    
-    /* 按钮区域完全重新布局 */
+
+    /* Completely re-layout button area */
     .buttons-container-responsive {
       display: flex !important;
       flex-direction: column !important;
@@ -138,8 +138,8 @@ endblock %} {% block head_extra_styles %}
       box-sizing: border-box !important;
       overflow: visible !important;
     }
-    
-    /* 所有按钮统一样式 */
+
+    /* Unified style for all buttons */
     .buttons-container-responsive button {
       display: flex !important;
       align-items: center !important;
@@ -157,19 +157,19 @@ endblock %} {% block head_extra_styles %}
       text-overflow: ellipsis !important;
       flex-shrink: 0 !important;
     }
-    
-    /* 特别针对清空全部按钮 */
+
+    /* Special style for clear all button */
     #deleteAllLogsBtn {
       background-color: #f87171 !important;
       border: 1px solid #f87171 !important;
     }
-    
+
     #deleteAllLogsBtn:hover {
       background-color: #ef4444 !important;
       border: 1px solid #ef4444 !important;
     }
-    
-    /* 确保容器不会溢出父级 */
+
+    /* Ensure container does not overflow parent */
     .mobile-buttons-container,
     .mobile-buttons-container > *,
     .buttons-container-responsive,
@@ -177,44 +177,44 @@ endblock %} {% block head_extra_styles %}
       max-width: 100% !important;
       box-sizing: border-box !important;
     }
-    
-    /* 额外的安全边距控制 */
+
+    /* Extra safe margin control */
     .mobile-buttons-container .grid {
       padding-left: 0 !important;
       padding-right: 0 !important;
       margin-left: 0 !important;
       margin-right: 0 !important;
     }
-    
-    /* 确保主内容区域有适当的内边距 */
+
+    /* Ensure main content area has proper padding */
     .rounded-xl.p-6 {
       padding-left: 1rem !important;
       padding-right: 1rem !important;
     }
   }
-  
-  /* 超小屏幕额外优化 */
+
+  /* Extra small screen optimization */
   @media (max-width: 480px) {
     .mobile-buttons-container {
       gap: 0.75rem !important;
     }
-    
+
     .buttons-container-responsive {
       gap: 0.4rem !important;
     }
-    
+
     .buttons-container-responsive button {
       padding: 0.4rem 0.8rem !important;
       font-size: 0.8rem !important;
     }
-    
-    /* 主容器内边距进一步缩小 */
+
+    /* Further reduce main container padding */
     .rounded-xl.p-6 {
       padding-left: 0.75rem !important;
       padding-right: 0.75rem !important;
     }
-    
-    /* 确保清空全部按钮文字不会太挤 */
+
+    /* Ensure clear all button text is not too crowded */
     #deleteAllLogsBtn i {
       margin-right: 0.25rem !important;
     }

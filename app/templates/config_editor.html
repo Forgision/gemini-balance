@@ -2869,17 +2869,17 @@ endblock %} {% block head_extra_styles %}
 
 {% endblock %} {% block body_scripts %}
 <script src="{{ static_url('js/config_editor.js') }}"></script>
-<!-- 增强下拉框样式和交互性 -->
+<!-- Enhance dropdown style and interactivity -->
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    // 增强所有下拉框的交互性
+    // Enhance interactivity of all dropdowns
     const selects = document.querySelectorAll(".form-select-themed");
 
     selects.forEach((select) => {
-      // 添加选择事件来应用选中效果
+      // Add change event to apply selected effect
       select.addEventListener("change", function () {
         this.classList.add("selected");
-        // 设置微小的动画效果
+        // Set a subtle animation effect
         this.style.transition = "all 0.2s ease";
         this.style.transform = "scale(1.02)";
         setTimeout(() => {
@@ -2887,61 +2887,61 @@ endblock %} {% block head_extra_styles %}
         }, 200);
       });
 
-      // 添加焦点事件
+      // Add focus event
       select.addEventListener("focus", function () {
         this.style.boxShadow = "0 0 0 3px rgba(216, 180, 254, 0.5)";
       });
 
-      // 根据是否有选中值添加选中样式
+      // Add selected style based on whether there is a selected value
       if (select.value && select.value !== "") {
         select.classList.add("selected");
       }
     });
 
-    // 美化日志级别选择的显示 - 浅色主题版本
+    // Beautify log level selection display - light theme version
     const logLevelSelect = document.getElementById("LOG_LEVEL");
     if (logLevelSelect) {
-      // 给不同日志级别添加统一的浅色主题样式
+      // Add a unified light theme style for different log levels
       const updateLogLevelStyle = () => {
         const value = logLevelSelect.value;
 
-        // 统一使用浅色主题样式，通过轻微的边框变化来区分级别
+        // Use a unified light theme style, differentiating levels with slight border changes
         switch (value) {
           case "DEBUG":
-            logLevelSelect.style.borderColor = "#3b82f6"; // blue-500 主题色
-            logLevelSelect.style.color = "#374151"; // gray-700 深灰文字
+            logLevelSelect.style.borderColor = "#3b82f6"; // blue-500 theme color
+            logLevelSelect.style.color = "#374151"; // gray-700 dark gray text
             break;
           case "INFO":
-            logLevelSelect.style.borderColor = "#3b82f6"; // blue-500 主题色
-            logLevelSelect.style.color = "#374151"; // gray-700 深灰文字
+            logLevelSelect.style.borderColor = "#3b82f6"; // blue-500 theme color
+            logLevelSelect.style.color = "#374151"; // gray-700 dark gray text
             break;
           case "WARNING":
-            logLevelSelect.style.borderColor = "#6b7280"; // gray-500 中性灰
-            logLevelSelect.style.color = "#374151"; // gray-700 深灰文字
+            logLevelSelect.style.borderColor = "#6b7280"; // gray-500 neutral gray
+            logLevelSelect.style.color = "#374151"; // gray-700 dark gray text
             break;
           case "ERROR":
-            logLevelSelect.style.borderColor = "#6b7280"; // gray-500 中性灰
-            logLevelSelect.style.color = "#374151"; // gray-700 深灰文字
+            logLevelSelect.style.borderColor = "#6b7280"; // gray-500 neutral gray
+            logLevelSelect.style.color = "#374151"; // gray-700 dark gray text
             break;
           case "CRITICAL":
-            logLevelSelect.style.borderColor = "#4b5563"; // gray-600 稍深灰
-            logLevelSelect.style.color = "#374151"; // gray-700 深灰文字
+            logLevelSelect.style.borderColor = "#4b5563"; // gray-600 slightly darker gray
+            logLevelSelect.style.color = "#374151"; // gray-700 dark gray text
             break;
           default:
-            logLevelSelect.style.borderColor = "rgba(0, 0, 0, 0.12)"; // 默认边框
-            logLevelSelect.style.color = "#374151"; // gray-700 深灰文字
+            logLevelSelect.style.borderColor = "rgba(0, 0, 0, 0.12)"; // default border
+            logLevelSelect.style.color = "#374151"; // gray-700 dark gray text
         }
       };
 
-      // 初始化和变更时更新样式
+      // Update style on initialization and change
       updateLogLevelStyle();
       logLevelSelect.addEventListener("change", updateLogLevelStyle);
     }
 
-    // 增强预算映射项交互
+    // Enhance budget map item interactivity
     const budgetInputs = document.querySelectorAll(".map-value-input");
     budgetInputs.forEach((input) => {
-      // 添加焦点和悬停效果
+      // Add focus and hover effects
       input.addEventListener("focus", function () {
         const parentItem = this.closest(".map-item");
         if (parentItem) {
@@ -2960,7 +2960,7 @@ endblock %} {% block head_extra_styles %}
         }
       });
 
-      // 输入限制为正整数且不超过最大值
+      // Limit input to positive integers not exceeding the maximum value
       input.addEventListener("input", function () {
         let val = this.value.replace(/[^0-9]/g, "");
         if (val !== "") {
@@ -2969,7 +2969,7 @@ endblock %} {% block head_extra_styles %}
         }
         this.value = val;
 
-        // 添加微小动画反馈
+        // Add subtle animation feedback
         this.style.transform = "scale(1.05)";
         setTimeout(() => {
           this.style.transform = "scale(1)";

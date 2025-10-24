@@ -48,21 +48,21 @@ class TestKeyRedaction(unittest.TestCase):
 
         # Test None
         result = redact_key_for_logging(None)
-        self.assertEqual(result, "[INVALID_INPUT]")
+        self.assertEqual(result, "[INVALID_KEY]")
 
     def test_invalid_input_types(self):
         """Test handling of invalid input types"""
         # Test integer
         result = redact_key_for_logging(123)
-        self.assertEqual(result, "[INVALID_INPUT]")
+        self.assertEqual(result, "[INVALID_KEY]")
 
         # Test list
         result = redact_key_for_logging(["key"])
-        self.assertEqual(result, "[INVALID_INPUT]")
+        self.assertEqual(result, "[INVALID_KEY]")
 
         # Test dict
         result = redact_key_for_logging({"key": "value"})
-        self.assertEqual(result, "[INVALID_INPUT]")
+        self.assertEqual(result, "[INVALID_KEY]")
 
     def test_boundary_cases(self):
         """Test boundary cases for key length"""

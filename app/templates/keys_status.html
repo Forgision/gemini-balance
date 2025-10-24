@@ -22,7 +22,7 @@ endblock %} {% block head_extra_styles %}
   }
   /* Copy status styling is handled by base.html's notification */
 
-  /* 现代数据统计样式 */
+  /* Modern data statistics styles */
   .stats-dashboard {
     display: grid;
     grid-template-columns: 1fr;
@@ -38,19 +38,21 @@ endblock %} {% block head_extra_styles %}
     }
   }
 
-  /* 让图表卡片在网格中占满整行 */
+  /* Make chart cards span the full width of the grid */
   .stats-card.chart-wide {
     grid-column: 1 / -1;
   }
-  /* 图表容器固定高度，配合 Chart.js maintainAspectRatio:false */
+  /* Fixed height for chart container, works with Chart.js maintainAspectRatio:false */
   .chart-container {
     height: 300px;
   }
   @media (max-width: 640px) {
-    .chart-container { height: 220px; }
+    .chart-container {
+      height: 220px;
+    }
   }
 
-  /* 统计卡片样式 */
+  /* Statistics card styles */
   .stats-card {
     background-color: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(8px);
