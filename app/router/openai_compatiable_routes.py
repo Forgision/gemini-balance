@@ -78,7 +78,7 @@ async def chat_completion(
 
         raw_response = None
         if is_image_chat:
-            raw_response = openai_service.create_image_chat_completion(
+            raw_response = await openai_service.create_image_chat_completion(
                 request, current_api_key
             )
         else:
@@ -93,7 +93,7 @@ async def chat_completion(
                 first_chunk = await raw_response.__anext__()
             except StopAsyncIteration:
                 # If the stream ends directly, return a standard SSE output
-                return StreamingResponse(None, media_type="text/event-stream")
+                return StreamingResponse((c for c in []), media_type="text/event-stream")
             except Exception as e:
                 # Initialization stream exception, return a 500 error directly
                 return JSONResponse(
@@ -118,6 +118,7 @@ async def chat_completion(
 async def generate_image(
     request: ImageGenerationRequest,
     allowed_token=Depends(security_service.verify_authorization),
+    key_manager: KeyManager = Depends(get_key_manager),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
     """Handle image generation requests."""
@@ -126,7 +127,8 @@ async def generate_image(
         logger.info(f"Handling image generation request for prompt: {request.prompt}")
         logger.info(f"Using allowed token: {allowed_token}")
         request.model = settings.CREATE_IMAGE_MODEL
-        return await openai_service.generate_images(request)
+        api_key = await key_manager.get_paid_key()
+        return await openai_service.generate_images(request, api_key)
 
 
 @router.post("/openai/v1/embeddings")

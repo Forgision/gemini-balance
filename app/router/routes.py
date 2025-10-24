@@ -80,8 +80,8 @@ def setup_page_routes(app: FastAPI) -> None:
         try:
             form = await request.form()
             auth_token = form.get("auth_token")
-            if not auth_token:
-                logger.warning("Authentication attempt with empty token")
+            if not auth_token or not isinstance(auth_token, str):
+                logger.warning("Authentication attempt with empty or invalid token")
                 return RedirectResponse(url="/", status_code=302)
 
             if verify_auth_token(auth_token):

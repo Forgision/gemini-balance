@@ -268,7 +268,7 @@ async def gemini_list_files(
     page_size: int = Query(10, ge=1, le=100, alias="pageSize"),
     page_token: Optional[str] = Query(None, alias="pageToken"),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
-) -> ListFilesResponse:
+) -> Union[ListFilesResponse, JSONResponse]:
     """List files (Gemini prefix)"""
     return await list_files(page_size, page_token, auth_token)
 
@@ -276,7 +276,7 @@ async def gemini_list_files(
 @router.get("/gemini/v1beta/files/{file_id:path}")
 async def gemini_get_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
-) -> FileMetadata:
+) -> Union[FileMetadata, JSONResponse]:
     """Get file information (Gemini prefix)"""
     return await get_file(file_id, auth_token)
 
@@ -284,6 +284,6 @@ async def gemini_get_file(
 @router.delete("/gemini/v1beta/files/{file_id:path}")
 async def gemini_delete_file(
     file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
-) -> DeleteFileResponse:
+) -> Union[DeleteFileResponse, JSONResponse]:
     """Delete file (Gemini prefix)"""
     return await delete_file(file_id, auth_token)

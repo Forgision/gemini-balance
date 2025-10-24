@@ -35,9 +35,7 @@ class FilesService:
     async def _get_key_manager(self):
         """Get KeyManager instance"""
         if not self.key_manager:
-            self.key_manager = await get_key_manager_instance(
-                settings.API_KEYS, settings.VERTEX_API_KEYS
-            )
+            self.key_manager = await get_key_manager_instance()
         return self.key_manager
 
     async def initialize_upload(

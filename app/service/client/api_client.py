@@ -26,7 +26,7 @@ class ApiClient(ABC):
     async def stream_generate_content(
         self, payload: Dict[str, Any], model: str, api_key: str
     ) -> AsyncGenerator[str, None]:
-        pass
+        yield
 
 
 class GeminiApiClient(ApiClient):

@@ -627,7 +627,7 @@ class OpenAIChatService:
         try:
             if image_data:
                 openai_chunk = self.response_handler.handle_image_chat_response(
-                    image_data, model, stream=True, finish_reason=None
+                    image_data, model, stream=True, finish_reason=""
                 )
                 if openai_chunk:
                     # Extract text content

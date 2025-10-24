@@ -147,6 +147,7 @@ class KeyManager:
                 logger.warning(
                     f"Vertex Express API key {redact_key_for_logging(api_key)} has failed {self.MAX_FAILURES} times"
                 )
+        return ""
 
     def get_fail_count(self, key: str) -> int:
         """Get the failure count for a specific key."""

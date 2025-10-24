@@ -112,7 +112,7 @@ async def chat_completion(
                 first_chunk = await raw_response.__anext__()
             except StopAsyncIteration:
                 # If the stream ends directly, return standard SSE output
-                return StreamingResponse(None, media_type="text/event-stream")
+                return StreamingResponse((c for c in []), media_type="text/event-stream")
             except Exception as e:
                 # If stream initialization fails, return a 500 error directly
                 return JSONResponse(

@@ -9,6 +9,7 @@ from app.config.config import settings
 from app.core.constants import API_VERSION
 from app.core.security import SecurityService
 from app.domain.gemini_models import (
+    GenerationConfig,
     GeminiBatchEmbedRequest,
     GeminiContent,
     GeminiEmbedRequest,
@@ -505,7 +506,9 @@ async def verify_key(
                     parts=[{"text": "hi"}],
                 )
             ],
-            generation_config={"temperature": 0.7, "topP": 1.0, "maxOutputTokens": 10},
+            generation_config=GenerationConfig(
+                temperature=0.7, topP=1.0, maxOutputTokens=10
+            ),
         )
 
         response = await chat_service.generate_content(
@@ -557,11 +560,11 @@ async def verify_selected_keys(
         try:
             gemini_request = GeminiRequest(
                 contents=[GeminiContent(role="user", parts=[{"text": "hi"}])],
-                generation_config={
-                    "temperature": 0.7,
-                    "topP": 1.0,
-                    "maxOutputTokens": 10,
-                },
+                generation_config=GenerationConfig(
+                    temperature=0.7,
+                    topP=1.0,
+                    maxOutputTokens=10,
+                ),
             )
             await chat_service.generate_content(
                 settings.TEST_MODEL, gemini_request, api_key

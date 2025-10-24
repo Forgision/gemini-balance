@@ -4,7 +4,7 @@ Configuration service module
 
 import datetime
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from dotenv import find_dotenv, load_dotenv
 from fastapi import HTTPException
@@ -229,13 +229,13 @@ class ConfigService:
         return await ConfigService.get_config()
 
     @staticmethod
-    async def fetch_ui_models() -> List[Dict[str, Any]]:
+    async def fetch_ui_models() -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """Get the list of models for UI display"""
         try:
             key_manager = await get_key_manager_instance(settings.API_KEYS, settings.VERTEX_API_KEYS)
             model_service = ModelService()
 
-            api_key = await key_manager.get_random_valid_key(model_name="gemini-pro")
+            api_key = await key_manager.get_random_valid_key()
             if not api_key:
                 logger.error("No valid API keys available to fetch model list for UI.")
                 raise HTTPException(

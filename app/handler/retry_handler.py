@@ -1,6 +1,6 @@
 import asyncio
 from functools import wraps
-from typing import Callable, TypeVar, cast
+from typing import Any, Callable, TypeVar, cast
 
 from app.config.config import settings
 from app.log.logger import get_retry_logger
@@ -18,7 +18,7 @@ class RetryHandler:
 
     def __call__(self, func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
-        async def wrapper(*args, **kwargs) -> T:
+        async def wrapper(*args, **kwargs) -> Any:
             last_exception = None
 
             for attempt in range(settings.MAX_RETRIES):

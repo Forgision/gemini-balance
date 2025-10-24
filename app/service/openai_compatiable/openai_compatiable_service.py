@@ -1,6 +1,6 @@
 import datetime
 import time
-from typing import Any, AsyncGenerator, Dict, Union
+from typing import Any, AsyncGenerator, Dict, Union, Optional
 
 from app.config.config import settings
 from app.database.services import (
@@ -17,7 +17,7 @@ logger = get_openai_compatible_logger()
 
 
 class OpenAICompatiableService:
-    def __init__(self, base_url: str, key_manager: KeyManager = None):
+    def __init__(self, base_url: str, key_manager: Optional[KeyManager] = None):
         self.key_manager = key_manager
         self.base_url = base_url
         self.api_client = OpenaiApiClient(base_url, settings.TIME_OUT)
@@ -43,15 +43,23 @@ class OpenAICompatiableService:
             request.model, request_dict, api_key
         )
 
+    async def create_image_chat_completion(
+        self,
+        request: ChatRequest,
+        api_key: str,
+    ) -> Union[Dict[str, Any], AsyncGenerator[str, None]]:
+        """Create image chat completion"""
+        return await self.create_chat_completion(request, api_key)
+
     async def generate_images(
         self,
         request: ImageGenerationRequest,
+        api_key: str,
     ) -> Dict[str, Any]:
         """Generate images"""
         request_dict = request.model_dump()
         # Remove null values
         request_dict = {k: v for k, v in request_dict.items() if v is not None}
-        api_key = settings.PAID_KEY
         return await self.api_client.generate_images(request_dict, api_key)
 
     async def create_embeddings(
@@ -73,7 +81,7 @@ class OpenAICompatiableService:
         status_code = None
         response = None
         try:
-            response = await self.api_client.generate_content(request, api_key)
+            response = await self.api_client.generate_content(request, model, api_key)
             is_success = True
             status_code = 200
             return response
@@ -121,7 +129,7 @@ class OpenAICompatiableService:
             final_api_key = current_attempt_key
             try:
                 async for line in self.api_client.stream_generate_content(
-                    payload, current_attempt_key
+                    payload, model, current_attempt_key
                 ):
                     if line.startswith("data:"):
                         # print(line)

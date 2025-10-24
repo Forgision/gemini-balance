@@ -4,7 +4,6 @@ import uuid
 
 from google import genai
 from google.genai import types
-from google.genai.types import generation_types
 
 from app.config.config import settings
 from app.core.constants import VALID_IMAGE_RATIOS
@@ -88,8 +87,8 @@ class ImageCreateService:
                 number_of_images=request.n,
                 output_mime_type="image/png",
                 aspect_ratio=self.aspect_ratio,
-                safety_filter_level=generation_types.SafetyFilterLevel.BLOCK_LOW_AND_ABOVE,
-                person_generation=generation_types.PersonGeneration.ALLOW_ADULT,
+                safety_filter_level=types.SafetyFilterLevel.BLOCK_LOW_AND_ABOVE,
+                person_generation=types.PersonGeneration.ALLOW_ADULT,
             ),
         )
 
@@ -149,8 +148,8 @@ class ImageCreateService:
                         raise ValueError(
                             f"Unsupported upload provider: {settings.UPLOAD_PROVIDER}"
                         )
-
-                    upload_response = image_uploader.upload(image_data, filename)
+                    if image_data:
+                        upload_response = image_uploader.upload(image_data, filename)
 
                     images_data.append(
                         {
@@ -183,3 +182,4 @@ class ImageCreateService:
                         f"![Generated Image {index + 1}](data:image/png;base64,{image_data['b64_json']})"
                     )
             return "\n".join(markdown_images)
+        return ""
