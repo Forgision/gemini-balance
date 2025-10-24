@@ -1,5 +1,5 @@
 """
-定时任务控制路由模块
+Scheduler control route module
 """
 
 from fastapi import APIRouter, Request, HTTPException, status
@@ -26,7 +26,7 @@ async def verify_token(request: Request):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-@router.post("/start", summary="启动定时任务")
+@router.post("/start", summary="Start scheduled tasks")
 async def start_scheduler_endpoint(request: Request):
     """Start the background scheduler task"""
     await verify_token(request)
@@ -41,7 +41,7 @@ async def start_scheduler_endpoint(request: Request):
             detail=f"Failed to start scheduler: {str(e)}"
         )
 
-@router.post("/stop", summary="停止定时任务")
+@router.post("/stop", summary="Stop scheduled tasks")
 async def stop_scheduler_endpoint(request: Request):
     """Stop the background scheduler task"""
     await verify_token(request)

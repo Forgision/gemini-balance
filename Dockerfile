@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 复制所需文件到容器中
+# Copy the required files into the container
 COPY ./requirements.txt /app
 COPY ./VERSION /app
 

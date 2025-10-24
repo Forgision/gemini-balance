@@ -1,5 +1,5 @@
 """
-通用工具函数模块
+General utility functions module
 """
 
 import base64
@@ -22,17 +22,17 @@ VERSION_FILE_PATH = PROJECT_ROOT / "VERSION"
 
 def extract_mime_type_and_data(base64_string: str) -> Tuple[Optional[str], str]:
     """
-    从 base64 字符串中提取 MIME 类型和数据
+    Extracts MIME type and data from a base64 string.
 
     Args:
-        base64_string: 可能包含 MIME 类型信息的 base64 字符串
+        base64_string: A base64 string that may contain MIME type information.
 
     Returns:
         tuple: (mime_type, encoded_data)
     """
-    # 检查字符串是否以 "data:" 格式开始
+    # Check if the string starts with the "data:" format.
     if base64_string.startswith("data:"):
-        # 提取 MIME 类型和数据
+        # Extract MIME type and data.
         pattern = DATA_URL_PATTERN
         match = re.match(pattern, base64_string)
         if match:
@@ -42,26 +42,26 @@ def extract_mime_type_and_data(base64_string: str) -> Tuple[Optional[str], str]:
             encoded_data = match.group(2)
             return mime_type, encoded_data
 
-    # 如果不是预期格式，假定它只是数据部分
+    # If it's not in the expected format, assume it's just the data part.
     return None, base64_string
 
 
 def convert_image_to_base64(url: str) -> str:
     """
-    将图片URL转换为base64编码
+    Converts an image URL to base64 encoding.
 
     Args:
-        url: 图片URL
+        url: The URL of the image.
 
     Returns:
-        str: base64编码的图片数据
+        str: The base64-encoded image data.
 
     Raises:
-        Exception: 如果获取图片失败
+        Exception: If fetching the image fails.
     """
     response = requests.get(url)
     if response.status_code == 200:
-        # 将图片内容转换为base64
+        # Convert the image content to base64.
         img_data = base64.b64encode(response.content).decode("utf-8")
         return img_data
     else:
@@ -70,14 +70,14 @@ def convert_image_to_base64(url: str) -> str:
 
 def format_json_response(data: Dict[str, Any], indent: int = 2) -> str:
     """
-    格式化JSON响应
+    Formats a JSON response.
 
     Args:
-        data: 要格式化的数据
-        indent: 缩进空格数
+        data: The data to format.
+        indent: The number of spaces for indentation.
 
     Returns:
-        str: 格式化后的JSON字符串
+        str: The formatted JSON string.
     """
     return json.dumps(data, indent=indent, ensure_ascii=False)
 
@@ -86,24 +86,24 @@ def parse_prompt_parameters(
     prompt: str, default_ratio: str = "1:1"
 ) -> Tuple[str, int, str]:
     """
-    从prompt中解析参数
+    Parses parameters from a prompt.
 
-    支持的格式:
-    - {n:数量} 例如: {n:2} 生成2张图片
-    - {ratio:比例} 例如: {ratio:16:9} 使用16:9比例
+    Supported formats:
+    - {n:number} e.g.: {n:2} generates 2 images
+    - {ratio:aspect_ratio} e.g.: {ratio:16:9} uses a 16:9 aspect ratio
 
     Args:
-        prompt: 提示文本
-        default_ratio: 默认比例
+        prompt: The prompt text.
+        default_ratio: The default aspect ratio.
 
     Returns:
-        tuple: (清理后的提示文本, 图片数量, 比例)
+        tuple: (cleaned_prompt_text, number_of_images, aspect_ratio)
     """
-    # 默认值
+    # Default values
     n = 1
     aspect_ratio = default_ratio
 
-    # 解析n参数
+    # Parse n parameter
     n_match = re.search(r"{n:(\d+)}", prompt)
     if n_match:
         n = int(n_match.group(1))
@@ -111,7 +111,7 @@ def parse_prompt_parameters(
             raise ValueError(f"Invalid n value: {n}. Must be between 1 and 4.")
         prompt = prompt.replace(n_match.group(0), "").strip()
 
-    # 解析ratio参数
+    # Parse ratio parameter
     ratio_match = re.search(r"{ratio:(\d+:\d+)}", prompt)
     if ratio_match:
         aspect_ratio = ratio_match.group(1)
@@ -126,13 +126,13 @@ def parse_prompt_parameters(
 
 def extract_image_urls_from_markdown(text: str) -> List[str]:
     """
-    从Markdown文本中提取图片URL
+    Extracts image URLs from Markdown text.
 
     Args:
-        text: Markdown文本
+        text: The Markdown text.
 
     Returns:
-        List[str]: 图片URL列表
+        List[str]: A list of image URLs.
     """
     pattern = IMAGE_URL_PATTERN
     matches = re.findall(pattern, text)
@@ -141,19 +141,19 @@ def extract_image_urls_from_markdown(text: str) -> List[str]:
 
 def is_valid_api_key(key: str) -> bool:
     """
-    检查API密钥格式是否有效
+    Checks if the API key format is valid.
 
     Args:
-        key: API密钥
+        key: The API key.
 
     Returns:
-        bool: 如果密钥格式有效则返回True
+        bool: True if the key format is valid, otherwise False.
     """
-    # 检查Gemini API密钥格式
+    # Check Gemini API key format
     if key.startswith("AIza"):
         return len(key) >= 30
 
-    # 检查OpenAI API密钥格式
+    # Check OpenAI API key format
     if key.startswith("sk-"):
         return len(key) >= 30
 
@@ -170,11 +170,11 @@ def redact_key_for_logging(key: str) -> str:
     Returns:
         str: Redacted key in format "first6...last6" or descriptive placeholder for edge cases
     """
-    if not key:
-        return key
+    if not isinstance(key, str) or not key:
+        return "[INVALID_KEY]"
 
     if len(key) <= 12:
-        return f"{key[:3]}...{key[-3:]}"
+        return "[SHORT_KEY]"
     else:
         return f"{key[:6]}...{key[-6:]}"
 

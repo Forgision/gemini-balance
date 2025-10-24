@@ -1,4 +1,4 @@
-{% extends "base.html" %} {% block title %}错误日志管理 - Gemini Balance{%
+{% extends "base.html" %} {% block title %}Error Log Management - Gemini Balance{%
 endblock %} {% block head_extra_styles %}
 <style>
   /* error_logs.html specific styles */
@@ -45,8 +45,8 @@ endblock %} {% block head_extra_styles %}
     .search-container {
       grid-template-columns: 1fr;
     }
-    
-    /* 移动端主容器布局 */
+
+    /* Mobile main container layout */
     .mobile-buttons-container {
       display: flex !important;
       flex-direction: column !important;
@@ -56,16 +56,16 @@ endblock %} {% block head_extra_styles %}
       padding: 0 !important;
       margin: 0 !important;
     }
-    
-    /* 移动端搜索控件布局优化 */
+
+    /* Mobile search controls layout optimization */
     .mobile-search-controls {
       grid-template-columns: 1fr !important;
       gap: 0.75rem !important;
       width: 100% !important;
       margin-bottom: 0.5rem !important;
     }
-    
-    /* 按钮容器在移动端的布局 */
+
+    /* Button container layout on mobile */
     .buttons-container-responsive {
       display: flex !important;
       flex-direction: column !important;
@@ -74,8 +74,8 @@ endblock %} {% block head_extra_styles %}
       align-items: stretch !important;
       justify-content: stretch !important;
     }
-    
-    /* 移动端所有按钮样式 */
+
+    /* All button styles on mobile */
     .buttons-container-responsive button {
       width: 100% !important;
       max-width: 100% !important;
@@ -91,14 +91,14 @@ endblock %} {% block head_extra_styles %}
       text-overflow: ellipsis !important;
     }
   }
-  
-  /* 中等屏幕优化 */
+
+  /* Medium screen optimization */
   @media (max-width: 1024px) and (min-width: 769px) {
     .buttons-container-responsive {
       flex-wrap: wrap !important;
       justify-content: center !important;
     }
-    
+
     .buttons-container-responsive button {
       flex-shrink: 1 !important;
       min-width: 0 !important;
@@ -106,10 +106,10 @@ endblock %} {% block head_extra_styles %}
       padding-right: 0.75rem !important;
     }
   }
-  
-  /* 小屏幕(手机)特殊优化 - 确保按钮在边框内 */
+
+  /* Small screen (mobile) special optimization - ensure buttons are within borders */
   @media (max-width: 640px) {
-    /* 强制重写主容器布局 */
+    /* Force override main container layout */
     .mobile-buttons-container {
       display: flex !important;
       flex-direction: column !important;
@@ -119,14 +119,14 @@ endblock %} {% block head_extra_styles %}
       gap: 1rem !important;
       overflow: visible !important;
     }
-    
-    /* 搜索区域在移动端占满宽度 */
+
+    /* Search area takes full width on mobile */
     .mobile-search-controls {
       width: 100% !important;
       box-sizing: border-box !important;
     }
-    
-    /* 按钮区域完全重新布局 */
+
+    /* Completely re-layout button area */
     .buttons-container-responsive {
       display: flex !important;
       flex-direction: column !important;
@@ -138,8 +138,8 @@ endblock %} {% block head_extra_styles %}
       box-sizing: border-box !important;
       overflow: visible !important;
     }
-    
-    /* 所有按钮统一样式 */
+
+    /* Unified style for all buttons */
     .buttons-container-responsive button {
       display: flex !important;
       align-items: center !important;
@@ -157,19 +157,19 @@ endblock %} {% block head_extra_styles %}
       text-overflow: ellipsis !important;
       flex-shrink: 0 !important;
     }
-    
-    /* 特别针对清空全部按钮 */
+
+    /* Special style for clear all button */
     #deleteAllLogsBtn {
       background-color: #f87171 !important;
       border: 1px solid #f87171 !important;
     }
-    
+
     #deleteAllLogsBtn:hover {
       background-color: #ef4444 !important;
       border: 1px solid #ef4444 !important;
     }
-    
-    /* 确保容器不会溢出父级 */
+
+    /* Ensure container does not overflow parent */
     .mobile-buttons-container,
     .mobile-buttons-container > *,
     .buttons-container-responsive,
@@ -177,44 +177,44 @@ endblock %} {% block head_extra_styles %}
       max-width: 100% !important;
       box-sizing: border-box !important;
     }
-    
-    /* 额外的安全边距控制 */
+
+    /* Extra safe margin control */
     .mobile-buttons-container .grid {
       padding-left: 0 !important;
       padding-right: 0 !important;
       margin-left: 0 !important;
       margin-right: 0 !important;
     }
-    
-    /* 确保主内容区域有适当的内边距 */
+
+    /* Ensure main content area has proper padding */
     .rounded-xl.p-6 {
       padding-left: 1rem !important;
       padding-right: 1rem !important;
     }
   }
-  
-  /* 超小屏幕额外优化 */
+
+  /* Extra small screen optimization */
   @media (max-width: 480px) {
     .mobile-buttons-container {
       gap: 0.75rem !important;
     }
-    
+
     .buttons-container-responsive {
       gap: 0.4rem !important;
     }
-    
+
     .buttons-container-responsive button {
       padding: 0.4rem 0.8rem !important;
       font-size: 0.8rem !important;
     }
-    
-    /* 主容器内边距进一步缩小 */
+
+    /* Further reduce main container padding */
     .rounded-xl.p-6 {
       padding-left: 0.75rem !important;
       padding-right: 0.75rem !important;
     }
-    
-    /* 确保清空全部按钮文字不会太挤 */
+
+    /* Ensure clear all button text is not too crowded */
     #deleteAllLogsBtn i {
       margin-right: 0.25rem !important;
     }
@@ -763,7 +763,7 @@ endblock %} {% block head_extra_styles %}
         alt="Gemini Balance Logo"
         class="h-9 inline-block align-middle mr-2"
       />
-      Gemini Balance - 错误日志
+      Gemini Balance - Error Logs
     </h1>
 
     <!-- Navigation Tabs -->
@@ -773,21 +773,21 @@ endblock %} {% block head_extra_styles %}
         class="nav-link whitespace-nowrap flex items-center justify-center gap-2 px-6 py-3 font-medium rounded-lg text-gray-700 hover:text-gray-900 transition-all duration-200"
         style="background-color: rgba(229, 231, 235, 0.8)"
       >
-        <i class="fas fa-cog"></i> 配置编辑
+        <i class="fas fa-cog"></i> Configuration Edit
       </a>
       <a
         href="/keys"
         class="nav-link whitespace-nowrap flex items-center justify-center gap-2 px-6 py-3 font-medium rounded-lg text-gray-700 hover:text-gray-900 transition-all duration-200"
         style="background-color: rgba(229, 231, 235, 0.8)"
       >
-        <i class="fas fa-tachometer-alt"></i> 监控面板
+        <i class="fas fa-tachometer-alt"></i> Monitoring Panel
       </a>
       <a
         href="/logs"
         class="main-nav-btn whitespace-nowrap flex items-center justify-center gap-2 px-6 py-3 font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
         style="background-color: #3b82f6 !important; color: #ffffff !important;"
       >
-        <i class="fas fa-exclamation-triangle"></i> 错误日志
+        <i class="fas fa-exclamation-triangle"></i> Error Logs
       </a>
     </div>
 
@@ -804,10 +804,10 @@ endblock %} {% block head_extra_styles %}
       <h2
         class="text-xl font-bold mb-6 pb-3 border-b flex items-center gap-2 text-gray-100 border-violet-300 border-opacity-30"
       >
-        <i class="fas fa-bug text-violet-400"></i> 错误日志列表
+        <i class="fas fa-bug text-violet-400"></i> Error Log List
       </h2>
 
-      <!-- 搜索与操作控件 -->
+      <!-- Search and Action Controls -->
       <div
         class="grid grid-cols-1 lg:grid-cols-[1fr_auto] items-center gap-4 mb-6 mobile-buttons-container"
       >
@@ -817,19 +817,19 @@ endblock %} {% block head_extra_styles %}
           <input
             type="text"
             id="keySearch"
-            placeholder="搜索密钥 (部分)"
+            placeholder="Search Key (partial)"
             class="px-3 py-1 rounded-lg form-input-themed"
           />
           <input
             type="text"
             id="errorSearch"
-            placeholder="搜索错误类型/日志"
+            placeholder="Search Error Type/Log"
             class="px-3 py-1 rounded-lg form-input-themed"
           />
           <input
             type="text"
             id="errorCodeSearch"
-            placeholder="搜索错误码"
+            placeholder="Search Error Code"
             class="px-3 py-1 rounded-lg form-input-themed"
           />
           <div
@@ -837,7 +837,7 @@ endblock %} {% block head_extra_styles %}
           >
             <div class="flex items-center gap-2">
               <label class="text-sm text-gray-300 whitespace-nowrap"
-                >开始时间:</label
+                >Start Time:</label
               >
               <input
                 type="datetime-local"
@@ -847,7 +847,7 @@ endblock %} {% block head_extra_styles %}
             </div>
             <div class="flex items-center gap-2">
               <label class="text-sm text-gray-300 whitespace-nowrap"
-                >结束时间:</label
+                >End Time:</label
               >
               <input
                 type="datetime-local"
@@ -862,28 +862,28 @@ endblock %} {% block head_extra_styles %}
             id="searchBtn"
             class="flex items-center justify-center px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md whitespace-nowrap"
           >
-            <i class="fas fa-search mr-1.5"></i>搜索
+            <i class="fas fa-search mr-1.5"></i>Search
           </button>
           <button
             id="copySelectedKeysBtn"
             class="flex items-center justify-center px-4 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md whitespace-nowrap"
             disabled
           >
-            <i class="far fa-copy mr-1.5"></i>复制
+            <i class="far fa-copy mr-1.5"></i>Copy
           </button>
           <button
             id="deleteSelectedBtn"
             class="flex items-center justify-center px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md whitespace-nowrap"
             disabled
           >
-            <i class="fas fa-trash-alt mr-1.5"></i>删除
+            <i class="fas fa-trash-alt mr-1.5"></i>Delete
           </button>
           <button
             id="deleteAllLogsBtn"
             class="flex items-center justify-center px-4 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md whitespace-nowrap"
-            title="清空所有错误日志"
+            title="Clear all error logs"
           >
-            <i class="fas fa-dumpster-fire mr-1.5"></i>清空全部
+            <i class="fas fa-dumpster-fire mr-1.5"></i>Clear All
           </button>
         </div>
       </div>
@@ -911,15 +911,15 @@ endblock %} {% block head_extra_styles %}
               >
                 ID <i class="fas fa-sort ml-1"></i>
               </th>
-              <th class="px-5 py-3 font-semibold text-gray-700">Gemini密钥</th>
-              <th class="px-5 py-3 font-semibold text-gray-700">错误类型</th>
-              <th class="px-5 py-3 font-semibold text-gray-700">错误码</th>
-              <th class="px-5 py-3 font-semibold text-gray-700">模型名称</th>
-              <th class="px-5 py-3 font-semibold text-gray-700">请求时间</th>
+              <th class="px-5 py-3 font-semibold text-gray-700">Gemini Key</th>
+              <th class="px-5 py-3 font-semibold text-gray-700">Error Type</th>
+              <th class="px-5 py-3 font-semibold text-gray-700">Error Code</th>
+              <th class="px-5 py-3 font-semibold text-gray-700">Model Name</th>
+              <th class="px-5 py-3 font-semibold text-gray-700">Request Time</th>
               <th
                 class="px-5 py-3 font-semibold text-gray-700 rounded-tr-lg text-center"
               >
-                操作
+                Actions
               </th>
             </tr>
           </thead>
@@ -928,12 +928,12 @@ endblock %} {% block head_extra_styles %}
             class="divide-y"
             style="border-color: rgba(0, 0, 0, 0.08)"
           >
-            <!-- 错误日志数据将通过JavaScript动态加载 -->
+            <!-- Error log data will be dynamically loaded via JavaScript -->
           </tbody>
         </table>
       </div>
 
-      <!-- 状态指示器 -->
+      <!-- Status Indicators -->
       <div
         id="loadingIndicator"
         class="flex items-center justify-center p-8 hidden"
@@ -941,12 +941,12 @@ endblock %} {% block head_extra_styles %}
         <div
           class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"
         ></div>
-        <p class="ml-4 text-lg text-gray-600 font-medium">加载中，请稍候...</p>
+        <p class="ml-4 text-lg text-gray-600 font-medium">Loading, please wait...</p>
       </div>
 
       <div id="noDataMessage" class="text-center py-12 text-gray-600 hidden">
         <i class="fas fa-inbox text-5xl mb-3"></i>
-        <p class="text-lg">暂无错误日志数据</p>
+        <p class="text-lg">No error log data available</p>
       </div>
 
       <div
@@ -955,16 +955,16 @@ endblock %} {% block head_extra_styles %}
         style="background-color: rgba(220, 38, 38, 0.2); color: #fca5a5"
       >
         <i class="fas fa-exclamation-circle mr-2"></i>
-        加载错误日志失败，请稍后重试。
+        Failed to load error logs, please try again later.
       </div>
 
-      <!-- 分页与每页显示控件 -->
+      <!-- Pagination and Page Size Controls -->
       <div
         class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4"
       >
         <div class="pagination-container text-sm text-gray-700">
           <label for="pageSize" class="font-medium pagination-text"
-            >每页显示:</label
+            >Show per page:</label
           >
           <select
             id="pageSize"
@@ -975,11 +975,11 @@ endblock %} {% block head_extra_styles %}
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
-          <span class="pagination-text">条</span>
+          <span class="pagination-text">items</span>
         </div>
         <div class="flex items-center gap-4">
           <ul class="pagination flex items-center gap-1" id="pagination">
-            <!-- 分页控件将通过JavaScript动态加载 -->
+            <!-- Pagination controls will be dynamically loaded via JavaScript -->
           </ul>
           <div class="flex items-center gap-1">
             <input
@@ -987,13 +987,13 @@ endblock %} {% block head_extra_styles %}
               id="pageInput"
               min="1"
               class="w-16 px-2 py-1 rounded-md text-sm form-input-themed"
-              placeholder="页码"
+              placeholder="Page"
             />
             <button
               id="goToPageBtn"
               class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition"
             >
-              跳转
+              Go
             </button>
           </div>
         </div>
@@ -1004,10 +1004,10 @@ endblock %} {% block head_extra_styles %}
 
 <!-- Scroll buttons are now in base.html -->
 <div class="scroll-buttons">
-  <button class="scroll-button" onclick="scrollToTop()" title="回到顶部">
+  <button class="scroll-button" onclick="scrollToTop()" title="Scroll to Top">
     <i class="fas fa-chevron-up"></i>
   </button>
-  <button class="scroll-button" onclick="scrollToBottom()" title="滚动到底部">
+  <button class="scroll-button" onclick="scrollToBottom()" title="Scroll to Bottom">
     <i class="fas fa-chevron-down"></i>
   </button>
 </div>
@@ -1016,7 +1016,7 @@ endblock %} {% block head_extra_styles %}
 <div id="notification" class="notification"></div>
 <!-- Footer is now in base.html -->
 
-<!-- 日志详情模态框 -->
+<!-- Log Detail Modal -->
 <div id="logDetailModal" class="modal">
   <div
     class="w-full max-w-6xl mx-auto rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
@@ -1031,7 +1031,7 @@ endblock %} {% block head_extra_styles %}
         class="flex justify-between items-center pb-4 mb-4"
         style="border-bottom: 1px solid #e5e7eb"
       >
-        <h2 class="text-xl font-bold text-gray-800">错误日志详情</h2>
+        <h2 class="text-xl font-bold text-gray-800">Error Log Details</h2>
         <button
           id="closeLogDetailModalBtn"
           class="text-gray-600 hover:text-gray-800 text-xl"
@@ -1046,7 +1046,7 @@ endblock %} {% block head_extra_styles %}
           style="background-color: #f8fafc"
         >
           <h6 class="text-sm font-semibold text-blue-600 mb-1">
-            Gemini密钥:
+            Gemini Key:
           </h6>
           <pre
             id="modalGeminiKey"
@@ -1057,7 +1057,7 @@ endblock %} {% block head_extra_styles %}
             class="copy-btn absolute top-2 right-2 hover:bg-gray-200 text-gray-600 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             style="background-color: #e2e8f0"
             data-target="modalGeminiKey"
-            title="复制密钥"
+            title="Copy Key"
           >
             <i class="far fa-copy"></i>
           </button>
@@ -1067,13 +1067,13 @@ endblock %} {% block head_extra_styles %}
           class="p-4 rounded-lg relative group"
           style="background-color: #f8fafc"
         >
-          <h6 class="text-sm font-semibold text-blue-600 mb-1">错误类型:</h6>
+          <h6 class="text-sm font-semibold text-blue-600 mb-1">Error Type:</h6>
           <p id="modalErrorType" class="text-red-600 font-medium pr-8"></p>
           <button
             class="copy-btn absolute top-2 right-2 hover:bg-gray-200 text-gray-600 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             style="background-color: #e2e8f0"
             data-target="modalErrorType"
-            title="复制错误类型"
+            title="Copy Error Type"
           >
             <i class="far fa-copy"></i>
           </button>
@@ -1083,7 +1083,7 @@ endblock %} {% block head_extra_styles %}
           class="p-4 rounded-lg relative group"
           style="background-color: #f8fafc"
         >
-          <h6 class="text-sm font-semibold text-blue-600 mb-1">错误日志:</h6>
+          <h6 class="text-sm font-semibold text-blue-600 mb-1">Error Log:</h6>
           <pre
             id="modalErrorLog"
             class="font-mono text-sm p-3 rounded overflow-x-auto whitespace-pre-wrap"
@@ -1093,7 +1093,7 @@ endblock %} {% block head_extra_styles %}
             class="copy-btn absolute top-2 right-2 hover:bg-gray-200 text-gray-600 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             style="background-color: #e2e8f0"
             data-target="modalErrorLog"
-            title="复制错误日志"
+            title="Copy Error Log"
           >
             <i class="far fa-copy"></i>
           </button>
@@ -1103,7 +1103,7 @@ endblock %} {% block head_extra_styles %}
           class="p-4 rounded-lg relative group"
           style="background-color: #f8fafc"
         >
-          <h6 class="text-sm font-semibold text-blue-600 mb-1">请求消息:</h6>
+          <h6 class="text-sm font-semibold text-blue-600 mb-1">Request Message:</h6>
           <pre
             id="modalRequestMsg"
             class="font-mono text-sm p-3 rounded overflow-x-auto whitespace-pre-wrap"
@@ -1113,7 +1113,7 @@ endblock %} {% block head_extra_styles %}
             class="copy-btn absolute top-2 right-2 hover:bg-gray-200 text-gray-600 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             style="background-color: #e2e8f0"
             data-target="modalRequestMsg"
-            title="复制请求消息"
+            title="Copy Request Message"
           >
             <i class="far fa-copy"></i>
           </button>
@@ -1123,13 +1123,13 @@ endblock %} {% block head_extra_styles %}
           class="p-4 rounded-lg relative group"
           style="background-color: #f8fafc"
         >
-          <h6 class="text-sm font-semibold text-blue-600 mb-1">模型名称:</h6>
+          <h6 class="text-sm font-semibold text-blue-600 mb-1">Model Name:</h6>
           <p id="modalModelName" class="font-medium pr-8 text-gray-700"></p>
           <button
             class="copy-btn absolute top-2 right-2 hover:bg-gray-200 text-gray-600 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             style="background-color: #e2e8f0"
             data-target="modalModelName"
-            title="复制模型名称"
+            title="Copy Model Name"
           >
             <i class="far fa-copy"></i>
           </button>
@@ -1139,13 +1139,13 @@ endblock %} {% block head_extra_styles %}
           class="p-4 rounded-lg relative group"
           style="background-color: #f8fafc"
         >
-          <h6 class="text-sm font-semibold text-blue-600 mb-1">请求时间:</h6>
+          <h6 class="text-sm font-semibold text-blue-600 mb-1">Request Time:</h6>
           <p id="modalRequestTime" class="font-medium pr-8 text-gray-700"></p>
           <button
             class="copy-btn absolute top-2 right-2 hover:bg-gray-200 text-gray-600 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             style="background-color: #e2e8f0"
             data-target="modalRequestTime"
-            title="复制请求时间"
+            title="Copy Request Time"
           >
             <i class="far fa-copy"></i>
           </button>
@@ -1161,14 +1161,14 @@ endblock %} {% block head_extra_styles %}
           id="closeModalFooterBtn"
           class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition"
         >
-          关闭
+          Close
         </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- 删除确认模态框 -->
+<!-- Delete Confirmation Modal -->
 <div id="deleteConfirmModal" class="modal">
   <div
     class="w-full max-w-md mx-auto rounded-xl shadow-xl overflow-hidden animate-fade-in"
@@ -1183,7 +1183,7 @@ endblock %} {% block head_extra_styles %}
         class="flex justify-between items-center pb-3 mb-4"
         style="border-bottom: 1px solid #e5e7eb"
       >
-        <h2 class="text-lg font-semibold text-gray-800">确认删除</h2>
+        <h2 class="text-lg font-semibold text-gray-800">Confirm Deletion</h2>
         <button
           id="closeDeleteConfirmModalBtn"
           class="text-gray-600 hover:text-gray-800 text-xl"
@@ -1192,7 +1192,7 @@ endblock %} {% block head_extra_styles %}
         </button>
       </div>
       <p id="deleteConfirmMessage" class="text-gray-700 mb-6">
-        你确定要删除选中的项目吗？此操作不可恢复！
+        Are you sure you want to delete the selected items? This action cannot be undone!
       </p>
       <div class="flex justify-end gap-3">
         <button
@@ -1200,14 +1200,14 @@ endblock %} {% block head_extra_styles %}
           type="button"
           class="bg-gray-500 hover:bg-gray-600 text-white px-5 py-2 rounded-lg font-medium transition"
         >
-          取消
+          Cancel
         </button>
         <button
           id="confirmDeleteBtn"
           type="button"
           class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg font-medium transition"
         >
-          确认删除
+          Confirm Delete
         </button>
       </div>
     </div>

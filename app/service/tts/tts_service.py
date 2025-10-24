@@ -30,7 +30,7 @@ def _create_wav_file(audio_data: bytes) -> bytes:
 class TTSService:
     async def create_tts(self, request: TTSRequest, api_key: str) -> Optional[bytes]:
         """
-        使用 Google Gemini SDK 创建音频。
+        Create audio using the Google Gemini SDK.
         """
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()

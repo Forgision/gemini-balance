@@ -1,6 +1,6 @@
 """
-原生Gemini TTS响应处理器扩展
-继承自原始响应处理器，添加原生Gemini TTS支持，保持向后兼容
+Native Gemini TTS response handler extension
+Inherits from the original response handler, adding native Gemini TTS support, while maintaining backward compatibility
 """
 
 from typing import Any, Dict, Optional
@@ -12,27 +12,27 @@ logger = get_gemini_logger()
 
 class TTSResponseHandler(GeminiResponseHandler):
     """
-    支持TTS的响应处理器
-    继承自原始的GeminiResponseHandler，添加TTS响应处理
+    Response handler with TTS support
+    Inherits from the original GeminiResponseHandler, adding TTS response handling
     """
 
     def handle_response(
         self, response: Dict[str, Any], model: str, stream: bool = False, usage_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        处理响应，支持TTS音频数据
+        Handle the response, with support for TTS audio data
         """
-        # 检查是否是TTS响应（包含音频数据）
+        # Check if it's a TTS response (contains audio data)
         if self._is_tts_response(response):
             logger.info("Detected TTS response with audio data, returning original response")
             return response
         
-        # 对于非TTS响应，使用父类的处理方法
+        # For non-TTS responses, use the parent class's handling method
         return super().handle_response(response, model, stream, usage_metadata)
 
     def _is_tts_response(self, response: Dict[str, Any]) -> bool:
         """
-        检查是否是TTS响应
+        Check if it's a TTS response
         """
         try:
             if (response.get("candidates") and

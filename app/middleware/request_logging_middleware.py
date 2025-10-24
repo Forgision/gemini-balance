@@ -8,18 +8,18 @@ from app.log.logger import get_request_logger
 logger = get_request_logger()
 
 
-# 添加中间件类
+# Add middleware class
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # 记录请求路径
+        # Log request path
         logger.info(f"Request path: {request.url.path}")
 
-        # 获取并记录请求体
+        # Get and log the request body
         try:
             body = await request.body()
             if body:
                 body_str = body.decode()
-                # 尝试格式化JSON
+                # Try to format JSON
                 try:
                     formatted_body = json.loads(body_str)
                     logger.info(
@@ -30,7 +30,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             logger.error(f"Error reading request body: {str(e)}")
 
-        # 重置请求的接收器，以便后续处理器可以继续读取请求体
+        # Reset the request's receiver so that subsequent handlers can continue to read the request body
         async def receive():
             return {"type": "http.request", "body": body, "more_body": False}
 

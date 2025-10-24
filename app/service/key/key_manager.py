@@ -4,6 +4,7 @@ from itertools import cycle
 from typing import Dict, Union
 
 from app.config.config import settings
+from app.database.services import get_usage_stats_by_key_and_model
 from app.log.logger import get_key_manager_logger
 from app.utils.helpers import redact_key_for_logging
 
@@ -31,39 +32,39 @@ class KeyManager:
         return self.paid_key
 
     async def get_next_key(self) -> str:
-        """获取下一个API key"""
+        """Get the next API key."""
         async with self.key_cycle_lock:
             return next(self.key_cycle)
 
     async def get_next_vertex_key(self) -> str:
-        """获取下一个 Vertex Express API key"""
+        """Get the next Vertex Express API key."""
         async with self.vertex_key_cycle_lock:
             return next(self.vertex_key_cycle)
 
     async def is_key_valid(self, key: str) -> bool:
-        """检查key是否有效"""
+        """Check if the key is valid."""
         async with self.failure_count_lock:
             return self.key_failure_counts[key] < self.MAX_FAILURES
 
     async def is_vertex_key_valid(self, key: str) -> bool:
-        """检查 Vertex key 是否有效"""
+        """Check if the Vertex key is valid."""
         async with self.vertex_failure_count_lock:
             return self.vertex_key_failure_counts[key] < self.MAX_FAILURES
 
     async def reset_failure_counts(self):
-        """重置所有key的失败计数"""
+        """Reset the failure count for all keys."""
         async with self.failure_count_lock:
             for key in self.key_failure_counts:
                 self.key_failure_counts[key] = 0
 
     async def reset_vertex_failure_counts(self):
-        """重置所有 Vertex key 的失败计数"""
+        """Reset the failure count for all Vertex keys."""
         async with self.vertex_failure_count_lock:
             for key in self.vertex_key_failure_counts:
                 self.vertex_key_failure_counts[key] = 0
 
     async def reset_key_failure_count(self, key: str) -> bool:
-        """重置指定key的失败计数"""
+        """Reset the failure count for a specific key."""
         async with self.failure_count_lock:
             if key in self.key_failure_counts:
                 self.key_failure_counts[key] = 0
@@ -75,7 +76,7 @@ class KeyManager:
             return False
 
     async def reset_vertex_key_failure_count(self, key: str) -> bool:
-        """重置指定 Vertex key 的失败计数"""
+        """Reset the failure count for a specific Vertex key."""
         async with self.vertex_failure_count_lock:
             if key in self.vertex_key_failure_counts:
                 self.vertex_key_failure_counts[key] = 0
@@ -86,21 +87,30 @@ class KeyManager:
             )
             return False
 
-    async def get_next_working_key(self) -> str:
-        """获取下一可用的API key"""
-        initial_key = await self.get_next_key()
-        current_key = initial_key
+    async def get_usage_stats(self, api_key: str, model_name: str) -> Dict[str, int]:
+        """Get usage statistics for a given key and model."""
+        return await get_usage_stats_by_key_and_model(api_key, model_name)
 
-        while True:
-            if await self.is_key_valid(current_key):
-                return current_key
+    async def get_next_working_key(self, model_name: str) -> str:
+        """Get the next available API key with the lowest RPM."""
+        valid_keys = [
+            key for key in self.api_keys if await self.is_key_valid(key)
+        ]
 
-            current_key = await self.get_next_key()
-            if current_key == initial_key:
-                return current_key
+        if not valid_keys:
+            return await self.get_next_key()
+
+        key_usage = {}
+        for key in valid_keys:
+            usage = await self.get_usage_stats(key, model_name)
+            key_usage[key] = usage["rpm"] if usage else 0
+
+        # Select the key with the lowest RPM
+        best_key = min(key_usage, key=key_usage.get)
+        return best_key
 
     async def get_next_working_vertex_key(self) -> str:
-        """获取下一可用的 Vertex Express API key"""
+        """Get the next available Vertex Express API key."""
         initial_key = await self.get_next_vertex_key()
         current_key = initial_key
 
@@ -113,7 +123,7 @@ class KeyManager:
                 return current_key
 
     async def handle_api_failure(self, api_key: str, retries: int) -> str:
-        """处理API调用失败"""
+        """Handle API call failure."""
         async with self.failure_count_lock:
             self.key_failure_counts[api_key] += 1
             if self.key_failure_counts[api_key] >= self.MAX_FAILURES:
@@ -126,7 +136,7 @@ class KeyManager:
             return ""
 
     async def handle_vertex_api_failure(self, api_key: str, retries: int) -> str:
-        """处理 Vertex Express API 调用失败"""
+        """Handle Vertex Express API call failure."""
         async with self.vertex_failure_count_lock:
             self.vertex_key_failure_counts[api_key] += 1
             if self.vertex_key_failure_counts[api_key] >= self.MAX_FAILURES:
@@ -135,15 +145,15 @@ class KeyManager:
                 )
 
     def get_fail_count(self, key: str) -> int:
-        """获取指定密钥的失败次数"""
+        """Get the failure count for a specific key."""
         return self.key_failure_counts.get(key, 0)
 
     def get_vertex_fail_count(self, key: str) -> int:
-        """获取指定 Vertex 密钥的失败次数"""
+        """Get the failure count for a specific Vertex key."""
         return self.vertex_key_failure_counts.get(key, 0)
 
     async def get_all_keys_with_fail_count(self) -> dict:
-        """获取所有API key及其失败次数"""
+        """Get all API keys and their failure counts."""
         all_keys = {}
         async with self.failure_count_lock:
             for key in self.api_keys:
@@ -155,7 +165,7 @@ class KeyManager:
         return {"valid_keys": valid_keys, "invalid_keys": invalid_keys, "all_keys": all_keys}
 
     async def get_keys_by_status(self) -> dict:
-        """获取分类后的API key列表，包括失败次数"""
+        """Get a list of categorized API keys, including failure counts."""
         valid_keys = {}
         invalid_keys = {}
 
@@ -170,7 +180,7 @@ class KeyManager:
         return {"valid_keys": valid_keys, "invalid_keys": invalid_keys}
 
     async def get_vertex_keys_by_status(self) -> dict:
-        """获取分类后的 Vertex Express API key 列表，包括失败次数"""
+        """Get a list of categorized Vertex Express API keys, including failure counts."""
         valid_keys = {}
         invalid_keys = {}
 
@@ -184,7 +194,7 @@ class KeyManager:
         return {"valid_keys": valid_keys, "invalid_keys": invalid_keys}
 
     async def get_first_valid_key(self) -> str:
-        """获取第一个有效的API key"""
+        """Get the first valid API key."""
         async with self.failure_count_lock:
             for key in self.key_failure_counts:
                 if self.key_failure_counts[key] < self.MAX_FAILURES:
@@ -197,7 +207,7 @@ class KeyManager:
         return self.api_keys[0]
 
     async def get_random_valid_key(self) -> str:
-        """获取随机的有效API key"""
+        """Get a random valid API key."""
         valid_keys = []
         async with self.failure_count_lock:
             for key in self.key_failure_counts:
@@ -207,7 +217,7 @@ class KeyManager:
         if valid_keys:
             return random.choice(valid_keys)
         
-        # 如果没有有效的key，返回第一个key作为fallback
+        # If there are no valid keys, return the first key as a fallback
         if self.api_keys:
             logger.warning("No valid keys available, returning first key as fallback.")
             return self.api_keys[0]
@@ -230,11 +240,11 @@ async def get_key_manager_instance(
     api_keys: list = None, vertex_api_keys: list = None
 ) -> KeyManager:
     """
-    获取 KeyManager 单例实例。
+    Get the KeyManager singleton instance.
 
-    如果尚未创建实例，将使用提供的 api_keys,vertex_api_keys 初始化 KeyManager。
-    如果已创建实例，则忽略 api_keys 参数，返回现有单例。
-    如果在重置后调用，会尝试恢复之前的状态（失败计数、循环位置）。
+    If the instance has not been created, it will be initialized with the provided api_keys and vertex_api_keys.
+    If the instance has already been created, the api_keys parameter is ignored, and the existing singleton is returned.
+    If called after a reset, it will attempt to restore the previous state (failure counts, cycle position).
     """
     global _singleton_instance, _preserved_failure_counts, _preserved_vertex_failure_counts, _preserved_old_api_keys_for_reset, _preserved_vertex_old_api_keys_for_reset, _preserved_next_key_in_cycle, _preserved_vertex_next_key_in_cycle
 
@@ -263,7 +273,7 @@ async def get_key_manager_instance(
                 f"KeyManager instance created/re-created with {len(api_keys)} API keys and {len(vertex_api_keys)} Vertex Express API keys."
             )
 
-            # 1. 恢复失败计数
+            # 1. Restore failure counts
             if _preserved_failure_counts:
                 current_failure_counts = {
                     key: 0 for key in _singleton_instance.api_keys
@@ -288,7 +298,7 @@ async def get_key_manager_instance(
                 logger.info("Inherited failure counts for applicable Vertex keys.")
             _preserved_vertex_failure_counts = None
 
-            # 2. 调整 key_cycle 的起始点
+            # 2. Adjust the starting point of the key_cycle
             start_key_for_new_cycle = None
             if (
                 _preserved_old_api_keys_for_reset
@@ -354,11 +364,11 @@ async def get_key_manager_instance(
                         "New key cycle not applicable as the new API key list is empty."
                     )
 
-            # 清理所有保存的状态
+            # Clean up all saved states
             _preserved_old_api_keys_for_reset = None
             _preserved_next_key_in_cycle = None
 
-            # 3. 调整 vertex_key_cycle 的起始点
+            # 3. Adjust the starting point of the vertex_key_cycle
             start_key_for_new_vertex_cycle = None
             if (
                 _preserved_vertex_old_api_keys_for_reset
@@ -424,7 +434,7 @@ async def get_key_manager_instance(
                         "New Vertex key cycle not applicable as the new Vertex Express API key list is empty."
                     )
 
-            # 清理所有保存的状态
+            # Clean up all saved states
             _preserved_vertex_old_api_keys_for_reset = None
             _preserved_vertex_next_key_in_cycle = None
 
@@ -433,26 +443,26 @@ async def get_key_manager_instance(
 
 async def reset_key_manager_instance():
     """
-    重置 KeyManager 单例实例。
-    将保存当前实例的状态（失败计数、旧 API keys、下一个 key 提示）
-    以供下一次 get_key_manager_instance 调用时恢复。
+    Reset the KeyManager singleton instance.
+    This will save the state of the current instance (failure counts, old API keys, next key hint)
+    to be restored on the next call to get_key_manager_instance.
     """
     global _singleton_instance, _preserved_failure_counts, _preserved_vertex_failure_counts, _preserved_old_api_keys_for_reset, _preserved_vertex_old_api_keys_for_reset, _preserved_next_key_in_cycle, _preserved_vertex_next_key_in_cycle
     async with _singleton_lock:
         if _singleton_instance:
-            # 1. 保存失败计数
+            # 1. Save failure counts
             _preserved_failure_counts = _singleton_instance.key_failure_counts.copy()
             _preserved_vertex_failure_counts = (
                 _singleton_instance.vertex_key_failure_counts.copy()
             )
 
-            # 2. 保存旧的 API keys 列表
+            # 2. Save the old list of API keys
             _preserved_old_api_keys_for_reset = _singleton_instance.api_keys.copy()
             _preserved_vertex_old_api_keys_for_reset = (
                 _singleton_instance.vertex_api_keys.copy()
             )
 
-            # 3. 保存 key_cycle 的下一个 key 提示
+            # 3. Save the next key hint for the key_cycle
             try:
                 if _singleton_instance.api_keys:
                     _preserved_next_key_in_cycle = (
@@ -469,7 +479,7 @@ async def reset_key_manager_instance():
                 logger.error(f"Error preserving next key hint during reset: {e}")
                 _preserved_next_key_in_cycle = None
 
-            # 4. 保存 vertex_key_cycle 的下一个 key 提示
+            # 4. Save the next key hint for the vertex_key_cycle
             try:
                 if _singleton_instance.vertex_api_keys:
                     _preserved_vertex_next_key_in_cycle = (

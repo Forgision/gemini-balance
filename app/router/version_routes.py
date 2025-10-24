@@ -10,15 +10,15 @@ router = APIRouter(prefix="/api/version", tags=["Version"])
 logger = get_update_logger()
 
 class VersionInfo(BaseModel):
-    current_version: str = Field(..., description="当前应用程序版本")
-    latest_version: Optional[str] = Field(None, description="可用的最新版本")
-    update_available: bool = Field(False, description="是否有可用更新")
-    error_message: Optional[str] = Field(None, description="检查更新时发生的错误信息")
+    current_version: str = Field(..., description="Current application version")
+    latest_version: Optional[str] = Field(None, description="Latest available version")
+    update_available: bool = Field(False, description="Whether an update is available")
+    error_message: Optional[str] = Field(None, description="Error message that occurred while checking for updates")
 
-@router.get("/check", response_model=VersionInfo, summary="检查应用程序更新")
+@router.get("/check", response_model=VersionInfo, summary="Check for application updates")
 async def get_version_info():
     """
-    检查当前应用程序版本与最新的 GitHub release 版本。
+    Check the current application version against the latest GitHub release version.
     """
     try:
         current_version = get_current_version()
@@ -34,4 +34,4 @@ async def get_version_info():
         )
     except Exception as e:
         logger.error(f"Error in /api/version/check endpoint: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="检查版本信息时发生内部错误")
+        raise HTTPException(status_code=500, detail="An internal error occurred while checking version information")

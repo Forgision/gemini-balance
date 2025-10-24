@@ -34,7 +34,7 @@ async def get_next_working_key_wrapper(
 
 
 async def get_openai_service(key_manager: KeyManager = Depends(get_key_manager)):
-    """获取OpenAI聊天服务实例"""
+    """Get the OpenAI chat service instance."""
     return OpenAICompatiableService(settings.BASE_URL, key_manager)
 
 
@@ -44,7 +44,7 @@ async def list_models(
     key_manager: KeyManager = Depends(get_key_manager),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    """获取可用模型列表。"""
+    """Get the list of available models."""
     operation_name = "list_models"
     async with handle_route_errors(logger, operation_name):
         logger.info("Handling models list request")
@@ -63,7 +63,7 @@ async def chat_completion(
     key_manager: KeyManager = Depends(get_key_manager),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    """处理聊天补全请求，支持流式响应和特定模型切换。"""
+    """Handle chat completion requests, supporting streaming responses and specific model switching."""
     operation_name = "chat_completion"
     is_image_chat = request.model == f"{settings.CREATE_IMAGE_MODEL}-chat"
     current_api_key = api_key
@@ -87,19 +87,19 @@ async def chat_completion(
             )
         if request.stream:
             try:
-                # 尝试获取第一条数据，判断是正常 SSE（data: 前缀）还是错误 JSON
+                # Try to get the first piece of data to determine if it is a normal SSE (data: prefix) or an error JSON
                 first_chunk = await raw_response.__anext__()
             except StopAsyncIteration:
-                # 如果流直接结束，退回标准 SSE 输出
+                # If the stream ends directly, return a standard SSE output
                 return StreamingResponse(raw_response, media_type="text/event-stream")
             except Exception as e:
-                # 初始化流异常，直接返回 500 错误
+                # Initialization stream exception, return a 500 error directly
                 return JSONResponse(
                     content={"error": {"code": e.args[0], "message": e.args[1]}},
                     status_code=e.args[0],
                 )
 
-            # 如果以 "data:" 开头，代表正常 SSE，将首块和后续块一起发送
+            # If it starts with "data:", it means it is a normal SSE, and the first block and subsequent blocks will be sent together
             if isinstance(first_chunk, str) and first_chunk.startswith("data:"):
 
                 async def combined():
@@ -118,7 +118,7 @@ async def generate_image(
     allowed_token=Depends(security_service.verify_authorization),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    """处理图像生成请求。"""
+    """Handle image generation requests."""
     operation_name = "generate_image"
     async with handle_route_errors(logger, operation_name):
         logger.info(f"Handling image generation request for prompt: {request.prompt}")
@@ -134,7 +134,7 @@ async def embedding(
     key_manager: KeyManager = Depends(get_key_manager),
     openai_service: OpenAICompatiableService = Depends(get_openai_service),
 ):
-    """处理文本嵌入请求。"""
+    """Handle text embedding requests."""
     operation_name = "embedding"
     async with handle_route_errors(logger, operation_name):
         logger.info(f"Handling embedding request for model: {request.model}")

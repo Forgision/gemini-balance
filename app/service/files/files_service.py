@@ -1,5 +1,5 @@
 """
-文件管理服务
+File Management Service
 """
 import json
 from datetime import datetime, timedelta, timezone
@@ -19,20 +19,20 @@ from app.service.key.key_manager import get_key_manager_instance
 
 logger = get_files_logger()
 
-# 全局上傳會話存儲
+# Global upload session storage
 _upload_sessions: Dict[str, Dict[str, Any]] = {}
 _upload_sessions_lock = asyncio.Lock()
 
 
 class FilesService:
-    """文件管理服务类"""
+    """File management service class"""
     
     def __init__(self):
         self.api_client = GeminiApiClient(base_url=settings.BASE_URL)
         self.key_manager = None
     
     async def _get_key_manager(self):
-        """获取 KeyManager 实例"""
+        """Get KeyManager instance"""
         if not self.key_manager:
             self.key_manager = await get_key_manager_instance(
                 settings.API_KEYS, 
@@ -45,43 +45,43 @@ class FilesService:
         headers: Dict[str, str], 
         body: Optional[bytes],
         user_token: str,
-        request_host: str = None  # 添加請求主機參數
+        request_host: str = None  # Add request host parameter
     ) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """
-        初始化文件上传
+        Initialize file upload
         
         Args:
-            headers: 请求头
-            body: 请求体
-            user_token: 用户令牌
+            headers: Request headers
+            body: Request body
+            user_token: User token
             
         Returns:
-            Tuple[Dict[str, Any], Dict[str, str]]: (响应体, 响应头)
+            Tuple[Dict[str, Any], Dict[str, str]]: (Response body, Response headers)
         """
         try:
-            # 获取可用的 API key
+            # Get an available API key
             key_manager = await self._get_key_manager()
             api_key = await key_manager.get_next_key()
             
             if not api_key:
                 raise HTTPException(status_code=503, detail="No available API keys")
             
-            # 转发请求到真实的 Gemini API
+            # Forward the request to the real Gemini API
             async with AsyncClient() as client:
-                # 准备请求头
+                # Prepare request headers
                 forward_headers = {
                     "X-Goog-Upload-Protocol": headers.get("x-goog-upload-protocol", "resumable"),
                     "X-Goog-Upload-Command": headers.get("x-goog-upload-command", "start"),
                     "Content-Type": headers.get("content-type", "application/json"),
                 }
                 
-                # 添加其他必要的头
+                # Add other necessary headers
                 if "x-goog-upload-header-content-length" in headers:
                     forward_headers["X-Goog-Upload-Header-Content-Length"] = headers["x-goog-upload-header-content-length"]
                 if "x-goog-upload-header-content-type" in headers:
                     forward_headers["X-Goog-Upload-Header-Content-Type"] = headers["x-goog-upload-header-content-type"]
                 
-                # 发送请求
+                # Send the request
                 response = await client.post(
                     "https://generativelanguage.googleapis.com/upload/v1beta/files",
                     headers=forward_headers,
@@ -93,7 +93,7 @@ class FilesService:
                     logger.error(f"Upload initialization failed: {response.status_code} - {response.text}")
                     raise HTTPException(status_code=response.status_code, detail="Upload initialization failed")
                 
-                # 获取上传 URL
+                # Get the upload URL
                 upload_url = response.headers.get("x-goog-upload-url")
                 if not upload_url:
                     raise HTTPException(status_code=500, detail="No upload URL in response")
@@ -101,14 +101,14 @@ class FilesService:
                 logger.info(f"Original upload URL from Google: {upload_url}")
                     
                 
-                # 儲存上傳資訊到 headers 中，供後續使用
-                # 不在這裡創建數據庫記錄，等到上傳完成後再創建
+                # Store upload information in headers for subsequent use
+                # Do not create a database record here, wait until the upload is complete
                 logger.info(f"Upload initialized with API key: {redact_key_for_logging(api_key)}")
                 
-                # 解析响应 - 初始化响应可能是空的
+                # Parse the response - the initialization response may be empty
                 response_data = {}
                 
-                # 從請求體中解析文件信息（如果有）
+                # Parse file information from the request body (if any)
                 display_name = ""
                 if body:
                     try:
@@ -116,14 +116,14 @@ class FilesService:
                         display_name = request_data.get("displayName", "")
                     except Exception:
                         pass
-                # 從 upload URL 中提取 upload_id
+                # Extract upload_id from the upload URL
                 import urllib.parse
                 parsed_url = urllib.parse.urlparse(upload_url)
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 upload_id = query_params.get('upload_id', [None])[0]
                 
                 if upload_id:
-                    # 儲存上傳會話信息，使用 upload_id 作為 key
+                    # Store upload session information, using upload_id as the key
                     async with _upload_sessions_lock:
                         _upload_sessions[upload_id] = {
                             "api_key": api_key,
@@ -139,28 +139,28 @@ class FilesService:
                 else:
                     logger.warning(f"No upload_id found in upload URL: {upload_url}")
                 
-                # 定期清理過期的會話（超過1小時）
+                # Periodically clean up expired sessions (older than 1 hour)
                 asyncio.create_task(self._cleanup_expired_sessions())
                 
-                # 替換 Google 的 URL 為我們的代理 URL
+                # Replace Google's URL with our proxy URL
                 proxy_upload_url = upload_url
                 if request_host:
-                    # 原始: https://generativelanguage.googleapis.com/upload/v1beta/files?key=AIzaSyDc...&upload_id=xxx&upload_protocol=resumable
-                    # 替換為: http://request-host/upload/v1beta/files?key=sk-123456&upload_id=xxx&upload_protocol=resumable
+                    # Original: https://generativelanguage.googleapis.com/upload/v1beta/files?key=AIzaSyDc...&upload_id=xxx&upload_protocol=resumable
+                    # Replace with: http://request-host/upload/v1beta/files?key=sk-123456&upload_id=xxx&upload_protocol=resumable
                     
-                    # 先替換域名
+                    # First, replace the domain
                     proxy_upload_url = upload_url.replace(
                         "https://generativelanguage.googleapis.com",
                         request_host.rstrip('/')
                     )
                     
-                    # 再替換 key 參數
+                    # Then, replace the key parameter
                     import re
-                    # 匹配 key=xxx 參數
+                    # Match the key=xxx parameter
                     key_pattern = r'(\?|&)key=([^&]+)'
                     match = re.search(key_pattern, proxy_upload_url)
                     if match:
-                        # 替換為我們的 token
+                        # Replace with our token
                         proxy_upload_url = proxy_upload_url.replace(
                             f"{match.group(1)}key={match.group(2)}",
                             f"{match.group(1)}key={user_token}"
@@ -180,7 +180,7 @@ class FilesService:
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
     
     async def _cleanup_expired_sessions(self):
-        """清理過期的上傳會話"""
+        """Clean up expired upload sessions"""
         try:
             async with _upload_sessions_lock:
                 now = datetime.now(timezone.utc)
@@ -198,15 +198,15 @@ class FilesService:
             logger.error(f"Error cleaning up upload sessions: {str(e)}")
     
     async def get_upload_session(self, key: str) -> Optional[Dict[str, Any]]:
-        """獲取上傳會話信息（支持 upload_id 或完整 URL）"""
+        """Get upload session information (supports upload_id or full URL)"""
         async with _upload_sessions_lock:
-            # 先嘗試直接查找
+            # First, try to find directly
             session = _upload_sessions.get(key)
             if session:
                 logger.debug(f"Found session by direct key {redact_key_for_logging(key)}")
                 return session
             
-            # 如果是 URL，嘗試提取 upload_id
+            # If it's a URL, try to extract upload_id
             if key.startswith("http"):
                 import urllib.parse
                 parsed_url = urllib.parse.urlparse(key)
@@ -223,31 +223,31 @@ class FilesService:
     
     async def get_file(self, file_name: str, user_token: str) -> FileMetadata:
         """
-        获取文件信息
+        Get file information
         
         Args:
-            file_name: 文件名称 (格式: files/{file_id})
-            user_token: 用户令牌
+            file_name: File name (format: files/{file_id})
+            user_token: User token
             
         Returns:
-            FileMetadata: 文件元数据
+            FileMetadata: File metadata
         """
         try:
-            # 查询文件记录
+            # Query the file record
             file_record = await db_services.get_file_record_by_name(file_name)
             
             if not file_record:
                 raise HTTPException(status_code=404, detail="File not found")
             
-            # 检查是否过期
+            # Check if it's expired
             expiration_time = datetime.fromisoformat(str(file_record["expiration_time"]))
-            # 如果是 naive datetime，假设为 UTC
+            # If it's a naive datetime, assume UTC
             if expiration_time.tzinfo is None:
                 expiration_time = expiration_time.replace(tzinfo=timezone.utc)
             if expiration_time <= datetime.now(timezone.utc):
                 raise HTTPException(status_code=404, detail="File has expired")
             
-            # 使用原始 API key 获取文件信息
+            # Use the original API key to get file information
             api_key = file_record["api_key"]
             
             async with AsyncClient() as client:
@@ -262,11 +262,11 @@ class FilesService:
                 
                 file_data = response.json()
                 
-                # 檢查並更新文件狀態
+                # Check and update the file state
                 google_state = file_data.get("state", "PROCESSING")
                 if google_state != file_record.get("state", "").value if file_record.get("state") else None:
                     logger.info(f"File state changed from {file_record.get('state')} to {google_state}")
-                    # 更新數據庫中的狀態
+                    # Update the state in the database
                     if google_state == "ACTIVE":
                         await db_services.update_file_record_state(
                             file_name=file_name,
@@ -280,7 +280,7 @@ class FilesService:
                             update_time=datetime.now(timezone.utc)
                         )
                 
-                # 构建响应
+                # Build the response
                 return FileMetadata(
                     name=file_data["name"],
                     displayName=file_data.get("displayName"),
@@ -307,20 +307,20 @@ class FilesService:
         user_token: Optional[str] = None
     ) -> ListFilesResponse:
         """
-        列出文件
+        List files
         
         Args:
-            page_size: 每页大小
-            page_token: 分页标记
-            user_token: 用户令牌（可选，如果提供则只返回该用户的文件）
+            page_size: Page size
+            page_token: Page token
+            user_token: User token (optional, if provided, only returns files for that user)
             
         Returns:
-            ListFilesResponse: 文件列表响应
+            ListFilesResponse: File list response
         """
         try:
             logger.debug(f"list_files called with page_size={page_size}, page_token={page_token}")
             
-            # 从数据库获取文件列表
+            # Get the file list from the database
             files, next_page_token = await db_services.list_file_records(
                 user_token=user_token,
                 page_size=page_size,
@@ -329,7 +329,7 @@ class FilesService:
             
             logger.debug(f"Database returned {len(files)} files, next_page_token={next_page_token}")
             
-            # 转换为响应格式
+            # Convert to the response format
             file_list = []
             for file_record in files:
                 file_list.append(FileMetadata(
@@ -360,23 +360,23 @@ class FilesService:
     
     async def delete_file(self, file_name: str, user_token: str) -> bool:
         """
-        删除文件
+        Delete a file
         
         Args:
-            file_name: 文件名称
-            user_token: 用户令牌
+            file_name: File name
+            user_token: User token
             
         Returns:
-            bool: 是否删除成功
+            bool: Whether the deletion was successful
         """
         try:
-            # 查询文件记录
+            # Query the file record
             file_record = await db_services.get_file_record_by_name(file_name)
             
             if not file_record:
                 raise HTTPException(status_code=404, detail="File not found")
             
-            # 使用原始 API key 删除文件
+            # Use the original API key to delete the file
             api_key = file_record["api_key"]
             
             async with AsyncClient() as client:
@@ -387,7 +387,7 @@ class FilesService:
                 
                 if response.status_code not in [200, 204]:
                     logger.error(f"Failed to delete file: {response.status_code} - {response.text}")
-                    # 如果 API 删除失败，但文件已过期，仍然删除数据库记录
+                    # If the API deletion fails, but the file has expired, still delete the database record
                     expiration_time = datetime.fromisoformat(str(file_record["expiration_time"]))
                     if expiration_time.tzinfo is None:
                         expiration_time = expiration_time.replace(tzinfo=timezone.utc)
@@ -396,7 +396,7 @@ class FilesService:
                         return True
                     raise HTTPException(status_code=response.status_code, detail="Failed to delete file")
             
-            # 删除数据库记录
+            # Delete the database record
             await db_services.delete_file_record(file_name)
             return True
             
@@ -408,14 +408,14 @@ class FilesService:
     
     async def check_file_state(self, file_name: str, api_key: str) -> str:
         """
-        檢查並更新文件狀態
+        Check and update the file state
         
         Args:
-            file_name: 文件名稱
-            api_key: API密鑰
+            file_name: File name
+            api_key: API key
             
         Returns:
-            str: 當前狀態
+            str: Current state
         """
         try:
             async with AsyncClient() as client:
@@ -431,7 +431,7 @@ class FilesService:
                 file_data = response.json()
                 google_state = file_data.get("state", "PROCESSING")
                 
-                # 更新數據庫狀態
+                # Update the database state
                 if google_state == "ACTIVE":
                     await db_services.update_file_record_state(
                         file_name=file_name,
@@ -453,19 +453,19 @@ class FilesService:
     
     async def cleanup_expired_files(self) -> int:
         """
-        清理过期文件
+        Clean up expired files
         
         Returns:
-            int: 清理的文件数量
+            int: Number of cleaned up files
         """
         try:
-            # 获取过期文件
+            # Get expired files
             expired_files = await db_services.delete_expired_file_records()
             
             if not expired_files:
                 return 0
             
-            # 尝试从 Gemini API 删除文件
+            # Try to delete files from the Gemini API
             for file_record in expired_files:
                 try:
                     api_key = file_record["api_key"]
@@ -477,7 +477,7 @@ class FilesService:
                             params={"key": api_key}
                         )
                 except Exception as e:
-                    # 记录错误但继续处理其他文件
+                    # Log the error but continue processing other files
                     logger.error(f"Failed to delete file {file_record['name']} from API: {str(e)}")
             
             return len(expired_files)
@@ -487,12 +487,12 @@ class FilesService:
             return 0
 
 
-# 单例实例
+# Singleton instance
 _files_service_instance: Optional[FilesService] = None
 
 
 async def get_files_service() -> FilesService:
-    """获取文件服务单例实例"""
+    """Get the file service singleton instance"""
     global _files_service_instance
     if _files_service_instance is None:
         _files_service_instance = FilesService()

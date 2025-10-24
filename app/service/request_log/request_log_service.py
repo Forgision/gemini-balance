@@ -16,7 +16,7 @@ logger = get_request_log_logger()
 
 async def delete_old_request_logs_task():
     """
-    定时删除旧的请求日志。
+    Periodically delete old request logs.
     """
     if not settings.AUTO_DELETE_REQUEST_LOGS_ENABLED:
         logger.info(

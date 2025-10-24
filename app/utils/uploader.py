@@ -10,17 +10,17 @@ from urllib.parse import quote
 from app.log.logger import get_image_create_logger
 
 class UploadErrorType(Enum):
-    """上传错误类型枚举"""
-    NETWORK_ERROR = "network_error"  # 网络请求错误
-    AUTH_ERROR = "auth_error"        # 认证错误
-    INVALID_FILE = "invalid_file"    # 无效文件
-    SERVER_ERROR = "server_error"    # 服务器错误
-    PARSE_ERROR = "parse_error"      # 响应解析错误
-    UNKNOWN = "unknown"              # 未知错误
+    """Upload error type enum."""
+    NETWORK_ERROR = "network_error"  # Network request error
+    AUTH_ERROR = "auth_error"        # Authentication error
+    INVALID_FILE = "invalid_file"    # Invalid file
+    SERVER_ERROR = "server_error"    # Server error
+    PARSE_ERROR = "parse_error"      # Response parsing error
+    UNKNOWN = "unknown"              # Unknown error
 
 
 class UploadError(Exception):
-    """图片上传错误异常类"""
+    """Image upload error exception class."""
     
     def __init__(
         self,
@@ -31,14 +31,14 @@ class UploadError(Exception):
         original_error: Optional[Exception] = None
     ):
         """
-        初始化上传错误异常
+        Initialize the upload error exception.
         
         Args:
-            message: 错误消息
-            error_type: 错误类型
-            status_code: HTTP状态码
-            details: 详细错误信息
-            original_error: 原始异常
+            message: Error message
+            error_type: Error type
+            status_code: HTTP status code
+            details: Detailed error information
+            original_error: Original exception
         """
         self.message = message
         self.error_type = error_type
@@ -46,7 +46,7 @@ class UploadError(Exception):
         self.details = details or {}
         self.original_error = original_error
         
-        # 构建完整错误信息
+        # Build the full error message
         full_message = f"[{error_type.value}] {message}"
         if status_code:
             full_message = f"{full_message} (Status: {status_code})"
@@ -58,11 +58,11 @@ class UploadError(Exception):
     @classmethod
     def from_response(cls, response: Any, message: Optional[str] = None) -> "UploadError":
         """
-        从HTTP响应创建错误实例
+        Create an error instance from an HTTP response.
         
         Args:
-            response: HTTP响应对象
-            message: 自定义错误消息
+            response: HTTP response object
+            message: Custom error message
         """
         try:
             error_data = response.json()
@@ -89,34 +89,34 @@ class SmMsUploader(ImageUploader):
         
     def upload(self, file: bytes, filename: str) -> UploadResponse:
         try:
-            # 准备请求头
+            # Prepare request headers
             headers = {
                 "Authorization": f"Basic {self.api_key}"
             }
             
-            # 准备文件数据
+            # Prepare file data
             files = {
                 "smfile": (filename, file, "image/png")
             }
             
-            # 发送请求
+            # Send the request
             response = requests.post(
                 self.API_URL,
                 headers=headers,
                 files=files
             )
             
-            # 检查响应状态
+            # Check the response status
             response.raise_for_status()
             
-            # 解析响应
+            # Parse the response
             result = response.json()
             
-            # 验证上传是否成功
+            # Verify if the upload was successful
             if not result.get("success"):
                 raise UploadError(result.get("message", "Upload failed"))
                 
-            # 转换为统一格式
+            # Convert to a unified format
             data = result["data"]
             image_metadata = ImageMetadata(
                 width=data["width"],
@@ -135,13 +135,13 @@ class SmMsUploader(ImageUploader):
             )
             
         except requests.RequestException as e:
-            # 处理网络请求相关错误
+            # Handle network request related errors
             raise UploadError(f"Upload request failed: {str(e)}")
         except (KeyError, ValueError) as e:
-            # 处理响应解析错误
+            # Handle response parsing errors
             raise UploadError(f"Invalid response format: {str(e)}")
         except Exception as e:
-            # 处理其他未预期的错误
+            # Handle other unexpected errors
             raise UploadError(f"Upload failed: {str(e)}")
     
     
@@ -151,50 +151,50 @@ class QiniuUploader(ImageUploader):
         self.secret_key = secret_key
         
     def upload(self, file: bytes, filename: str) -> UploadResponse:
-        # 实现七牛云的具体上传逻辑
+        # Implement the specific upload logic for Qiniu
         pass
     
     
 class PicGoUploader(ImageUploader):
-    """Chevereto API 图片上传器"""
+    """Chevereto API Image Uploader"""
     
     def __init__(self, api_key: str, api_url: str = "https://www.picgo.net/api/1/upload"):
         """
-        初始化 Chevereto 上传器
+        Initialize the Chevereto uploader.
         
         Args:
-            api_key: Chevereto API 密钥
-            api_url: Chevereto API 上传地址
+            api_key: Chevereto API key
+            api_url: Chevereto API upload address
         """
         self.api_key = api_key
         self.api_url = api_url
         
     def upload(self, file: bytes, filename: str) -> UploadResponse:
         """
-        上传图片到 Chevereto 服务
+        Upload an image to the Chevereto service.
         
         Args:
-            file: 图片文件二进制数据
-            filename: 文件名
+            file: Image file binary data
+            filename: File name
             
         Returns:
-            UploadResponse: 上传响应对象
+            UploadResponse: Upload response object
             
         Raises:
-            UploadError: 上传失败时抛出异常
+            UploadError: Thrown when the upload fails
         """
         try:
-            # 准备请求头
+            # Prepare request headers
             headers = {}
             
-            # 构建请求URL
+            # Build the request URL
             request_url = self.api_url
             
-            # 判断是否为默认PicGo URL，如果是则使用header认证，否则使用URL参数认证
+            # Check if it is the default PicGo URL, if so, use header authentication, otherwise use URL parameter authentication
             if self.api_url == "https://www.picgo.net/api/1/upload":
                 headers["X-API-Key"] = self.api_key
             else:
-                # 对于自定义URL，将API key作为查询参数添加到URL中
+                # For custom URLs, add the API key as a query parameter to the URL
                 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
                 parsed_url = urlparse(request_url)
                 query_params = parse_qs(parsed_url.query)
@@ -202,27 +202,27 @@ class PicGoUploader(ImageUploader):
                 new_query = urlencode(query_params, doseq=True)
                 request_url = urlunparse(parsed_url._replace(query=new_query))
             
-            # 准备文件数据
+            # Prepare file data
             files = {
                 "source": (filename, file)
             }
             
-            # 发送请求
+            # Send the request
             response = requests.post(
                 request_url,
                 headers=headers,
                 files=files
             )
             
-            # 检查响应状态
+            # Check the response status
             response.raise_for_status()
             
-            # 解析响应
+            # Parse the response
             result = response.json()
             
-            # 处理自定义PicGo服务器的响应格式
+            # Handle the response format of a custom PicGo server
             if "success" in result and "result" in result:
-                # 自定义PicGo服务器格式: {"success": true, "result": ["url"]}
+                # Custom PicGo server format: {"success": true, "result": ["url"]}
                 if result["success"]:
                     image_url = result["result"][0] if result["result"] and len(result["result"]) > 0 else ""
                     image_metadata = ImageMetadata(
@@ -247,8 +247,8 @@ class PicGoUploader(ImageUploader):
                         details=result
                     )
             
-            # 处理官方PicGo服务器的响应格式
-            # 验证上传是否成功
+            # Handle the response format of the official PicGo server
+            # Verify if the upload was successful
             if result.get("status_code") != 200:
                 error_message = "Upload failed"
                 if "error" in result:
@@ -260,10 +260,10 @@ class PicGoUploader(ImageUploader):
                     details=result.get("error")
                 )
                 
-            # 从响应中提取图片信息
+            # Extract image information from the response
             image_data = result.get("image", {})
             
-            # 构建图片元数据
+            # Build image metadata
             image_metadata = ImageMetadata(
                 width=image_data.get("width", 0),
                 height=image_data.get("height", 0),
@@ -281,24 +281,24 @@ class PicGoUploader(ImageUploader):
             )
             
         except requests.RequestException as e:
-            # 处理网络请求相关错误
+            # Handle network request related errors
             raise UploadError(
                 message=f"Upload request failed: {str(e)}",
                 error_type=UploadErrorType.NETWORK_ERROR,
                 original_error=e
             )
         except (KeyError, ValueError, TypeError) as e:
-            # 处理响应解析错误
+            # Handle response parsing errors
             raise UploadError(
                 message=f"Invalid response format: {str(e)}",
                 error_type=UploadErrorType.PARSE_ERROR,
                 original_error=e
             )
         except UploadError:
-            # 重新抛出已经是 UploadError 类型的异常
+            # Re-throw exceptions that are already of type UploadError
             raise
         except Exception as e:
-            # 处理其他未预期的错误
+            # Handle other unexpected errors
             raise UploadError(
                 message=f"Upload failed: {str(e)}",
                 error_type=UploadErrorType.UNKNOWN,
@@ -307,20 +307,20 @@ class PicGoUploader(ImageUploader):
 
 
 class AliyunOSSUploader(ImageUploader):
-    """阿里云OSS图片上传器"""
+    """Alibaba Cloud OSS Image Uploader"""
     
     def __init__(self, access_key: str, access_key_secret: str, bucket_name: str, 
                  endpoint: str, region: str, use_internal: bool = False):
         """
-        初始化阿里云OSS上传器
+        Initialize the Alibaba Cloud OSS uploader.
         
         Args:
-            access_key: OSS访问密钥ID
-            access_key_secret: OSS访问密钥
-            bucket_name: OSS存储桶名称
-            endpoint: OSS端点地址
-            region: OSS区域
-            use_internal: 是否使用内网端点
+            access_key: OSS access key ID
+            access_key_secret: OSS access key secret
+            bucket_name: OSS bucket name
+            endpoint: OSS endpoint address
+            region: OSS region
+            use_internal: Whether to use the internal endpoint
         """
         self.access_key = access_key
         self.access_key_secret = access_key_secret
@@ -330,7 +330,7 @@ class AliyunOSSUploader(ImageUploader):
         self.use_internal = use_internal
         self.logger = get_image_create_logger()
         
-        # 构建请求URL
+        # Build the request URL
         if not endpoint.startswith(('http://', 'https://')):
             self.base_url = f"https://{bucket_name}.{endpoint}"
         else:
@@ -340,30 +340,30 @@ class AliyunOSSUploader(ImageUploader):
     
     def _sign_request(self, method: str, path: str, headers: dict, content: bytes = b'') -> dict:
         """
-        为OSS请求生成签名
+        Generate a signature for the OSS request.
         
         Args:
-            method: HTTP方法
-            path: 请求路径
-            headers: 请求头
-            content: 请求内容
+            method: HTTP method
+            path: Request path
+            headers: Request headers
+            content: Request content
             
         Returns:
-            包含签名的请求头
+            Request headers containing the signature
         """
-        # 计算Content-MD5
+        # Calculate Content-MD5
         content_md5 = base64.b64encode(hashlib.md5(content).digest()).decode('utf-8') if content else ''
         
-        # 设置日期
+        # Set the date
         date = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
         
-        # 更新headers
+        # Update headers
         headers['Date'] = date
         if content_md5:
             headers['Content-MD5'] = content_md5
         headers['Content-Type'] = headers.get('Content-Type', 'image/png')
         
-        # 构建CanonicalizedOSSHeaders
+        # Build CanonicalizedOSSHeaders
         oss_headers = []
         for key, value in sorted(headers.items()):
             if key.lower().startswith('x-oss-'):
@@ -372,13 +372,13 @@ class AliyunOSSUploader(ImageUploader):
         if canonicalized_oss_headers:
             canonicalized_oss_headers += '\n'
         
-        # 构建CanonicalizedResource
+        # Build CanonicalizedResource
         canonicalized_resource = f"/{self.bucket_name}{path}"
         
-        # 构建StringToSign
+        # Build StringToSign
         string_to_sign = f"{method}\n{content_md5}\n{headers.get('Content-Type', '')}\n{date}\n{canonicalized_oss_headers}{canonicalized_resource}"
         
-        # 计算签名
+        # Calculate the signature
         signature = base64.b64encode(
             hmac.new(
                 self.access_key_secret.encode('utf-8'),
@@ -387,53 +387,53 @@ class AliyunOSSUploader(ImageUploader):
             ).digest()
         ).decode('utf-8')
         
-        # 添加Authorization头
+        # Add the Authorization header
         headers['Authorization'] = f"OSS {self.access_key}:{signature}"
         
         return headers
     
     def upload(self, file: bytes, filename: str) -> UploadResponse:
         """
-        上传图片到阿里云OSS
+        Upload an image to Alibaba Cloud OSS.
         
         Args:
-            file: 图片文件二进制数据
-            filename: 文件名（将作为OSS对象的key）
+            file: Image file binary data
+            filename: File name (will be used as the OSS object key)
             
         Returns:
-            UploadResponse: 上传响应对象
+            UploadResponse: Upload response object
             
         Raises:
-            UploadError: 上传失败时抛出异常
+            UploadError: Thrown when the upload fails
         """
-        # 记录开始上传的日志
+        # Log the start of the upload
         self.logger.info(f"Starting OSS upload for file: {filename}, size: {len(file)} bytes")
         
         try:
-            # 构建对象路径
+            # Build the object path
             object_key = f"/{filename}"
             
-            # 准备请求头
+            # Prepare request headers
             headers = {
                 'Content-Type': 'image/png',
-                'x-oss-object-acl': 'public-read'  # 设置为公共读
+                'x-oss-object-acl': 'public-read'  # Set to public read
             }
             
-            # 签名请求
+            # Sign the request
             signed_headers = self._sign_request('PUT', object_key, headers, file)
             
-            # 构建完整URL
+            # Build the full URL
             upload_url = f"{self.base_url}{object_key}"
             self.logger.debug(f"OSS upload URL: {upload_url}")
             
-            # 发送请求
+            # Send the request
             response = requests.put(
                 upload_url,
                 data=file,
                 headers=signed_headers
             )
             
-            # 检查响应状态
+            # Check the response status
             if response.status_code != 200:
                 error_msg = f"OSS upload failed with status {response.status_code}, response: {response.text}"
                 self.logger.error(f"OSS upload failed for {filename}: {error_msg}")
@@ -444,23 +444,23 @@ class AliyunOSSUploader(ImageUploader):
                     details={'response': response.text}
                 )
             
-            # 构建访问URL
+            # Build the access URL
             if self.endpoint.startswith(('http://', 'https://')):
                 access_url = f"{self.endpoint}/{self.bucket_name}{object_key}"
             else:
                 access_url = f"https://{self.bucket_name}.{self.endpoint}{object_key}"
             
-            # 构建图片元数据
+            # Build image metadata
             image_metadata = ImageMetadata(
-                width=0,  # OSS PUT不返回图片尺寸
+                width=0,  # OSS PUT does not return image dimensions
                 height=0,
                 filename=filename,
                 size=len(file),
                 url=access_url,
-                delete_url=None  # OSS需要单独的删除操作
+                delete_url=None  # OSS requires a separate delete operation
             )
             
-            # 记录上传成功的日志
+            # Log the successful upload
             self.logger.info(f"OSS upload successful for {filename}, URL: {access_url}")
             
             return UploadResponse(
@@ -479,7 +479,7 @@ class AliyunOSSUploader(ImageUploader):
                 original_error=e
             )
         except UploadError:
-            # UploadError 已经被记录了，直接重新抛出
+            # UploadError has already been logged, re-throw it
             raise
         except Exception as e:
             error_msg = f"OSS upload failed: {str(e)}"
@@ -492,16 +492,16 @@ class AliyunOSSUploader(ImageUploader):
 
 
 class CloudFlareImgBedUploader(ImageUploader):
-    """CloudFlare图床上传器"""
+    """CloudFlare Image Bed Uploader"""
 
     def __init__(self, auth_code: str, api_url: str, upload_folder: str = ""):
         """
-        初始化CloudFlare图床上传器
+        Initialize the CloudFlare Image Bed uploader.
         
         Args:
-            auth_code: 认证码
-            api_url: 上传API地址
-            upload_folder: 上传文件夹路径（可选）
+            auth_code: Authentication code
+            api_url: Upload API address
+            upload_folder: Upload folder path (optional)
         """
         self.auth_code = auth_code
         self.api_url = api_url
@@ -509,20 +509,20 @@ class CloudFlareImgBedUploader(ImageUploader):
 
     def upload(self, file: bytes, filename: str) -> UploadResponse:
         """
-        上传图片到CloudFlare图床
+        Upload an image to the CloudFlare Image Bed.
         
         Args:
-            file: 图片文件二进制数据
-            filename: 文件名
+            file: Image file binary data
+            filename: File name
             
         Returns:
-            UploadResponse: 上传响应对象
+            UploadResponse: Upload response object
             
         Raises:
-            UploadError: 上传失败时抛出异常
+            UploadError: Thrown when the upload fails
         """
         try:
-            # 准备请求URL参数
+            # Prepare request URL parameters
             params = []
             if self.upload_folder:
                 params.append(f"uploadFolder={self.upload_folder}")
@@ -532,31 +532,31 @@ class CloudFlareImgBedUploader(ImageUploader):
 
             request_url = f"{self.api_url}?{'&'.join(params)}"
 
-            # 准备文件数据
+            # Prepare file data
             files = {
                 "file": (filename, file)
             }
             
-            # 发送请求
+            # Send the request
             response = requests.post(
                 request_url,
                 files=files
             )
             
-            # 检查响应状态
+            # Check the response status
             response.raise_for_status()
             
-            # 解析响应
+            # Parse the response
             result = response.json()
             
-            # 验证响应格式
+            # Validate the response format
             if not result or not isinstance(result, list) or len(result) == 0:
                 raise UploadError(
                     message="Invalid response format",
                     error_type=UploadErrorType.PARSE_ERROR
                 )
                 
-            # 获取文件URL
+            # Get the file URL
             file_path = result[0].get("src")
             if not file_path:
                 raise UploadError(
@@ -564,18 +564,18 @@ class CloudFlareImgBedUploader(ImageUploader):
                     error_type=UploadErrorType.PARSE_ERROR
                 )
                 
-            # 构建完整URL（如果返回的是相对路径）
+            # Build the full URL (if a relative path is returned)
             base_url = self.api_url.split("/upload")[0]
             full_url = file_path if file_path.startswith(("http://", "https://")) else f"{base_url}{file_path}"
                 
-            # 构建图片元数据（注意：CloudFlare-ImgBed不返回所有元数据，所以部分字段为默认值）
+            # Build image metadata (note: CloudFlare-ImgBed does not return all metadata, so some fields have default values)
             image_metadata = ImageMetadata(
-                width=0,  # CloudFlare-ImgBed不返回宽度
-                height=0,  # CloudFlare-ImgBed不返回高度
+                width=0,  # CloudFlare-ImgBed does not return width
+                height=0,  # CloudFlare-ImgBed does not return height
                 filename=filename,
-                size=0,  # CloudFlare-ImgBed不返回大小
+                size=0,  # CloudFlare-ImgBed does not return size
                 url=full_url,
-                delete_url=None  # CloudFlare-ImgBed不返回删除URL
+                delete_url=None  # CloudFlare-ImgBed does not return a delete URL
             )
             
             return UploadResponse(
@@ -586,24 +586,24 @@ class CloudFlareImgBedUploader(ImageUploader):
             )
             
         except requests.RequestException as e:
-            # 处理网络请求相关错误
+            # Handle network request related errors
             raise UploadError(
                 message=f"Upload request failed: {str(e)}",
                 error_type=UploadErrorType.NETWORK_ERROR,
                 original_error=e
             )
         except (KeyError, ValueError, TypeError, IndexError) as e:
-            # 处理响应解析错误
+            # Handle response parsing errors
             raise UploadError(
                 message=f"Invalid response format: {str(e)}",
                 error_type=UploadErrorType.PARSE_ERROR,
                 original_error=e
             )
         except UploadError:
-            # 重新抛出已经是 UploadError 类型的异常
+            # Re-throw exceptions that are already of type UploadError
             raise
         except Exception as e:
-            # 处理其他未预期的错误
+            # Handle other unexpected errors
             raise UploadError(
                 message=f"Upload failed: {str(e)}",
                 error_type=UploadErrorType.UNKNOWN,

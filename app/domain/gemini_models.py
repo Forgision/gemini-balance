@@ -41,7 +41,7 @@ class GenerationConfig(BaseModel):
     responseLogprobs: Optional[bool] = None
     logprobs: Optional[int] = None
     thinkingConfig: Optional[Dict[str, Any]] = None
-    # TTS相关字段
+    # TTS related fields
     responseModalities: Optional[List[str]] = None
     speechConfig: Optional[Dict[str, Any]] = None
 
@@ -83,13 +83,13 @@ class VerifySelectedKeysRequest(BaseModel):
 
 
 class GeminiEmbedContent(BaseModel):
-    """嵌入内容模型"""
+    """Embedding content model."""
 
     parts: List[Dict[str, str]]
 
 
 class GeminiEmbedRequest(BaseModel):
-    """单一嵌入请求模型"""
+    """Single embedding request model."""
 
     content: GeminiEmbedContent
     taskType: Optional[
@@ -110,6 +110,6 @@ class GeminiEmbedRequest(BaseModel):
 
 
 class GeminiBatchEmbedRequest(BaseModel):
-    """批量嵌入请求模型"""
+    """Batch embedding request model."""
 
     requests: List[GeminiEmbedRequest]

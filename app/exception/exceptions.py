@@ -1,5 +1,5 @@
 """
-异常处理模块，定义应用程序中使用的自定义异常和异常处理器
+Exception handling module, defining custom exceptions and exception handlers used in the application.
 """
 
 from fastapi import FastAPI, Request
@@ -13,7 +13,7 @@ logger = get_exceptions_logger()
 
 
 class APIError(Exception):
-    """API错误基类"""
+    """API error base class."""
 
     def __init__(self, status_code: int, detail: str, error_code: str = None):
         self.status_code = status_code
@@ -23,7 +23,7 @@ class APIError(Exception):
 
 
 class AuthenticationError(APIError):
-    """认证错误"""
+    """Authentication error."""
 
     def __init__(self, detail: str = "Authentication failed"):
         super().__init__(
@@ -32,7 +32,7 @@ class AuthenticationError(APIError):
 
 
 class AuthorizationError(APIError):
-    """授权错误"""
+    """Authorization error."""
 
     def __init__(self, detail: str = "Not authorized to access this resource"):
         super().__init__(
@@ -41,7 +41,7 @@ class AuthorizationError(APIError):
 
 
 class ResourceNotFoundError(APIError):
-    """资源未找到错误"""
+    """Resource not found error."""
 
     def __init__(self, detail: str = "Resource not found"):
         super().__init__(
@@ -50,7 +50,7 @@ class ResourceNotFoundError(APIError):
 
 
 class ModelNotSupportedError(APIError):
-    """模型不支持错误"""
+    """Model not supported error."""
 
     def __init__(self, model: str):
         super().__init__(
@@ -61,14 +61,14 @@ class ModelNotSupportedError(APIError):
 
 
 class APIKeyError(APIError):
-    """API密钥错误"""
+    """API key error."""
 
     def __init__(self, detail: str = "Invalid or expired API key"):
         super().__init__(status_code=401, detail=detail, error_code="api_key_error")
 
 
 class ServiceUnavailableError(APIError):
-    """服务不可用错误"""
+    """Service unavailable error."""
 
     def __init__(self, detail: str = "Service temporarily unavailable"):
         super().__init__(
@@ -78,15 +78,15 @@ class ServiceUnavailableError(APIError):
 
 def setup_exception_handlers(app: FastAPI) -> None:
     """
-    设置应用程序的异常处理器
+    Set up the application's exception handlers.
 
     Args:
-        app: FastAPI应用程序实例
+        app: FastAPI application instance
     """
 
     @app.exception_handler(APIError)
     async def api_error_handler(request: Request, exc: APIError):
-        """处理API错误"""
+        """Handle API errors."""
         logger.error(f"API Error: {exc.detail} (Code: {exc.error_code})")
         return JSONResponse(
             status_code=exc.status_code,
@@ -95,7 +95,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-        """处理HTTP异常"""
+        """Handle HTTP exceptions."""
         logger.error(f"HTTP Exception: {exc.detail} (Status: {exc.status_code})")
         return JSONResponse(
             status_code=exc.status_code,
@@ -106,7 +106,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
     ):
-        """处理请求验证错误"""
+        """Handle request validation errors."""
         error_details = []
         for error in exc.errors():
             error_details.append(
@@ -127,7 +127,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
-        """处理通用异常"""
+        """Handle general exceptions."""
         logger.exception(f"Unhandled Exception: {str(exc)}")
         return JSONResponse(
             status_code=500,

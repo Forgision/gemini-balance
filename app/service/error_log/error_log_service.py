@@ -78,7 +78,7 @@ async def process_get_error_logs(
     sort_order: str,
 ) -> Dict[str, Any]:
     """
-    处理错误日志的检索，支持分页和过滤。
+    Processes the retrieval of error logs, supporting pagination and filtering.
     """
     try:
         logs_data = await db_services.get_error_logs(
@@ -107,8 +107,8 @@ async def process_get_error_logs(
 
 async def process_get_error_log_details(log_id: int) -> Optional[Dict[str, Any]]:
     """
-    处理特定错误日志详细信息的检索。
-    如果未找到，则返回 None。
+    Processes the retrieval of specific error log details.
+    Returns None if not found.
     """
     try:
         log_details = await db_services.get_error_log_details(log_id=log_id)
@@ -128,7 +128,7 @@ async def process_find_error_log_by_info(
     window_seconds: int = 100,
 ) -> Optional[Dict[str, Any]]:
     """
-    根据 key/状态码/时间窗口 查询最匹配的一条错误日志，未找到则返回 None。
+    Finds the best matching error log based on key/status code/time window, returns None if not found.
     """
     try:
         return await db_services.find_error_log_by_info(
@@ -147,8 +147,8 @@ async def process_find_error_log_by_info(
 
 async def process_delete_error_logs_by_ids(log_ids: List[int]) -> int:
     """
-    按 ID 批量删除错误日志。
-    返回尝试删除的日志数量。
+    Deletes error logs in bulk by ID.
+    Returns the number of logs attempted to be deleted.
     """
     if not log_ids:
         return 0
@@ -165,8 +165,8 @@ async def process_delete_error_logs_by_ids(log_ids: List[int]) -> int:
 
 async def process_delete_error_log_by_id(log_id: int) -> bool:
     """
-    按 ID 删除单个错误日志。
-    如果删除成功（或找到日志并尝试删除），则返回 True，否则返回 False。
+    Deletes a single error log by ID.
+    Returns True if deletion was successful (or if the log was found and deletion was attempted), otherwise False.
     """
     try:
         success = await db_services.delete_error_log_by_id(log_id)
@@ -181,8 +181,8 @@ async def process_delete_error_log_by_id(log_id: int) -> bool:
 
 async def process_delete_all_error_logs() -> int:
     """
-    处理删除所有错误日志的请求。
-    返回删除的日志数量。
+    Handles the request to delete all error logs.
+    Returns the number of deleted logs.
     """
     try:
         if not database.is_connected:

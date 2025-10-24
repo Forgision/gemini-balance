@@ -1,5 +1,5 @@
 """
-原生Gemini TTS功能模块
+Native Gemini TTS functionality module
 Native Gemini TTS functionality for both single and multi-speaker scenarios
 """
 

@@ -18,9 +18,9 @@ logger_gemini = get_gemini_logger()
 
 
 class StreamOptimizer:
-    """流式输出优化器
+    """Stream Output Optimizer
 
-    提供流式输出优化功能，包括智能延迟调整和长文本分块输出。
+    Provides stream output optimization features, including intelligent delay adjustment and long text chunking.
     """
 
     def __init__(
@@ -32,15 +32,15 @@ class StreamOptimizer:
         long_text_threshold: int = DEFAULT_STREAM_LONG_TEXT_THRESHOLD,
         chunk_size: int = DEFAULT_STREAM_CHUNK_SIZE,
     ):
-        """初始化流式输出优化器
+        """Initializes the stream output optimizer.
 
-        参数:
-            logger: 日志记录器
-            min_delay: 最小延迟时间（秒）
-            max_delay: 最大延迟时间（秒）
-            short_text_threshold: 短文本阈值（字符数）
-            long_text_threshold: 长文本阈值（字符数）
-            chunk_size: 长文本分块大小（字符数）
+        Args:
+            logger: Logger instance
+            min_delay: Minimum delay time (seconds)
+            max_delay: Maximum delay time (seconds)
+            short_text_threshold: Short text threshold (characters)
+            long_text_threshold: Long text threshold (characters)
+            chunk_size: Long text chunk size (characters)
         """
         self.logger = logger
         self.min_delay = min_delay
@@ -50,36 +50,36 @@ class StreamOptimizer:
         self.chunk_size = chunk_size
 
     def calculate_delay(self, text_length: int) -> float:
-        """根据文本长度计算延迟时间
+        """Calculates the delay time based on the text length.
 
-        参数:
-            text_length: 文本长度
+        Args:
+            text_length: The length of the text.
 
-        返回:
-            延迟时间（秒）
+        Returns:
+            The delay time in seconds.
         """
         if text_length <= self.short_text_threshold:
-            # 短文本使用较大延迟
+            # Use a larger delay for short texts
             return self.max_delay
         elif text_length >= self.long_text_threshold:
-            # 长文本使用较小延迟
+            # Use a smaller delay for long texts
             return self.min_delay
         else:
-            # 中等长度文本使用线性插值计算延迟
-            # 使用对数函数使延迟变化更平滑
+            # Use linear interpolation to calculate the delay for medium-length texts
+            # Use a logarithmic function to make the delay change smoother
             ratio = math.log(text_length / self.short_text_threshold) / math.log(
                 self.long_text_threshold / self.short_text_threshold
             )
             return self.max_delay - ratio * (self.max_delay - self.min_delay)
 
     def split_text_into_chunks(self, text: str) -> List[str]:
-        """将文本分割成小块
+        """Splits the text into small chunks.
 
-        参数:
-            text: 要分割的文本
+        Args:
+            text: The text to be split.
 
-        返回:
-            文本块列表
+        Returns:
+            A list of text chunks.
         """
         return [
             text[i : i + self.chunk_size] for i in range(0, len(text), self.chunk_size)
@@ -91,39 +91,39 @@ class StreamOptimizer:
         create_response_chunk: Callable[[str], Any],
         format_chunk: Callable[[Any], str],
     ) -> AsyncGenerator[str, None]:
-        """优化流式输出
+        """Optimizes the stream output.
 
-        参数:
-            text: 要输出的文本
-            create_response_chunk: 创建响应块的函数，接收文本，返回响应块
-            format_chunk: 格式化响应块的函数，接收响应块，返回格式化后的字符串
+        Args:
+            text: The text to be output.
+            create_response_chunk: A function to create a response chunk, which receives text and returns a response chunk.
+            format_chunk: A function to format the response chunk, which receives a response chunk and returns a formatted string.
 
-        返回:
-            异步生成器，生成格式化后的响应块
+        Returns:
+            An asynchronous generator that yields formatted response chunks.
         """
         if not text:
             return
 
-        # 计算智能延迟时间
+        # Calculate the intelligent delay time
         delay = self.calculate_delay(len(text))
 
-        # 根据文本长度决定输出方式
+        # Decide the output method based on the text length
         if len(text) >= self.long_text_threshold:
-            # 长文本：分块输出
+            # Long text: output in chunks
             chunks = self.split_text_into_chunks(text)
             for chunk_text in chunks:
                 chunk_response = create_response_chunk(chunk_text)
                 yield format_chunk(chunk_response)
                 await asyncio.sleep(delay)
         else:
-            # 短文本：逐字符输出
+            # Short text: output character by character
             for char in text:
                 char_chunk = create_response_chunk(char)
                 yield format_chunk(char_chunk)
                 await asyncio.sleep(delay)
 
 
-# 创建默认的优化器实例，可以直接导入使用
+# Create a default optimizer instance that can be imported directly
 openai_optimizer = StreamOptimizer(
     logger=logger_openai,
     min_delay=settings.STREAM_MIN_DELAY,

@@ -15,31 +15,31 @@ logger = Logger.setup_logger("scheduler")
 
 async def check_failed_keys():
     """
-    定时检查失败次数大于0的API密钥，并尝试验证它们。
-    如果验证成功，重置失败计数；如果失败，增加失败计数。
+    Periodically checks API keys with a failure count greater than 0 and attempts to validate them.
+    If validation is successful, the failure count is reset; if it fails, the failure count is incremented.
     """
     logger.info("Starting scheduled check for failed API keys...")
     try:
         key_manager = await get_key_manager_instance()
-        # 确保 KeyManager 已经初始化
+        # Ensure KeyManager is initialized
         if not key_manager or not hasattr(key_manager, "key_failure_counts"):
             logger.warning(
                 "KeyManager instance not available or not initialized. Skipping check."
             )
             return
 
-        # 创建 GeminiChatService 实例用于验证
-        # 注意：这里直接创建实例，而不是通过依赖注入，因为这是后台任务
+        # Create a GeminiChatService instance for validation
+        # Note: An instance is created directly here, not through dependency injection, as this is a background task
         chat_service = GeminiChatService(settings.BASE_URL, key_manager)
 
-        # 获取需要检查的 key 列表 (失败次数 > 0)
+        # Get the list of keys to check (failure count > 0)
         keys_to_check = []
-        async with key_manager.failure_count_lock:  # 访问共享数据需要加锁
-            # 复制一份以避免在迭代时修改字典
+        async with key_manager.failure_count_lock:  # Accessing shared data requires a lock
+            # Make a copy to avoid modifying the dictionary while iterating
             failure_counts_copy = key_manager.key_failure_counts.copy()
             keys_to_check = [
                 key for key, count in failure_counts_copy.items() if count > 0
-            ]  # 检查所有失败次数大于0的key
+            ]  # Check all keys with a failure count greater than 0
 
         if not keys_to_check:
             logger.info("No keys with failure count > 0 found. Skipping verification.")
@@ -50,11 +50,11 @@ async def check_failed_keys():
         )
 
         for key in keys_to_check:
-            # 隐藏部分 key 用于日志记录
+            # Redact part of the key for logging
             log_key = redact_key_for_logging(key)
             logger.info(f"Verifying key: {log_key}...")
             try:
-                # 构造测试请求
+                # Construct a test request
                 gemini_request = GeminiRequest(
                     contents=[
                         GeminiContent(
@@ -74,9 +74,9 @@ async def check_failed_keys():
                 logger.warning(
                     f"Key {log_key} verification failed: {str(e)}. Incrementing failure count."
                 )
-                # 直接操作计数器，需要加锁
+                # Operate the counter directly, requiring a lock
                 async with key_manager.failure_count_lock:
-                    # 再次检查 key 是否存在且失败次数未达上限
+                    # Re-check if the key exists and the failure count has not reached the upper limit
                     if (
                         key in key_manager.key_failure_counts
                         and key_manager.key_failure_counts[key]
@@ -99,7 +99,7 @@ async def check_failed_keys():
 
 async def cleanup_expired_files():
     """
-    定时清理过期的文件记录
+    Periodically clean up expired file records
     """
     logger.info("Starting scheduled cleanup for expired files...")
     try:
@@ -119,9 +119,9 @@ async def cleanup_expired_files():
 
 
 def setup_scheduler():
-    """设置并启动 APScheduler"""
-    scheduler = AsyncIOScheduler(timezone=str(settings.TIMEZONE))  # 从配置读取时区
-    # 添加检查失败密钥的定时任务
+    """Set up and start APScheduler"""
+    scheduler = AsyncIOScheduler(timezone=str(settings.TIMEZONE))  # Read timezone from configuration
+    # Add a scheduled task to check failed keys
     if settings.CHECK_INTERVAL_HOURS != 0:
         scheduler.add_job(
             check_failed_keys,
@@ -134,7 +134,7 @@ def setup_scheduler():
             f"Key check job scheduled to run every {settings.CHECK_INTERVAL_HOURS} hour(s)."
         )
 
-    # 新增：添加自动删除错误日志的定时任务，每天凌晨0点执行
+    # New: Add a scheduled task to automatically delete error logs, executed at midnight every day
     scheduler.add_job(
         delete_old_error_logs,
         "cron",
@@ -145,7 +145,7 @@ def setup_scheduler():
     )
     logger.info("Auto-delete error logs job scheduled to run daily at 3:00 AM.")
 
-    # 新增：添加自动删除请求日志的定时任务，每天凌晨0点执行
+    # New: Add a scheduled task to automatically delete request logs, executed at midnight every day
     scheduler.add_job(
         delete_old_request_logs_task,
         "cron",
@@ -158,7 +158,7 @@ def setup_scheduler():
         f"Auto-delete request logs job scheduled to run daily at 3:05 AM, if enabled and AUTO_DELETE_REQUEST_LOGS_DAYS is set to {settings.AUTO_DELETE_REQUEST_LOGS_DAYS} days."
     )
 
-    # 新增：添加文件过期清理的定时任务，每小时执行一次
+    # New: Add a scheduled task for file expiration cleanup, executed once per hour
     if getattr(settings, "FILES_CLEANUP_ENABLED", True):
         cleanup_interval = getattr(settings, "FILES_CLEANUP_INTERVAL_HOURS", 1)
         scheduler.add_job(
@@ -177,7 +177,7 @@ def setup_scheduler():
     return scheduler
 
 
-# 可以在这里添加一个全局的 scheduler 实例，以便在应用关闭时优雅地停止
+# A global scheduler instance can be added here to stop it gracefully when the application is closed
 scheduler_instance = None
 
 

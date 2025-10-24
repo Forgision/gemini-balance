@@ -1,6 +1,6 @@
 """
-原生Gemini TTS聊天服务扩展
-继承自原始聊天服务，添加原生Gemini TTS支持（单人和多人），保持向后兼容
+Native Gemini TTS chat service extension
+Inherits from the original chat service, adding native Gemini TTS support (single and multi-speaker), maintaining backward compatibility
 """
 
 import datetime
@@ -19,16 +19,16 @@ logger = get_gemini_logger()
 
 class TTSGeminiChatService(GeminiChatService):
     """
-    支持TTS的Gemini聊天服务
-    继承自原始的GeminiChatService，添加TTS功能
+    Gemini chat service with TTS support
+    Inherits from the original GeminiChatService, adding TTS functionality
     """
 
     def __init__(self, base_url: str, key_manager):
         """
-        初始化TTS聊天服务
+        Initialize the TTS chat service
         """
         super().__init__(base_url, key_manager)
-        # 使用TTS响应处理器替换原始处理器
+        # Replace the original processor with the TTS response handler
         self.response_handler = TTSResponseHandler()
         logger.info(
             "TTS Gemini Chat Service initialized with multi-speaker TTS support"
@@ -38,21 +38,21 @@ class TTSGeminiChatService(GeminiChatService):
         self, model: str, request: GeminiRequest, api_key: str
     ) -> Dict[str, Any]:
         """
-        生成内容，支持TTS
+        Generate content, with TTS support
         """
         try:
-            # 添加调试日志
+            # Add debug logs
             logger.info(f"TTS request model: {model}")
             logger.info(f"TTS request generationConfig: {request.generationConfig}")
 
-            # 检查是否是TTS模型，如果是，需要特殊处理
+            # Check if it's a TTS model, if so, special handling is required
             if "tts" in model.lower():
                 logger.info("Detected TTS model, applying TTS-specific processing")
-                # 对于TTS模型，我们需要确保正确的字段被传递
+                # For TTS models, we need to ensure the correct fields are passed
                 response = await self._handle_tts_request(model, request, api_key)
                 return response
             else:
-                # 对于非TTS模型，使用父类的方法
+                # For non-TTS models, use the parent class's method
                 response = await super().generate_content(model, request, api_key)
                 return response
         except Exception as e:
@@ -63,37 +63,37 @@ class TTSGeminiChatService(GeminiChatService):
         self, model: str, request: GeminiRequest, api_key: str
     ) -> Dict[str, Any]:
         """
-        处理TTS特定的请求，包含完整的日志记录功能
+        Handle TTS-specific requests, including full logging functionality
         """
-        # 记录开始时间和请求时间
+        # Record the start time and request time
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()
         is_success = False
         status_code = None
 
         try:
-            # 构建TTS专用的payload - 不包含tools和safetySettings
+            # Build a TTS-specific payload - without tools and safetySettings
             from app.service.chat.gemini_chat_service import _filter_empty_parts
 
             request_dict = request.model_dump(exclude_none=False)
 
-            # 构建TTS专用的简化payload
+            # Build a simplified payload for TTS
             payload = {
                 "contents": _filter_empty_parts(request_dict.get("contents", [])),
                 "generationConfig": request_dict.get("generationConfig", {}),
             }
 
-            # 只在有systemInstruction时才添加
+            # Only add systemInstruction if it exists
             if request_dict.get("systemInstruction"):
                 payload["systemInstruction"] = request_dict.get("systemInstruction")
 
-            # 确保 generationConfig 不为 None
+            # Ensure generationConfig is not None
             if payload["generationConfig"] is None:
                 payload["generationConfig"] = {}
 
-            # 从request.generationConfig直接获取TTS相关字段
+            # Get TTS-related fields directly from request.generationConfig
             if request.generationConfig:
-                # 添加TTS特定字段
+                # Add TTS-specific fields
                 if request.generationConfig.responseModalities:
                     payload["generationConfig"][
                         "responseModalities"
@@ -116,22 +116,22 @@ class TTSGeminiChatService(GeminiChatService):
 
             logger.info(f"TTS payload before API call: {payload}")
 
-            # 调用API
+            # Call the API
             response = await self.api_client.generate_content(payload, model, api_key)
 
-            # 如果到达这里，说明API调用成功
+            # If we get here, the API call was successful
             is_success = True
             status_code = 200
 
-            # 使用TTS响应处理器处理响应
+            # Use the TTS response handler to process the response
             return self.response_handler.handle_response(response, model, False, None)
 
         except Exception as e:
-            # 记录错误
+            # Log the error
             is_success = False
             error_msg = str(e)
 
-            # 尝试从错误消息中提取状态码
+            # Try to extract the status code from the error message
             import re
 
             match = re.search(r"status code (\d+)", error_msg)
@@ -140,7 +140,7 @@ class TTSGeminiChatService(GeminiChatService):
             else:
                 status_code = 500
 
-            # 添加错误日志
+            # Add an error log
             await add_error_log(
                 gemini_key=api_key,
                 model_name=model,
@@ -158,7 +158,7 @@ class TTSGeminiChatService(GeminiChatService):
             raise
 
         finally:
-            # 记录请求日志
+            # Log the request
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
 

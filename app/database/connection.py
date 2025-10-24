@@ -1,5 +1,5 @@
 """
-数据库连接池模块
+Database connection pool module
 """
 from pathlib import Path
 from urllib.parse import quote_plus
@@ -12,9 +12,9 @@ from app.log.logger import get_database_logger
 
 logger = get_database_logger()
 
-# 数据库URL
+# Database URL
 if settings.DATABASE_TYPE == "sqlite":
-    # 确保 data 目录存在
+    # Ensure the data directory exists
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
     db_path = data_dir / settings.SQLITE_DATABASE
@@ -27,22 +27,22 @@ elif settings.DATABASE_TYPE == "mysql":
 else:
     raise ValueError("Unsupported database type. Please set DATABASE_TYPE to 'sqlite' or 'mysql'.")
 
-# 创建数据库引擎
-# pool_pre_ping=True: 在从连接池获取连接前执行简单的 "ping" 测试，确保连接有效
+# Create database engine
+# pool_pre_ping=True: Perform a simple "ping" test before getting a connection from the pool to ensure the connection is valid
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
-# 创建元数据对象
+# Create metadata object
 metadata = MetaData()
 
-# 创建基类
+# Create base class
 Base = declarative_base(metadata=metadata)
 
-# 创建数据库连接池，并配置连接池参数，在sqlite中不使用连接池
-# min_size/max_size: 连接池的最小/最大连接数
-# pool_recycle=3600: 连接在池中允许存在的最大秒数（生命周期）。
-#                    设置为 3600 秒（1小时），确保在 MySQL 默认的 wait_timeout (通常8小时) 或其他网络超时之前回收连接。
-#                    如果遇到连接失效问题，可以尝试调低此值，使其小于实际的 wait_timeout 或网络超时时间。
-# databases 库会自动处理连接失效后的重连尝试。
+# Create a database connection pool and configure its parameters; connection pooling is not used in SQLite
+# min_size/max_size: The minimum/maximum number of connections in the connection pool
+# pool_recycle=3600: The maximum number of seconds a connection is allowed to exist in the pool (lifecycle).
+#                    Set to 3600 seconds (1 hour) to ensure connections are recycled before the default MySQL wait_timeout (usually 8 hours) or other network timeouts.
+#                    If you encounter connection failure issues, you can try lowering this value to be less than the actual wait_timeout or network timeout.
+# The databases library automatically handles reconnection attempts after a connection failure.
 if settings.DATABASE_TYPE == "sqlite":
     database = Database(DATABASE_URL)
 else:
@@ -50,7 +50,7 @@ else:
 
 async def connect_to_db():
     """
-    连接到数据库
+    Connect to the database
     """
     try:
         await database.connect()
@@ -62,7 +62,7 @@ async def connect_to_db():
 
 async def disconnect_from_db():
     """
-    断开数据库连接
+    Disconnect from the database
     """
     try:
         await database.disconnect()

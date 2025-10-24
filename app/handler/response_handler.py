@@ -16,7 +16,7 @@ logger = get_openai_logger()
 
 
 class ResponseHandler(ABC):
-    """响应处理器基类"""
+    """Base class for response handlers."""
 
     @abstractmethod
     def handle_response(
@@ -26,7 +26,7 @@ class ResponseHandler(ABC):
 
 
 class GeminiResponseHandler(ResponseHandler):
-    """Gemini响应处理器"""
+    """Gemini response handler."""
 
     def __init__(self):
         self.thinking_first = True
@@ -129,7 +129,7 @@ def _handle_openai_normal_response(
 
 
 class OpenAIResponseHandler(ResponseHandler):
-    """OpenAI响应处理器"""
+    """OpenAI response handler."""
 
     def __init__(self, config):
         self.config = config
@@ -240,7 +240,7 @@ def _extract_result(
             candidate = response["candidates"][0]
             text, reasoning_content = "", ""
 
-            # 使用安全的访问方式
+            # Use safe access
             content = candidate.get("content", {})
 
             if content and isinstance(content, dict):
@@ -264,12 +264,12 @@ def _extract_result(
 
             text = _add_search_link_text(model, candidate, text)
 
-            # 安全地获取 parts 用于工具调用提取
+            # Safely get parts for tool call extraction
             parts = candidate.get("content", {}).get("parts", [])
             tool_calls = _extract_tool_calls(parts, gemini_format)
         else:
             logger.warning(f"No candidates found in response for model: {model}")
-            text = "暂无返回"
+            text = "No response"
 
     return text, reasoning_content, tool_calls, thought
 
@@ -318,7 +318,7 @@ def _extract_image_data(part: dict) -> str:
     filename = f"{current_date}/{uuid.uuid4().hex[:8]}.png"
     base64_data = part["inlineData"]["data"]
     mime_type = part["inlineData"]["mimeType"]
-    # 将base64_data转成bytes数组
+    # Convert base64_data to a bytes array
     # Return empty string if no uploader is configured
     if not is_image_upload_configured(settings):
         return f"\n\n![image](data:{mime_type};base64,{base64_data})\n\n"
@@ -334,7 +334,7 @@ def _extract_image_data(part: dict) -> str:
 def _extract_tool_calls(
     parts: List[Dict[str, Any]], gemini_format: bool
 ) -> List[Dict[str, Any]]:
-    """提取工具调用信息"""
+    """Extract tool call information."""
     if not parts or not isinstance(parts, list):
         return []
 
@@ -414,10 +414,10 @@ def _handle_gemini_normal_response(
 
 
 def _format_code_block(code_data: dict) -> str:
-    """格式化代码块输出"""
+    """Format code block output."""
     language = code_data.get("language", "").lower()
     code = code_data.get("code", "").strip()
-    return f"""\n\n---\n\n【代码执行】\n```{language}\n{code}\n```\n"""
+    return f"""\n\n---\n\n【Code Execution】\n```{language}\n{code}\n```\n"""
 
 
 def _add_search_link_text(model: str, candidate: dict, text: str) -> str:
@@ -429,7 +429,7 @@ def _add_search_link_text(model: str, candidate: dict, text: str) -> str:
     ):
         grounding_chunks = candidate["groundingMetadata"]["groundingChunks"]
         text += "\n\n---\n\n"
-        text += "**【引用来源】**\n\n"
+        text += "**【References】**\n\n"
         for _, grounding_chunk in enumerate(grounding_chunks, 1):
             if "web" in grounding_chunk:
                 text += _create_search_link(grounding_chunk["web"])
@@ -443,7 +443,7 @@ def _create_search_link(grounding_chunk: dict) -> str:
 
 
 def _format_execution_result(result_data: dict) -> str:
-    """格式化执行结果输出"""
+    """Format execution result output."""
     outcome = result_data.get("outcome", "")
     output = result_data.get("output", "").strip()
-    return f"""\n【执行结果】\n> outcome: {outcome}\n\n【输出结果】\n```plaintext\n{output}\n```\n\n---\n\n"""
+    return f"""\n【Execution Result】\n> outcome: {outcome}\n\n【Output】\n```plaintext\n{output}\n```\n\n---\n\n"""

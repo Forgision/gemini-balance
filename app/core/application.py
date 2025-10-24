@@ -23,15 +23,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 STATIC_DIR = PROJECT_ROOT / "app" / "static"
 TEMPLATES_DIR = PROJECT_ROOT / "app" / "templates"
 
-# 初始化模板引擎，并添加全局变量
+# Initialize the template engine and add global variables
 templates = Jinja2Templates(directory="app/templates")
 
 
-# 定义一个函数来更新模板全局变量
+# Define a function to update template global variables
 def update_template_globals(app: FastAPI, update_info: dict):
-    # Jinja2Templates 实例没有直接更新全局变量的方法
-    # 我们需要在请求上下文中传递这些变量，或者修改 Jinja 环境
-    # 更简单的方法是将其存储在 app.state 中，并在渲染时传递
+    # Jinja2Templates instances do not have a direct method to update global variables
+    # We need to pass these variables in the request context or modify the Jinja environment
+    # A simpler method is to store it in app.state and pass it during rendering
     app.state.update_info = update_info
     logger.info(f"Update info stored in app.state: {update_info}")
 
@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
     Manages the application startup and shutdown events.
 
     Args:
-        app: FastAPI应用实例
+        app: FastAPI application instance
     """
     logger.info("Application starting up...")
     try:
@@ -112,17 +112,17 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """
-    创建并配置FastAPI应用程序实例
+    Creates and configures a FastAPI application instance.
 
     Returns:
-        FastAPI: 配置好的FastAPI应用程序实例
+        FastAPI: A configured FastAPI application instance.
     """
 
-    # 创建FastAPI应用
+    # Create a FastAPI application
     current_version = get_current_version()
     app = FastAPI(
         title="Gemini Balance API",
-        description="Gemini API代理服务，支持负载均衡和密钥管理",
+        description="Gemini API proxy service, supporting load balancing and key management.",
         version=current_version,
         lifespan=lifespan,
     )
@@ -138,19 +138,19 @@ def create_app() -> FastAPI:
         "current_version": current_version,
     }
 
-    # 配置静态文件
+    # Configure static files
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-    # 配置中间件
+    # Configure middleware
     setup_middlewares(app)
 
-    # 配置异常处理器
+    # Configure exception handlers
     setup_exception_handlers(app)
 
-    # 配置路由
+    # Configure routes
     setup_routers(app)
 
-    # 配置访问日志API密钥隐藏
+    # Configure access log API key redaction
     setup_access_logging()
 
     return app

@@ -15,7 +15,7 @@ logger = get_gemini_embedding_logger()
 
 
 def _build_embed_payload(request: GeminiEmbedRequest) -> Dict[str, Any]:
-    """构建嵌入请求payload"""
+    """Build the embedding request payload."""
     payload = {"content": request.content.model_dump()}
 
     if request.taskType:
@@ -31,12 +31,12 @@ def _build_embed_payload(request: GeminiEmbedRequest) -> Dict[str, Any]:
 def _build_batch_embed_payload(
     request: GeminiBatchEmbedRequest, model: str
 ) -> Dict[str, Any]:
-    """构建批量嵌入请求payload"""
+    """Build the batch embedding request payload."""
     requests = []
     for embed_request in request.requests:
         embed_payload = _build_embed_payload(embed_request)
         embed_payload["model"] = (
-            f"models/{model}"  # Gemini API要求每个请求包含model字段
+            f"models/{model}"  # The Gemini API requires each request to include the model field
         )
         requests.append(embed_payload)
 
@@ -44,7 +44,7 @@ def _build_batch_embed_payload(
 
 
 class GeminiEmbeddingService:
-    """Gemini嵌入服务"""
+    """Gemini embedding service."""
 
     def __init__(self, base_url: str, key_manager: KeyManager):
         self.api_client = GeminiApiClient(base_url, settings.TIME_OUT)
@@ -53,7 +53,7 @@ class GeminiEmbeddingService:
     async def embed_content(
         self, model: str, request: GeminiEmbedRequest, api_key: str
     ) -> Dict[str, Any]:
-        """生成单一嵌入内容"""
+        """Generate a single embedding content."""
         payload = _build_embed_payload(request)
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()
@@ -97,7 +97,7 @@ class GeminiEmbeddingService:
     async def batch_embed_contents(
         self, model: str, request: GeminiBatchEmbedRequest, api_key: str
     ) -> Dict[str, Any]:
-        """生成批量嵌入内容"""
+        """Generate batch embedding content."""
         payload = _build_batch_embed_payload(request, model)
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()
