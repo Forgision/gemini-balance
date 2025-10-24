@@ -2,6 +2,7 @@
 Exception handling module, defining custom exceptions and exception handlers used in the application.
 """
 
+from typing import Optional
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -15,7 +16,7 @@ logger = get_exceptions_logger()
 class APIError(Exception):
     """API error base class."""
 
-    def __init__(self, status_code: int, detail: str, error_code: str = None):
+    def __init__(self, status_code: int, detail: str, error_code: Optional[str] = None):
         self.status_code = status_code
         self.detail = detail
         self.error_code = error_code or "api_error"

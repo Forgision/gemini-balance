@@ -1,5 +1,6 @@
 import asyncio
 from copy import deepcopy
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -342,7 +343,7 @@ async def batch_embed_contents(
 
 @router.post("/reset-all-fail-counts")
 async def reset_all_key_fail_counts(
-    key_type: str = None, key_manager: KeyManager = Depends(get_key_manager)
+    key_type: Optional[str] = '', key_manager: KeyManager = Depends(get_key_manager)
 ):
     """Batch reset the failure count of Gemini API keys, optionally resetting only valid or invalid keys."""
     logger.info("-" * 50 + "reset_all_gemini_key_fail_counts" + "-" * 50)
