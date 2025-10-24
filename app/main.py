@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 # Load the .env file into environment variables before importing application configuration
 load_dotenv()
 
-from app.core.application import create_app
-from app.log.logger import get_main_logger
+from app.core.application import create_app  # noqa: E402
+from app.log.logger import get_main_logger  # noqa: E402
 
 app = create_app()
 

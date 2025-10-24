@@ -13,7 +13,6 @@ def verify_auth_token(token: str) -> bool:
 
 
 class SecurityService:
-
     async def verify_key(self, key: str):
         if key not in settings.ALLOWED_TOKENS and key != settings.AUTH_TOKEN:
             logger.error("Invalid key")
@@ -71,20 +70,27 @@ class SecurityService:
         return token
 
     async def verify_key_or_goog_api_key(
-        self, key: Optional[str] = None , x_goog_api_key: Optional[str] = Header(None)
+        self, key: Optional[str] = None, x_goog_api_key: Optional[str] = Header(None)
     ) -> str:
         """Verify the key in the URL or the x-goog-api-key in the request header"""
         # If the key in the URL is valid, return it directly
         if key in settings.ALLOWED_TOKENS or key == settings.AUTH_TOKEN:
             return key
-        
+
         # Otherwise, check the x-goog-api-key in the request header
         if not x_goog_api_key:
             logger.error("Invalid key and missing x-goog-api-key header")
-            raise HTTPException(status_code=401, detail="Invalid key and missing x-goog-api-key header")
-        
-        if x_goog_api_key not in settings.ALLOWED_TOKENS and x_goog_api_key != settings.AUTH_TOKEN:
+            raise HTTPException(
+                status_code=401, detail="Invalid key and missing x-goog-api-key header"
+            )
+
+        if (
+            x_goog_api_key not in settings.ALLOWED_TOKENS
+            and x_goog_api_key != settings.AUTH_TOKEN
+        ):
             logger.error("Invalid key and invalid x-goog-api-key")
-            raise HTTPException(status_code=401, detail="Invalid key and invalid x-goog-api-key")
-        
+            raise HTTPException(
+                status_code=401, detail="Invalid key and invalid x-goog-api-key"
+            )
+
         return x_goog_api_key

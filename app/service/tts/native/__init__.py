@@ -4,7 +4,12 @@ Native Gemini TTS functionality for both single and multi-speaker scenarios
 """
 
 from .tts_chat_service import TTSGeminiChatService
-from .tts_models import TTSGenerationConfig, MultiSpeakerVoiceConfig, SpeechConfig, TTSRequest
+from .tts_models import (
+    TTSGenerationConfig,
+    MultiSpeakerVoiceConfig,
+    SpeechConfig,
+    TTSRequest,
+)
 from .tts_response_handler import TTSResponseHandler
 from .tts_routes import get_tts_chat_service
 
@@ -15,5 +20,5 @@ __all__ = [
     "SpeechConfig",
     "TTSRequest",
     "TTSResponseHandler",
-    "get_tts_chat_service"
+    "get_tts_chat_service",
 ]

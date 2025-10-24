@@ -183,7 +183,7 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
         # Handle List type
         if origin_type is list:
             # Handle List[str]
-            if args and args[0] == str:
+            if args and args[0] is str:
                 try:
                     parsed = json.loads(db_value)
                     if isinstance(parsed, list):
@@ -284,13 +284,13 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                         )
                 return parsed_dict
         # Handle bool
-        elif target_type == bool:
+        elif target_type is bool:
             return db_value.lower() in ("true", "1", "yes", "on")
         # Handle int
-        elif target_type == int:
+        elif target_type is int:
             return int(db_value)
         # Handle float
-        elif target_type == float:
+        elif target_type is float:
             return float(db_value)
         # Default to str or other types that pydantic can handle directly
         else:

@@ -15,10 +15,10 @@ async def get_key_manager():
     return get_key_manager_instance()
 
 
-async def get_tts_chat_service(key_manager: KeyManager = Depends(get_key_manager)) -> TTSGeminiChatService:
+async def get_tts_chat_service(
+    key_manager: KeyManager = Depends(get_key_manager),
+) -> TTSGeminiChatService:
     """
     Get the native Gemini TTS enhanced chat service instance, supporting single and multi-speaker voice
     """
     return TTSGeminiChatService(settings.BASE_URL, key_manager)
-
-

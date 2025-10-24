@@ -36,7 +36,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
             and not request.url.path.startswith("/vertex-express")
             and not request.url.path.startswith("/upload")
         ):
-
             auth_token = request.cookies.get("auth_token")
             if not auth_token or not verify_auth_token(auth_token):
                 logger.warning(f"Unauthorized access attempt to {request.url.path}")

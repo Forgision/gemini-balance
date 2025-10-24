@@ -96,7 +96,7 @@ async def list_models(
                 return
             item = deepcopy(model)
             item["name"] = f"models/{base_name}{suffix}"
-            display_name = f'{item.get("displayName", base_name)}{display_suffix}'
+            display_name = f"{item.get('displayName', base_name)}{display_suffix}"
             item["displayName"] = display_name
             item["description"] = display_name
             models_json["models"].append(item)
@@ -366,7 +366,10 @@ async def reset_all_key_fail_counts(
             # Reset all keys
             await key_manager.reset_failure_counts()
             return JSONResponse(
-                {"success": True, "message": "Failure count for all keys has been reset."}
+                {
+                    "success": True,
+                    "message": "Failure count for all keys has been reset.",
+                }
             )
 
         # Batch reset the specified type of keys
@@ -383,7 +386,8 @@ async def reset_all_key_fail_counts(
     except Exception as e:
         logger.error(f"Failed to reset key failure counts: {str(e)}")
         return JSONResponse(
-            {"success": False, "message": f"Batch reset failed: {str(e)}"}, status_code=500
+            {"success": False, "message": f"Batch reset failed: {str(e)}"},
+            status_code=500,
         )
 
 
@@ -425,7 +429,9 @@ async def reset_selected_key_fail_counts(
                 errors.append(f"Key {key}: {str(key_error)}")
 
         if errors:
-            error_message = f"Batch reset completed, but with errors: {'; '.join(errors)}"
+            error_message = (
+                f"Batch reset completed, but with errors: {'; '.join(errors)}"
+            )
             final_success = reset_count > 0
             status_code = 207 if final_success and errors else 500
             return JSONResponse(
@@ -467,7 +473,9 @@ async def reset_key_fail_count(
     try:
         result = await key_manager.reset_key_failure_count(api_key)
         if result:
-            return JSONResponse({"success": True, "message": "Failure count has been reset."})
+            return JSONResponse(
+                {"success": True, "message": "Failure count has been reset."}
+            )
         return JSONResponse(
             {"success": False, "message": "Specified key not found."}, status_code=404
         )
@@ -535,7 +543,8 @@ async def verify_selected_keys(
 
     if not keys_to_verify:
         return JSONResponse(
-            {"success": False, "message": "No keys provided for verification."}, status_code=400
+            {"success": False, "message": "No keys provided for verification."},
+            status_code=400,
         )
 
     successful_keys = []

@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
+
 @router.get("/api/keys")
 async def get_keys_paginated(
     request: Request,
@@ -31,8 +32,10 @@ async def get_keys_paginated(
         keys_to_filter = all_keys_with_status["invalid_keys"]
     else:
         # Combine both for 'all' status, which might be useful for a unified view if ever needed
-        keys_to_filter = {**all_keys_with_status["valid_keys"], **all_keys_with_status["invalid_keys"]}
-
+        keys_to_filter = {
+            **all_keys_with_status["valid_keys"],
+            **all_keys_with_status["invalid_keys"],
+        }
 
     # Further filtering (search and fail_count_threshold)
     filtered_keys = {}
@@ -62,6 +65,7 @@ async def get_keys_paginated(
         "current_page": page,
     }
 
+
 @router.get("/api/keys/all")
 async def get_all_keys(
     request: Request,
@@ -75,9 +79,10 @@ async def get_all_keys(
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
     all_keys_with_status = await key_manager.get_all_keys_with_fail_count()
-    
+
     return {
         "valid_keys": list(all_keys_with_status["valid_keys"].keys()),
         "invalid_keys": list(all_keys_with_status["invalid_keys"].keys()),
-        "total_count": len(all_keys_with_status["valid_keys"]) + len(all_keys_with_status["invalid_keys"])
+        "total_count": len(all_keys_with_status["valid_keys"])
+        + len(all_keys_with_status["invalid_keys"]),
     }

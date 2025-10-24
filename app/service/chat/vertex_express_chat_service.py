@@ -72,7 +72,7 @@ def _clean_json_schema_properties(obj: Any) -> Any:
     return cleaned
 
 
-def _build_tools(model: str, payload: Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Build tools."""
 
     def _has_function_call(contents: List[Dict[str, Any]]) -> bool:
@@ -113,7 +113,7 @@ def _build_tools(model: str, payload: Dict[str, Any]]) -> List[Dict[str, Any]]:
                     record[k] = v
         return record
 
-    def _is_structured_output_request(payload: Dict[str, Any]]) -> bool:
+    def _is_structured_output_request(payload: Dict[str, Any]) -> bool:
         """Check if the request requires structured JSON output."""
         try:
             generation_config = payload.get("generationConfig", {})

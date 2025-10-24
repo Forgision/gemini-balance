@@ -3,7 +3,6 @@ Unit tests for API key redaction functionality
 """
 
 import unittest
-import logging
 from unittest.mock import patch, MagicMock
 
 from app.utils.helpers import redact_key_for_logging

@@ -34,7 +34,9 @@ async def check_failed_keys():
 
         # Get the list of keys to check (failure count > 0)
         keys_to_check = []
-        async with key_manager.failure_count_lock:  # Accessing shared data requires a lock
+        async with (
+            key_manager.failure_count_lock
+        ):  # Accessing shared data requires a lock
             # Make a copy to avoid modifying the dictionary while iterating
             failure_counts_copy = key_manager.key_failure_counts.copy()
             keys_to_check = [
@@ -120,7 +122,9 @@ async def cleanup_expired_files():
 
 def setup_scheduler():
     """Set up and start APScheduler"""
-    scheduler = AsyncIOScheduler(timezone=str(settings.TIMEZONE))  # Read timezone from configuration
+    scheduler = AsyncIOScheduler(
+        timezone=str(settings.TIMEZONE)
+    )  # Read timezone from configuration
     # Add a scheduled task to check failed keys
     if settings.CHECK_INTERVAL_HOURS != 0:
         scheduler.add_job(

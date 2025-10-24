@@ -857,9 +857,7 @@ async def get_file_api_key(name: str) -> Optional[str]:
         raise
 
 
-async def update_usage_stats(
-    api_key: str, model_name: str, token_count: int
-) -> bool:
+async def update_usage_stats(api_key: str, model_name: str, token_count: int) -> bool:
     """
     Update usage statistics.
 

@@ -11,10 +11,8 @@ from app.log.logger import get_scheduler_routes
 
 logger = get_scheduler_routes()
 
-router = APIRouter(
-    prefix="/api/scheduler",
-    tags=["Scheduler"]
-)
+router = APIRouter(prefix="/api/scheduler", tags=["Scheduler"])
+
 
 async def verify_token(request: Request):
     auth_token = request.cookies.get("auth_token")
@@ -26,6 +24,7 @@ async def verify_token(request: Request):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+
 @router.post("/start", summary="Start scheduled tasks")
 async def start_scheduler_endpoint(request: Request):
     """Start the background scheduler task"""
@@ -33,13 +32,17 @@ async def start_scheduler_endpoint(request: Request):
     try:
         logger.info("Received request to start scheduler.")
         start_scheduler()
-        return JSONResponse(content={"message": "Scheduler started successfully."}, status_code=status.HTTP_200_OK)
+        return JSONResponse(
+            content={"message": "Scheduler started successfully."},
+            status_code=status.HTTP_200_OK,
+        )
     except Exception as e:
         logger.error(f"Error starting scheduler: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start scheduler: {str(e)}"
+            detail=f"Failed to start scheduler: {str(e)}",
         )
+
 
 @router.post("/stop", summary="Stop scheduled tasks")
 async def stop_scheduler_endpoint(request: Request):
@@ -48,10 +51,13 @@ async def stop_scheduler_endpoint(request: Request):
     try:
         logger.info("Received request to stop scheduler.")
         stop_scheduler()
-        return JSONResponse(content={"message": "Scheduler stopped successfully."}, status_code=status.HTTP_200_OK)
+        return JSONResponse(
+            content={"message": "Scheduler stopped successfully."},
+            status_code=status.HTTP_200_OK,
+        )
     except Exception as e:
         logger.error(f"Error stopping scheduler: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to stop scheduler: {str(e)}"
+            detail=f"Failed to stop scheduler: {str(e)}",
         )

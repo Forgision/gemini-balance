@@ -6,6 +6,7 @@ import re
 
 logger = get_main_logger()
 
+
 class SmartRoutingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
         super().__init__(app)
@@ -18,7 +19,7 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
         logger.debug(f"request: {request}")
         original_path = str(request.url.path)
         method = request.method
-        
+
         # Try to fix the URL
         fixed_path, fix_info = self.fix_request_url(original_path, method, request)
 
@@ -30,7 +31,7 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
             # Rewrite the request path
             request.scope["path"] = fixed_path
             request.scope["raw_path"] = fixed_path.encode()
-        
+
         return await call_next(request)
 
     def fix_request_url(self, path: str, method: str, request: Request) -> tuple:

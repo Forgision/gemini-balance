@@ -17,16 +17,22 @@ class TTSResponseHandler(GeminiResponseHandler):
     """
 
     def handle_response(
-        self, response: Dict[str, Any], model: str, stream: bool = False, usage_metadata: Optional[Dict[str, Any]] = None
+        self,
+        response: Dict[str, Any],
+        model: str,
+        stream: bool = False,
+        usage_metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Handle the response, with support for TTS audio data
         """
         # Check if it's a TTS response (contains audio data)
         if self._is_tts_response(response):
-            logger.info("Detected TTS response with audio data, returning original response")
+            logger.info(
+                "Detected TTS response with audio data, returning original response"
+            )
             return response
-        
+
         # For non-TTS responses, use the parent class's handling method
         return super().handle_response(response, model, stream, usage_metadata)
 
@@ -35,12 +41,13 @@ class TTSResponseHandler(GeminiResponseHandler):
         Check if it's a TTS response
         """
         try:
-            if (response.get("candidates") and
-                len(response["candidates"]) > 0 and
-                response["candidates"][0].get("content") and
-                response["candidates"][0]["content"].get("parts") and
-                len(response["candidates"][0]["content"]["parts"]) > 0):
-                
+            if (
+                response.get("candidates")
+                and len(response["candidates"]) > 0
+                and response["candidates"][0].get("content")
+                and response["candidates"][0]["content"].get("parts")
+                and len(response["candidates"][0]["content"]["parts"]) > 0
+            ):
                 parts = response["candidates"][0]["content"]["parts"]
                 for part in parts:
                     if "inlineData" in part:

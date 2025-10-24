@@ -595,7 +595,6 @@ class OpenAIChatService:
     async def create_image_chat_completion(
         self, request: ChatRequest, api_key: str
     ) -> Union[Dict[str, Any], AsyncGenerator[str, None]]:
-
         image_generate_request = ImageGenerationRequest()
         image_generate_request.prompt = request.messages[-1]["content"]
         image_res = self.image_create_service.generate_images_chat(

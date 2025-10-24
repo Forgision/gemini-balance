@@ -139,7 +139,7 @@ class ImageCreateService:
                             bucket_name=settings.OSS_BUCKET_NAME,
                             endpoint=settings.OSS_ENDPOINT,
                             region=settings.OSS_REGION,
-                            use_internal=False
+                            use_internal=False,
                         )
                     else:
                         raise ValueError(
@@ -171,11 +171,11 @@ class ImageCreateService:
             for index, image_data in enumerate(image_datas):
                 if "url" in image_data:
                     markdown_images.append(
-                        f"![Generated Image {index+1}]({image_data['url']})"
+                        f"![Generated Image {index + 1}]({image_data['url']})"
                     )
                 else:
                     # If it is in base64 format, create a data URL
                     markdown_images.append(
-                        f"![Generated Image {index+1}](data:image/png;base64,{image_data['b64_json']})"
+                        f"![Generated Image {index + 1}](data:image/png;base64,{image_data['b64_json']})"
                     )
             return "\n".join(markdown_images)

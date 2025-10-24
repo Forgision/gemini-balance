@@ -139,10 +139,15 @@ class ConfigService:
             # Use update_config to persist the changes, it handles both the database and KeyManager
             await ConfigService.update_config({"API_KEYS": settings.API_KEYS})
             logger.info(f"Key '{key_to_delete}' has been successfully deleted.")
-            return {"success": True, "message": f"Key '{key_to_delete}' has been successfully deleted."}
+            return {
+                "success": True,
+                "message": f"Key '{key_to_delete}' has been successfully deleted.",
+            }
         else:
             # The key was not found
-            logger.warning(f"Attempted to delete key '{key_to_delete}', but it was not found.")
+            logger.warning(
+                f"Attempted to delete key '{key_to_delete}', but it was not found."
+            )
             return {"success": False, "message": f"Key '{key_to_delete}' not found."}
 
     @staticmethod

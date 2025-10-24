@@ -218,7 +218,7 @@ def is_image_upload_configured(settings: Settings) -> bool:
                 getattr(settings, "OSS_ACCESS_KEY_SECRET", ""),
                 getattr(settings, "OSS_BUCKET_NAME", ""),
                 getattr(settings, "OSS_ENDPOINT", ""),
-                getattr(settings, "OSS_REGION", "")
+                getattr(settings, "OSS_REGION", ""),
             ]
         )
     if provider == "cloudflare_imgbed":

@@ -37,7 +37,7 @@ class ModelService:
         gemini_models = await self.get_gemini_models(api_key)
         if gemini_models is None:
             return None
-        
+
         return await self.convert_to_openai_models_format(gemini_models)
 
     async def convert_to_openai_models_format(

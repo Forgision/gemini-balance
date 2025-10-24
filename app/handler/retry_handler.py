@@ -1,4 +1,3 @@
-
 from functools import wraps
 from typing import Callable, TypeVar
 
@@ -38,9 +37,13 @@ class RetryHandler:
                         new_key = await key_manager.handle_api_failure(old_key, retries)
                         if new_key:
                             kwargs[self.key_arg] = new_key
-                            logger.info(f"Switched to new API key: {redact_key_for_logging(new_key)}")
+                            logger.info(
+                                f"Switched to new API key: {redact_key_for_logging(new_key)}"
+                            )
                         else:
-                            logger.error(f"No valid API key available after {retries} retries.")
+                            logger.error(
+                                f"No valid API key available after {retries} retries."
+                            )
                             break
 
             logger.error(

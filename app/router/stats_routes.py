@@ -18,17 +18,17 @@ async def verify_token(request: Request):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-router = APIRouter(
-    prefix="/api",
-    tags=["stats"],
-    dependencies=[Depends(verify_token)]
-)
+
+router = APIRouter(prefix="/api", tags=["stats"], dependencies=[Depends(verify_token)])
 
 stats_service = StatsService()
 
-@router.get("/key-usage-details/{key}",
-            summary="Get the number of model calls for a specified key in the last 24 hours",
-            description="Returns the number of times each model has been called in the last 24 hours for the provided API key.")
+
+@router.get(
+    "/key-usage-details/{key}",
+    summary="Get the number of model calls for a specified key in the last 24 hours",
+    description="Returns the number of times each model has been called in the last 24 hours for the provided API key.",
+)
 async def get_key_usage_details(key: str):
     """
     Retrieves the model usage count for a specific API key within the last 24 hours.
@@ -49,8 +49,10 @@ async def get_key_usage_details(key: str):
             return {}
         return usage_details
     except Exception as e:
-        logger.error(f"Error fetching key usage details for key {redact_key_for_logging(key)}: {e}")
+        logger.error(
+            f"Error fetching key usage details for key {redact_key_for_logging(key)}: {e}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting key usage details: {e}"
+            detail=f"Error getting key usage details: {e}",
         )

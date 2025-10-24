@@ -2,8 +2,14 @@ from contextlib import asynccontextmanager
 from fastapi import HTTPException
 import logging
 
+
 @asynccontextmanager
-async def handle_route_errors(logger: logging.Logger, operation_name: str, success_message: str = None, failure_message: str = None):
+async def handle_route_errors(
+    logger: logging.Logger,
+    operation_name: str,
+    success_message: str = None,
+    failure_message: str = None,
+):
     """
     An asynchronous context manager for handling common errors and logging in FastAPI routes.
 
@@ -22,7 +28,9 @@ async def handle_route_errors(logger: logging.Logger, operation_name: str, succe
         logger.info(success_message or default_success_msg)
     except HTTPException as http_exc:
         # If it is already an HTTPException, re-raise it directly, preserving the original status code and details
-        logger.error(f"{failure_message or default_failure_msg}: {http_exc.detail} (Status: {http_exc.status_code})")
+        logger.error(
+            f"{failure_message or default_failure_msg}: {http_exc.detail} (Status: {http_exc.status_code})"
+        )
         raise http_exc
     except Exception as e:
         # For all other exceptions, log the error and throw a standard 500 error

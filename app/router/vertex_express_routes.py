@@ -77,7 +77,7 @@ async def list_models(
                 return
             item = deepcopy(model)
             item["name"] = f"models/{base_name}{suffix}"
-            display_name = f'{item.get("displayName", base_name)}{display_suffix}'
+            display_name = f"{item.get('displayName', base_name)}{display_suffix}"
             item["displayName"] = display_name
             item["description"] = display_name
             models_json["models"].append(item)

@@ -1,6 +1,7 @@
 """
 Database connection pool module
 """
+
 from pathlib import Path
 from urllib.parse import quote_plus
 from databases import Database
@@ -25,7 +26,9 @@ elif settings.DATABASE_TYPE == "mysql":
     else:
         DATABASE_URL = f"mysql+pymysql://{settings.MYSQL_USER}:{quote_plus(settings.MYSQL_PASSWORD)}@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}"
 else:
-    raise ValueError("Unsupported database type. Please set DATABASE_TYPE to 'sqlite' or 'mysql'.")
+    raise ValueError(
+        "Unsupported database type. Please set DATABASE_TYPE to 'sqlite' or 'mysql'."
+    )
 
 # Create database engine
 # pool_pre_ping=True: Perform a simple "ping" test before getting a connection from the pool to ensure the connection is valid
@@ -47,6 +50,7 @@ if settings.DATABASE_TYPE == "sqlite":
     database = Database(DATABASE_URL)
 else:
     database = Database(DATABASE_URL, min_size=5, max_size=20, pool_recycle=1800)
+
 
 async def connect_to_db():
     """

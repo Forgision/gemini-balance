@@ -17,7 +17,6 @@ logger = get_openai_compatible_logger()
 
 
 class OpenAICompatiableService:
-
     def __init__(self, base_url: str, key_manager: KeyManager = None):
         self.key_manager = key_manager
         self.base_url = base_url
@@ -35,7 +34,9 @@ class OpenAICompatiableService:
         request_dict = request.model_dump()
         # Remove null values
         request_dict = {k: v for k, v in request_dict.items() if v is not None}
-        del request_dict["top_k"]  # Delete the top_k parameter, as it is not currently supported
+        del request_dict[
+            "top_k"
+        ]  # Delete the top_k parameter, as it is not currently supported
         if request.stream:
             return self._handle_stream_completion(request.model, request_dict, api_key)
         return await self._handle_normal_completion(

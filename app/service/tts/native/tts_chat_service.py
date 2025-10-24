@@ -95,17 +95,17 @@ class TTSGeminiChatService(GeminiChatService):
             if request.generationConfig:
                 # Add TTS-specific fields
                 if request.generationConfig.responseModalities:
-                    payload["generationConfig"][
-                        "responseModalities"
-                    ] = request.generationConfig.responseModalities
+                    payload["generationConfig"]["responseModalities"] = (
+                        request.generationConfig.responseModalities
+                    )
                     logger.info(
                         f"Added responseModalities: {request.generationConfig.responseModalities}"
                     )
 
                 if request.generationConfig.speechConfig:
-                    payload["generationConfig"][
-                        "speechConfig"
-                    ] = request.generationConfig.speechConfig
+                    payload["generationConfig"]["speechConfig"] = (
+                        request.generationConfig.speechConfig
+                    )
                     logger.info(
                         f"Added speechConfig: {request.generationConfig.speechConfig}"
                     )

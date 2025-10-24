@@ -68,7 +68,9 @@ class KeyManager:
         async with self.failure_count_lock:
             if key in self.key_failure_counts:
                 self.key_failure_counts[key] = 0
-                logger.info(f"Reset failure count for key: {redact_key_for_logging(key)}")
+                logger.info(
+                    f"Reset failure count for key: {redact_key_for_logging(key)}"
+                )
                 return True
             logger.warning(
                 f"Attempt to reset failure count for non-existent key: {key}"
@@ -80,7 +82,9 @@ class KeyManager:
         async with self.vertex_failure_count_lock:
             if key in self.vertex_key_failure_counts:
                 self.vertex_key_failure_counts[key] = 0
-                logger.info(f"Reset failure count for Vertex key: {redact_key_for_logging(key)}")
+                logger.info(
+                    f"Reset failure count for Vertex key: {redact_key_for_logging(key)}"
+                )
                 return True
             logger.warning(
                 f"Attempt to reset failure count for non-existent Vertex key: {key}"
@@ -93,9 +97,7 @@ class KeyManager:
 
     async def get_next_working_key(self, model_name: str) -> str:
         """Get the next available API key with the lowest RPM."""
-        valid_keys = [
-            key for key in self.api_keys if await self.is_key_valid(key)
-        ]
+        valid_keys = [key for key in self.api_keys if await self.is_key_valid(key)]
 
         if not valid_keys:
             return await self.get_next_key()
@@ -158,11 +160,15 @@ class KeyManager:
         async with self.failure_count_lock:
             for key in self.api_keys:
                 all_keys[key] = self.key_failure_counts.get(key, 0)
-        
+
         valid_keys = {k: v for k, v in all_keys.items() if v < self.MAX_FAILURES}
         invalid_keys = {k: v for k, v in all_keys.items() if v >= self.MAX_FAILURES}
-        
-        return {"valid_keys": valid_keys, "invalid_keys": invalid_keys, "all_keys": all_keys}
+
+        return {
+            "valid_keys": valid_keys,
+            "invalid_keys": invalid_keys,
+            "all_keys": all_keys,
+        }
 
     async def get_keys_by_status(self) -> dict:
         """Get a list of categorized API keys, including failure counts."""
@@ -213,15 +219,15 @@ class KeyManager:
             for key in self.key_failure_counts:
                 if self.key_failure_counts[key] < self.MAX_FAILURES:
                     valid_keys.append(key)
-        
+
         if valid_keys:
             return random.choice(valid_keys)
-        
+
         # If there are no valid keys, return the first key as a fallback
         if self.api_keys:
             logger.warning("No valid keys available, returning first key as fallback.")
             return self.api_keys[0]
-        
+
         logger.warning("API key list is empty, cannot get random valid key.")
         return ""
 
@@ -246,7 +252,14 @@ async def get_key_manager_instance(
     If the instance has already been created, the api_keys parameter is ignored, and the existing singleton is returned.
     If called after a reset, it will attempt to restore the previous state (failure counts, cycle position).
     """
-    global _singleton_instance, _preserved_failure_counts, _preserved_vertex_failure_counts, _preserved_old_api_keys_for_reset, _preserved_vertex_old_api_keys_for_reset, _preserved_next_key_in_cycle, _preserved_vertex_next_key_in_cycle
+    global \
+        _singleton_instance, \
+        _preserved_failure_counts, \
+        _preserved_vertex_failure_counts, \
+        _preserved_old_api_keys_for_reset, \
+        _preserved_vertex_old_api_keys_for_reset, \
+        _preserved_next_key_in_cycle, \
+        _preserved_vertex_next_key_in_cycle
 
     async with _singleton_lock:
         if _singleton_instance is None:
@@ -447,7 +460,14 @@ async def reset_key_manager_instance():
     This will save the state of the current instance (failure counts, old API keys, next key hint)
     to be restored on the next call to get_key_manager_instance.
     """
-    global _singleton_instance, _preserved_failure_counts, _preserved_vertex_failure_counts, _preserved_old_api_keys_for_reset, _preserved_vertex_old_api_keys_for_reset, _preserved_next_key_in_cycle, _preserved_vertex_next_key_in_cycle
+    global \
+        _singleton_instance, \
+        _preserved_failure_counts, \
+        _preserved_vertex_failure_counts, \
+        _preserved_old_api_keys_for_reset, \
+        _preserved_vertex_old_api_keys_for_reset, \
+        _preserved_next_key_in_cycle, \
+        _preserved_vertex_next_key_in_cycle
     async with _singleton_lock:
         if _singleton_instance:
             # 1. Save failure counts

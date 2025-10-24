@@ -293,9 +293,9 @@ def _extract_image_data(part: dict) -> str:
         )
     elif settings.UPLOAD_PROVIDER == "picgo":
         image_uploader = ImageUploaderFactory.create(
-            provider=settings.UPLOAD_PROVIDER, 
+            provider=settings.UPLOAD_PROVIDER,
             api_key=settings.PICGO_API_KEY,
-            api_url=settings.PICGO_API_URL
+            api_url=settings.PICGO_API_URL,
         )
     elif settings.UPLOAD_PROVIDER == "cloudflare_imgbed":
         image_uploader = ImageUploaderFactory.create(
@@ -312,7 +312,7 @@ def _extract_image_data(part: dict) -> str:
             bucket_name=settings.OSS_BUCKET_NAME,
             endpoint=settings.OSS_ENDPOINT,
             region=settings.OSS_REGION,
-            use_internal=False
+            use_internal=False,
         )
     current_date = time.strftime("%Y/%m/%d")
     filename = f"{current_date}/{uuid.uuid4().hex[:8]}.png"
@@ -439,7 +439,7 @@ def _add_search_link_text(model: str, candidate: dict, text: str) -> str:
 
 
 def _create_search_link(grounding_chunk: dict) -> str:
-    return f'\n- [{grounding_chunk["title"]}]({grounding_chunk["uri"]})'
+    return f"\n- [{grounding_chunk['title']}]({grounding_chunk['uri']})"
 
 
 def _format_execution_result(result_data: dict) -> str:
