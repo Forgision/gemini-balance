@@ -246,7 +246,7 @@ _preserved_vertex_next_key_in_cycle: Union[str, None] = None
 
 
 async def get_key_manager_instance(
-    api_keys: list = None, vertex_api_keys: list = None
+    api_keys: Optional[list] = None, vertex_api_keys: Optional[list] = None
 ) -> KeyManager:
     """
     Get the KeyManager singleton instance.

@@ -148,6 +148,7 @@ class ImageCreateService:
                         raise ValueError(
                             f"Unsupported upload provider: {settings.UPLOAD_PROVIDER}"
                         )
+                    upload_response = None
                     if image_data:
                         upload_response = image_uploader.upload(image_data, filename)
 

@@ -35,7 +35,9 @@ class FilesService:
     async def _get_key_manager(self):
         """Get KeyManager instance"""
         if not self.key_manager:
-            self.key_manager = await get_key_manager_instance()
+            self.key_manager = await get_key_manager_instance(
+                settings.GEMINI_API_KEYS, settings.VERTEX_API_KEYS
+            )
         return self.key_manager
 
     async def initialize_upload(
@@ -43,7 +45,7 @@ class FilesService:
         headers: Dict[str, str],
         body: Optional[bytes],
         user_token: str,
-        request_host: str = None,  # Add request host parameter
+        request_host: Optional[str] = None,  # Add request host parameter
     ) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """
         Initialize file upload

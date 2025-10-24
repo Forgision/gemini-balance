@@ -35,7 +35,7 @@ class StatsService:
                 ).label("success"),
                 func.sum(
                     case(
-                        [
+                        (
                             (
                                 or_(
                                     RequestLog.status_code < 200,
@@ -44,7 +44,7 @@ class StatsService:
                                 1,
                             ),
                             (RequestLog.status_code.is_(None), 1),
-                        ],
+                        ),
                         else_=0,
                     )
                 ).label("failure"),
@@ -92,7 +92,7 @@ class StatsService:
                 ).label("success"),
                 func.sum(
                     case(
-                        [
+                        (
                             (
                                 or_(
                                     RequestLog.status_code < 200,
@@ -101,7 +101,7 @@ class StatsService:
                                 1,
                             ),
                             (RequestLog.status_code.is_(None), 1),
-                        ],
+                        ),
                         else_=0,
                     )
                 ).label("failure"),

@@ -105,7 +105,7 @@ async def chat_completion(
             )
 
         if request.stream:
-            if not hasattr(raw_response, "__anext__"):
+            if isinstance(raw_response, dict):
                 return JSONResponse(content=raw_response, status_code=500)
             try:
                 # Try to get the first piece of data to determine if it's a normal SSE (data: prefix) or an error JSON
