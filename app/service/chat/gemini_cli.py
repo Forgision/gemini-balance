@@ -1,6 +1,4 @@
-# app/service/chat/code_assist_service.py
-
-# app/service/chat/code_assist_service.py
+# app/service/chat/gemini_cli.py
 
 import os
 import json
@@ -30,7 +28,7 @@ class OAuthWebConfig(BaseModel):
 class OAuthClientConfig(BaseModel):
     web: OAuthWebConfig
 
-class CodeAssistService:
+class GeminiCLIService:
     OAUTH_SCOPE = [
         "https://www.googleapis.com/auth/cloud-platform",
         "https://www.googleapis.com/auth/userinfo.email",
