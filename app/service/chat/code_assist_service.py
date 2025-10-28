@@ -3,19 +3,20 @@
 # app/service/chat/code_assist_service.py
 
 import os
+import json
 from typing import List
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 class OAuthWebConfig(BaseModel):
     client_id: str
     client_secret: str
-    auth_uri: str = "https://accounts.google.com/o/oauth2/auth"
-    token_uri: str = "https://oauth2.googleapis.com/token"
     redirect_uris: List[str]
+    auth_uri: str
+    token_uri: str
 
 class OAuthClientConfig(BaseModel):
     web: OAuthWebConfig
@@ -29,22 +30,16 @@ class CodeAssistService:
     CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com"
     CODE_ASSIST_API_VERSION = "v1internal"
 
-    def __init__(self):
-        redirect_uri = os.environ.get(
-            "OAUTH_REDIRECT_URI", "http://localhost:8080/oauth2callback"
-        )
-        web_config = OAuthWebConfig(
-            client_id=os.environ.get("OAUTH_CLIENT_ID"),
-            client_secret=os.environ.get("OAUTH_CLIENT_SECRET"),
-            redirect_uris=[redirect_uri],
-        )
-        client_config = OAuthClientConfig(web=web_config)
+    def __init__(self, client_secrets_file="client_secret.json"):
+        with open(client_secrets_file, 'r') as f:
+            config_data = json.load(f)
+
+        client_config = OAuthClientConfig(**config_data)
 
         self.flow = google_auth_oauthlib.flow.Flow.from_client_config(
-            client_config.model_dump(),
-            scopes=self.OAUTH_SCOPE,
+            client_config.model_dump(), scopes=self.OAUTH_SCOPE
         )
-        self.flow.redirect_uri = redirect_uri
+        self.flow.redirect_uri = client_config.web.redirect_uris[0]
         self.credentials = None
         self.client = httpx.AsyncClient()
 
