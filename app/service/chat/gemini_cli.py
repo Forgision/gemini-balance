@@ -107,9 +107,9 @@ class GeminiCLIService:
             expiry_date=self.authorization.expiry.isoformat(),
         )
 
-    def _save_authorization(self, credentials, json_path: str):
+    def _save_authorization(self, credentials: Credentials, json_path: str):
         """Saves the active credentials to a JSON file."""
-        if not credentials.expiry:
+        if not credentials or not credentials.expiry:
             raise ValueError("Cannot save credentials without an expiry date.")
         auth_model = GeminiCLIAuthorization(
             access_token=credentials.token,
@@ -159,6 +159,12 @@ class GeminiCLIService:
             raise Exception(
                 "User not authenticated. Please call 'oauth' or 'load_authorization' first."
             )
+
+        if not isinstance(self.authorization, Credentials):
+            raise TypeError(
+                "Authorization is not a valid Credentials object."
+            )
+
         if not self.authorization.valid:
             if self.authorization.expired and self.authorization.refresh_token:
                 import requests
