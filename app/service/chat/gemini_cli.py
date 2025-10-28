@@ -6,13 +6,14 @@ import asyncio
 import datetime
 from typing import List, Optional
 import requests
+from google.auth.credentials import Credentials
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from google.auth.transport.requests import Request as AuthRequest
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,7 +47,7 @@ class GeminiCLIService:
     CODE_ASSIST_API_VERSION = "v1internal"
 
     def __init__(self):
-        self.authorization: Optional[google.oauth2.credentials.Credentials] = None
+        self.authorization: Optional[Credentials] = None
         self.credentials_file_path: Optional[str] = None
         self.client = httpx.AsyncClient()
 
@@ -58,7 +59,7 @@ class GeminiCLIService:
             with open(json_path, "r") as f:
                 config_data = json.load(f)
             return GeminiCLICredentials(**config_data)
-        except (IOError, json.JSONDecodeError, BaseModel.ValidationError) as e:
+        except (IOError, json.JSONDecodeError, ValidationError) as e:
             print(f"Error loading client secrets file: {e}")
             raise
 
@@ -71,7 +72,7 @@ class GeminiCLIService:
             with open(json_path, "r") as f:
                 cred_data = json.load(f)
             auth_model = GeminiCLIAuthorization(**cred_data)
-        except (IOError, json.JSONDecodeError, BaseModel.ValidationError) as e:
+        except (IOError, json.JSONDecodeError, ValidationError) as e:
             print(f"Error loading authorization file: {e}")
             raise
 
@@ -97,6 +98,8 @@ class GeminiCLIService:
         """Creates a GeminiCLIAuthorization model from the active credentials."""
         if not self.authorization:
             raise Exception("No active authorization.")
+        if not self.authorization.expiry:
+            raise ValueError("Authorization credentials do not have an expiry date.")
         return GeminiCLIAuthorization(
             access_token=self.authorization.token,
             refresh_token=self.authorization.refresh_token,
@@ -106,6 +109,8 @@ class GeminiCLIService:
 
     def _save_authorization(self, credentials, json_path: str):
         """Saves the active credentials to a JSON file."""
+        if not credentials.expiry:
+            raise ValueError("Cannot save credentials without an expiry date.")
         auth_model = GeminiCLIAuthorization(
             access_token=credentials.token,
             refresh_token=credentials.refresh_token,
