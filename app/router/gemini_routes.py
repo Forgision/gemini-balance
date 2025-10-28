@@ -47,9 +47,7 @@ async def get_next_working_key(
     return await key_manager.get_next_working_key(model_name)
 
 
-async def get_chat_service(key_manager: KeyManager = Depends(get_key_manager)):
-    """Get the Gemini chat service instance."""
-    return GeminiChatService(settings.BASE_URL, key_manager)
+from app.dependencies import get_gemini_chat_service as get_chat_service
 
 
 async def get_embedding_service(key_manager: KeyManager = Depends(get_key_manager)):
@@ -132,7 +130,7 @@ async def generate_content(
     model_name: str,
     request: GeminiRequest,
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
-    api_key: str = Depends(lambda model_name: get_next_working_key(model_name)),
+    api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
 ):
@@ -196,7 +194,7 @@ async def stream_generate_content(
     model_name: str,
     request: GeminiRequest,
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
-    api_key: str = Depends(lambda model_name: get_next_working_key(model_name)),
+    api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
 ):
@@ -228,9 +226,10 @@ async def stream_generate_content(
             return StreamingResponse(raw_stream, media_type="text/event-stream")
         except Exception as e:
             # If stream initialization fails, return a 500 error directly
+            logger.error(f"Stream initialization failed: {e}")
             return JSONResponse(
-                content={"error": {"code": e.args[0], "message": e.args[1]}},
-                status_code=e.args[0],
+                content={"error": {"message": "Stream initialization failed"}},
+                status_code=500,
             )
 
         # If it starts with "data:", it's a normal SSE, send the first chunk and subsequent chunks together
@@ -251,7 +250,7 @@ async def count_tokens(
     model_name: str,
     request: GeminiRequest,
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
-    api_key: str = Depends(lambda model_name: get_next_working_key(model_name)),
+    api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
 ):
@@ -283,7 +282,7 @@ async def embed_content(
     model_name: str,
     request: GeminiEmbedRequest,
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
-    api_key: str = Depends(lambda model_name: get_next_working_key(model_name)),
+    api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
     embedding_service: GeminiEmbeddingService = Depends(get_embedding_service),
 ):
@@ -315,7 +314,7 @@ async def batch_embed_contents(
     model_name: str,
     request: GeminiBatchEmbedRequest,
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
-    api_key: str = Depends(lambda model_name: get_next_working_key(model_name)),
+    api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
     embedding_service: GeminiEmbeddingService = Depends(get_embedding_service),
 ):

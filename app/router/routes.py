@@ -15,7 +15,7 @@ from app.router import (
     files_routes,
     gemini_routes,
     key_routes,
-    openai_compatiable_routes,
+    openai_compatible_routes,
     openai_routes,
     scheduler_routes,
     stats_routes,
@@ -49,7 +49,7 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(scheduler_routes.router)
     app.include_router(stats_routes.router)
     app.include_router(version_routes.router)
-    app.include_router(openai_compatiable_routes.router)
+    app.include_router(openai_compatible_routes.router)
     app.include_router(vertex_express_routes.router)
     app.include_router(files_routes.router)
     app.include_router(key_routes.router)

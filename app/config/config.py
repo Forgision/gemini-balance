@@ -7,7 +7,7 @@ import json
 from typing import Any, Dict, List, Type, get_args, get_origin
 
 from pydantic import Field, ValidationError, ValidationInfo, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, EnvSettingsSource
 from sqlalchemy import insert, select, update
 
 from app.core.constants import (
@@ -27,7 +27,32 @@ from app.core.constants import (
 from app.log.logger import Logger
 
 
+class CommaSeparatedListEnvSettingsSource(EnvSettingsSource):
+    def prepare_field_value(
+        self, field_name: str, field: "FieldInfo", value: Any, value_is_complex: bool
+    ) -> Any:
+        if get_origin(field.annotation) is list and get_args(field.annotation)[0] is str and isinstance(value, str):
+            return [item.strip() for item in value.split(',') if item.strip()]
+        return super().prepare_field_value(field_name, field, value, value_is_complex)
+
+
 class Settings(BaseSettings):
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            CommaSeparatedListEnvSettingsSource(settings_cls),
+            dotenv_settings,
+            file_secret_settings,
+        )
+
     # Database Configuration
     DATABASE_TYPE: str = "sqlite"  # sqlite or mysql
     SQLITE_DATABASE: str = "default_db"
@@ -53,6 +78,7 @@ class Settings(BaseSettings):
     # API Related Configuration
     API_KEYS: List[str] = []
     ALLOWED_TOKENS: List[str] = []
+
     BASE_URL: str = f"https://generativelanguage.googleapis.com/{API_VERSION}"
     AUTH_TOKEN: str = ""
     MAX_FAILURES: int = 3

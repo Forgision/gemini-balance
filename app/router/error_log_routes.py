@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 from fastapi import (
     APIRouter,
     Body,
+    Depends,
     HTTPException,
     Path,
     Query,
@@ -40,6 +41,8 @@ class ErrorLogListResponse(BaseModel):
     total: int
 
 
+from app.dependencies import get_error_log_service
+
 @router.get("/errors", response_model=ErrorLogListResponse)
 async def get_error_logs_api(
     request: Request,
@@ -64,6 +67,7 @@ async def get_error_logs_api(
         "id", description="Field to sort by (e.g., 'id', 'request_time')"
     ),
     sort_order: str = Query("desc", description="Sort order ('asc' or 'desc')"),
+    error_log_service = Depends(get_error_log_service),
 ):
     """
     Get a list of error logs (returns error codes), supports filtering and sorting
@@ -124,7 +128,11 @@ class ErrorLogDetailResponse(BaseModel):
 
 
 @router.get("/errors/{log_id}/details", response_model=ErrorLogDetailResponse)
-async def get_error_log_detail_api(request: Request, log_id: int = Path(..., ge=1)):
+async def get_error_log_detail_api(
+    request: Request,
+    log_id: int = Path(..., ge=1),
+    error_log_service = Depends(get_error_log_service),
+):
     """
     Get detailed information of an error log (including error_log and request_msg) by log ID
     """
@@ -161,6 +169,7 @@ async def lookup_error_log_by_info(
     window_seconds: int = Query(
         100, ge=1, le=300, description="Time window (seconds), default 100 seconds"
     ),
+    error_log_service = Depends(get_error_log_service),
 ):
     """
     Find the best matching error log details through key / error code / time window.
@@ -191,7 +200,9 @@ async def lookup_error_log_by_info(
 
 @router.delete("/errors", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_error_logs_bulk_api(
-    request: Request, payload: Dict[str, List[int]] = Body(...)
+    request: Request,
+    payload: Dict[str, List[int]] = Body(...),
+    error_log_service = Depends(get_error_log_service),
 ):
     """
     Batch delete error logs (asynchronous)
@@ -222,7 +233,9 @@ async def delete_error_logs_bulk_api(
 
 
 @router.delete("/errors/all", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_all_error_logs_api(request: Request):
+async def delete_all_error_logs_api(
+    request: Request, error_log_service = Depends(get_error_log_service)
+):
     """
     Delete all error logs (asynchronous)
     """
@@ -244,7 +257,11 @@ async def delete_all_error_logs_api(request: Request):
 
 
 @router.delete("/errors/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_error_log_api(request: Request, log_id: int = Path(..., ge=1)):
+async def delete_error_log_api(
+    request: Request,
+    log_id: int = Path(..., ge=1),
+    error_log_service = Depends(get_error_log_service),
+):
     """
     Delete a single error log (asynchronous)
     """

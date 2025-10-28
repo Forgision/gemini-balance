@@ -33,9 +33,7 @@ async def get_next_working_key_wrapper(
     return await key_manager.get_next_working_key(model_name="gemini-pro")
 
 
-async def get_openai_service(key_manager: KeyManager = Depends(get_key_manager)):
-    """Get the OpenAI chat service instance."""
-    return OpenAICompatiableService(settings.BASE_URL, key_manager)
+from app.dependencies import get_openai_compatible_chat_service as get_openai_service
 
 
 @router.get("/openai/v1/models")

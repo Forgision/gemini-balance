@@ -32,9 +32,7 @@ async def get_next_working_key(key_manager: KeyManager = Depends(get_key_manager
     return await key_manager.get_next_working_vertex_key()
 
 
-async def get_chat_service(key_manager: KeyManager = Depends(get_key_manager)):
-    """Get the Gemini chat service instance."""
-    return GeminiChatService(settings.VERTEX_EXPRESS_BASE_URL, key_manager)
+from app.dependencies import get_vertex_express_chat_service as get_chat_service
 
 
 @router.get("/models")

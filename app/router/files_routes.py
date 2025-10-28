@@ -20,6 +20,8 @@ router = APIRouter()
 security_service = SecurityService()
 
 
+from app.dependencies import get_files_service
+
 @router.post("/upload/v1beta/files")
 async def upload_file_init(
     request: Request,
@@ -28,6 +30,7 @@ async def upload_file_init(
     x_goog_upload_command: Optional[str] = Header(None),
     x_goog_upload_header_content_length: Optional[str] = Header(None),
     x_goog_upload_header_content_type: Optional[str] = Header(None),
+    files_service = Depends(get_files_service),
 ):
     """Initialize file upload"""
     logger.debug(
@@ -109,6 +112,7 @@ async def list_files(
         None, description="Page token", alias="pageToken"
     ),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
+    files_service = Depends(get_files_service),
 ) -> Union[ListFilesResponse, JSONResponse]:
     """List files"""
     logger.debug(f"List files: {page_size=}, {page_token=}, {auth_token=}")
@@ -116,7 +120,6 @@ async def list_files(
         # Use the authentication token as user_token (if user isolation is enabled)
         user_token = auth_token if settings.FILES_USER_ISOLATION_ENABLED else None
         # Call the service
-        files_service = await get_files_service()
         return await files_service.list_files(
             page_size=page_size, page_token=page_token, user_token=user_token
         )
@@ -135,7 +138,9 @@ async def list_files(
 
 @router.get("/v1beta/files/{file_id:path}", response_model=FileMetadata)
 async def get_file(
-    file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
+    file_id: str,
+    auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
+    files_service = Depends(get_files_service),
 ) -> Union[FileMetadata, JSONResponse]:
     """Get file information"""
     logger.debug(f"Get file request: {file_id=}, {auth_token=}")
@@ -143,7 +148,6 @@ async def get_file(
         # Use the authentication token as user_token
         user_token = auth_token
         # Call the service
-        files_service = await get_files_service()
         return await files_service.get_file(f"files/{file_id}", user_token)
 
     except HTTPException as e:
@@ -160,7 +164,9 @@ async def get_file(
 
 @router.delete("/v1beta/files/{file_id:path}", response_model=DeleteFileResponse)
 async def delete_file(
-    file_id: str, auth_token: str = Depends(security_service.verify_key_or_goog_api_key)
+    file_id: str,
+    auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
+    files_service = Depends(get_files_service),
 ) -> Union[DeleteFileResponse, JSONResponse]:
     """Delete file"""
     logger.info(f"Delete file: {file_id=}, {auth_token=}")
@@ -168,7 +174,6 @@ async def delete_file(
         # Use the authentication token as user_token
         user_token = auth_token
         # Call the service
-        files_service = await get_files_service()
         success = await files_service.delete_file(f"files/{file_id}", user_token)
 
         return DeleteFileResponse(
@@ -195,6 +200,7 @@ async def handle_upload(
     request: Request,
     key: Optional[str] = Query(None),  # Get key from query parameters
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
+    files_service = Depends(get_files_service),
 ):
     """Handle file upload requests"""
     try:
@@ -208,7 +214,6 @@ async def handle_upload(
             raise HTTPException(status_code=400, detail="Missing upload_id")
 
         # Get the real API key from the session
-        files_service = await get_files_service()
         session_info = await files_service.get_upload_session(upload_id)
         if not session_info:
             logger.error(f"No session found for upload_id: {upload_id}")

@@ -388,8 +388,8 @@ class GeminiChatService:
             return self.response_handler.handle_response(response, model, stream=False)
         except Exception as e:
             is_success = False
-            status_code = e.args[0]
-            error_log_msg = e.args[1]
+            status_code = e.args[0] if e.args else 500
+            error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
             logger.error(f"Normal API call failed with error: {error_log_msg}")
 
             await add_error_log(
@@ -435,8 +435,8 @@ class GeminiChatService:
             return response
         except Exception as e:
             is_success = False
-            status_code = e.args[0]
-            error_log_msg = e.args[1]
+            status_code = e.args[0] if e.args else 500
+            error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
             logger.error(f"Count tokens API call failed with error: {error_log_msg}")
 
             await add_error_log(
@@ -526,8 +526,8 @@ class GeminiChatService:
             except Exception as e:
                 retries += 1
                 is_success = False
-                status_code = e.args[0]
-                error_log_msg = e.args[1]
+                status_code = e.args[0] if e.args else 500
+                error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
                 logger.warning(
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
                 )

@@ -179,26 +179,27 @@ def redact_key_for_logging(key: str) -> str:
         return f"{key[:6]}...{key[-6:]}"
 
 
-def get_current_version(default_version: str = "0.0.0") -> str:
-    """Reads the current version from the VERSION file."""
-    version_file = VERSION_FILE_PATH
+def get_current_version(
+    version_file_path: Path = VERSION_FILE_PATH, default_version: str = "0.0.0"
+) -> str:
+    """Reads the current version from the specified version file."""
     try:
-        with version_file.open("r", encoding="utf-8") as f:
+        with version_file_path.open("r", encoding="utf-8") as f:
             version = f.read().strip()
         if not version:
             helper_logger.warning(
-                f"VERSION file ('{version_file}') is empty. Using default version '{default_version}'."
+                f"Version file ('{version_file_path}') is empty. Using default version '{default_version}'."
             )
             return default_version
         return version
     except FileNotFoundError:
         helper_logger.warning(
-            f"VERSION file not found at '{version_file}'. Using default version '{default_version}'."
+            f"Version file not found at '{version_file_path}'. Using default version '{default_version}'."
         )
         return default_version
     except IOError as e:
         helper_logger.error(
-            f"Error reading VERSION file ('{version_file}'): {e}. Using default version '{default_version}'."
+            f"Error reading version file ('{version_file_path}'): {e}. Using default version '{default_version}'."
         )
         return default_version
 

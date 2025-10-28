@@ -4,7 +4,7 @@ Configuration route module
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -22,23 +22,25 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 logger = get_config_routes_logger()
 
 
+from app.dependencies import get_config_service
+
 @router.get("", response_model=Dict[str, Any])
-async def get_config(request: Request):
+async def get_config(request: Request, config_service: ConfigService = Depends(get_config_service)):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to config page")
         return RedirectResponse(url="/", status_code=302)
-    return await ConfigService.get_config()
+    return await config_service.get_config()
 
 
 @router.put("", response_model=Dict[str, Any])
-async def update_config(config_data: Dict[str, Any], request: Request):
+async def update_config(config_data: Dict[str, Any], request: Request, config_service: ConfigService = Depends(get_config_service)):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to config page")
         return RedirectResponse(url="/", status_code=302)
     try:
-        result = await ConfigService.update_config(config_data)
+        result = await config_service.update_config(config_data)
         # After the configuration is updated successfully, immediately update the level of all loggers
         Logger.update_log_levels(config_data["LOG_LEVEL"])
         logger.info("Log levels updated after configuration change.")
@@ -49,13 +51,13 @@ async def update_config(config_data: Dict[str, Any], request: Request):
 
 
 @router.post("/reset", response_model=Dict[str, Any])
-async def reset_config(request: Request):
+async def reset_config(request: Request, config_service: ConfigService = Depends(get_config_service)):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to config page")
         return RedirectResponse(url="/", status_code=302)
     try:
-        return await ConfigService.reset_config()
+        return await config_service.reset_config()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -65,7 +67,7 @@ class DeleteKeysRequest(BaseModel):
 
 
 @router.delete("/keys/{key_to_delete}", response_model=Dict[str, Any])
-async def delete_single_key(key_to_delete: str, request: Request):
+async def delete_single_key(key_to_delete: str, request: Request, config_service: ConfigService = Depends(get_config_service)):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning(
@@ -76,7 +78,7 @@ async def delete_single_key(key_to_delete: str, request: Request):
         logger.info(
             f"Attempting to delete key: {redact_key_for_logging(key_to_delete)}"
         )
-        result = await ConfigService.delete_key(key_to_delete)
+        result = await config_service.delete_key(key_to_delete)
         if not result.get("success"):
             raise HTTPException(
                 status_code=(
@@ -97,7 +99,7 @@ async def delete_single_key(key_to_delete: str, request: Request):
 
 @router.post("/keys/delete-selected", response_model=Dict[str, Any])
 async def delete_selected_keys_route(
-    delete_request: DeleteKeysRequest, request: Request
+    delete_request: DeleteKeysRequest, request: Request, config_service: ConfigService = Depends(get_config_service)
 ):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -110,7 +112,7 @@ async def delete_selected_keys_route(
 
     try:
         logger.info(f"Attempting to bulk delete {len(delete_request.keys)} keys.")
-        result = await ConfigService.delete_selected_keys(delete_request.keys)
+        result = await config_service.delete_selected_keys(delete_request.keys)
         if not result.get("success") and result.get("deleted_count", 0) == 0:
             raise HTTPException(
                 status_code=400, detail=result.get("message", "Failed to delete keys.")
@@ -126,14 +128,14 @@ async def delete_selected_keys_route(
 
 
 @router.get("/ui/models")
-async def get_ui_models(request: Request):
+async def get_ui_models(request: Request, config_service: ConfigService = Depends(get_config_service)):
     auth_token_cookie = request.cookies.get("auth_token")
     if not auth_token_cookie or not verify_auth_token(auth_token_cookie):
         logger.warning("Unauthorized access attempt to /api/config/ui/models")
         raise HTTPException(status_code=403, detail="Not authenticated")
 
     try:
-        models = await ConfigService.fetch_ui_models()
+        models = await config_service.fetch_ui_models()
         return models
     except HTTPException as e:
         raise e
@@ -214,7 +216,7 @@ async def get_proxy_cache_stats(request: Request):
 
     try:
         proxy_service = get_proxy_check_service()
-        stats = proxy_service.get_cache_stats()
+        stats = await proxy_service.get_cache_stats()
         return stats
     except Exception as e:
         logger.error(f"Get proxy cache stats failed: {str(e)}", exc_info=True)
@@ -231,7 +233,7 @@ async def clear_proxy_cache(request: Request):
 
     try:
         proxy_service = get_proxy_check_service()
-        proxy_service.clear_cache()
+        await proxy_service.clear_cache()
         return {"success": True, "message": "Proxy check cache cleared"}
     except Exception as e:
         logger.error(f"Clear proxy cache failed: {str(e)}", exc_info=True)
