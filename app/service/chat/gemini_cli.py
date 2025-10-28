@@ -4,8 +4,10 @@ import os
 import json
 import asyncio
 import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 import requests
+from google.auth.external_account_authorized_user import \
+    Credentials as ExternalAccountCredentials
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from google.auth.transport.requests import Request as AuthRequest
@@ -46,7 +48,7 @@ class GeminiCLIService:
     CODE_ASSIST_API_VERSION = "v1internal"
 
     def __init__(self):
-        self.authorization: Optional[google.oauth2.credentials.Credentials] = None
+        self.authorization: Optional[Union[google.oauth2.credentials.Credentials, ExternalAccountCredentials]] = None
         self.credentials_file_path: Optional[str] = None
         self.client = httpx.AsyncClient()
 
@@ -108,7 +110,7 @@ class GeminiCLIService:
             expiry_date=self.authorization.expiry.isoformat(),
         )
 
-    def _save_authorization(self, credentials: google.oauth2.credentials.Credentials, json_path: str):
+    def _save_authorization(self, credentials: Union[google.oauth2.credentials.Credentials, ExternalAccountCredentials], json_path: str):
         """Saves the active credentials to a JSON file."""
         if not credentials or not credentials.token or not credentials.expiry:
             raise ValueError("Cannot save incomplete credentials.")
