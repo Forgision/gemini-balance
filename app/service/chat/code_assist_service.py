@@ -44,37 +44,51 @@ class CodeAssistService:
         client_secrets_file="client_secret.json",
         credentials_file="credentials.json",
     ):
-        with open(client_secrets_file, "r") as f:
-            config_data = json.load(f)
-
-        client_config = OAuthClientConfig(**config_data)
+        client_config = self._load_oauthwebconfig(client_secrets_file)
         self.client_config = client_config.model_dump()
+        self.credentials_file = credentials_file
 
         self.flow = google_auth_oauthlib.flow.Flow.from_client_config(
             self.client_config, scopes=self.OAUTH_SCOPE
         )
         self.flow.redirect_uri = client_config.web.redirect_uris[0]
-        self.credentials_file = credentials_file
         self.credentials = self._load_credentials()
         self.client = httpx.AsyncClient()
 
+    def _load_oauthwebconfig(self, client_secrets_file: str) -> OAuthClientConfig:
+        """Loads and validates the client configuration from a JSON file."""
+        try:
+            with open(client_secrets_file, "r") as f:
+                config_data = json.load(f)
+            return OAuthClientConfig(**config_data)
+        except (IOError, json.JSONDecodeError, BaseModel.ValidationError) as e:
+            print(f"Error loading client secrets file: {e}")
+            raise
+
     def _load_credentials(self):
+        stored_creds = self._load_stored_credentials()
+        if not stored_creds:
+            return None
+
+        creds = google.oauth2.credentials.Credentials(
+            token=stored_creds.access_token,
+            refresh_token=stored_creds.refresh_token,
+            token_uri=self.client_config["web"]["token_uri"],
+            client_id=self.client_config["web"]["client_id"],
+            client_secret=self.client_config["web"]["client_secret"],
+            scopes=self.OAUTH_SCOPE,
+        )
+        creds.expiry = datetime.datetime.fromisoformat(stored_creds.expiry_date)
+        return creds
+
+    def _load_stored_credentials(self) -> Optional[StoredCredentials]:
+        """Loads and validates stored user credentials from a JSON file."""
         if not os.path.exists(self.credentials_file):
             return None
         try:
             with open(self.credentials_file, "r") as f:
                 cred_data = json.load(f)
-            stored_creds = StoredCredentials(**cred_data)
-            creds = google.oauth2.credentials.Credentials(
-                token=stored_creds.access_token,
-                refresh_token=stored_creds.refresh_token,
-                token_uri=self.client_config["web"]["token_uri"],
-                client_id=self.client_config["web"]["client_id"],
-                client_secret=self.client_config["web"]["client_secret"],
-                scopes=self.OAUTH_SCOPE,
-            )
-            creds.expiry = datetime.datetime.fromisoformat(stored_creds.expiry_date)
-            return creds
+            return StoredCredentials(**cred_data)
         except (IOError, json.JSONDecodeError, BaseModel.ValidationError) as e:
             # Handle corrupted or invalid credentials file
             print(f"Error loading credentials: {e}")
