@@ -2,33 +2,41 @@
 
 import os
 import json
+import asyncio
 import datetime
 from typing import List, Optional
+import requests
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
-from google.auth.transport.httpx import Request as AuthRequest
+from google.auth.transport.requests import Request as AuthRequest
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 import httpx
 from pydantic import BaseModel
+from dotenv import load_dotenv
 
-class StoredCredentials(BaseModel):
+load_dotenv()
+
+
+class GeminiCLIAuthorization(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "Bearer"
     expiry_date: str
 
-class OAuthWebConfig(BaseModel):
+class GeminiCLICredentialsWeb(BaseModel):
     client_id: str
     client_secret: str
     redirect_uris: List[str]
     auth_uri: str
     token_uri: str
 
-class OAuthClientConfig(BaseModel):
-    web: OAuthWebConfig
+class GeminiCLICredentials(BaseModel):
+    web: GeminiCLICredentialsWeb
 
 class GeminiCLIService:
+    OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID")
+    OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET")
     OAUTH_SCOPE = [
         "https://www.googleapis.com/auth/cloud-platform",
         "https://www.googleapis.com/auth/userinfo.email",
@@ -37,102 +45,129 @@ class GeminiCLIService:
     CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com"
     CODE_ASSIST_API_VERSION = "v1internal"
 
-    def __init__(
-        self,
-        client_secrets_file="client_secret.json",
-        credentials_file="credentials.json",
-    ):
-        client_config = self._load_oauthwebconfig(client_secrets_file)
-        self.client_config = client_config.model_dump()
-        self.credentials_file = credentials_file
-
-        self.flow = google_auth_oauthlib.flow.Flow.from_client_config(
-            self.client_config, scopes=self.OAUTH_SCOPE
-        )
-        self.flow.redirect_uri = client_config.web.redirect_uris[0]
-        self.credentials = self._load_credentials()
+    def __init__(self):
+        self.authorization: Optional[google.oauth2.credentials.Credentials] = None
+        self.credentials_file_path: Optional[str] = None
         self.client = httpx.AsyncClient()
 
-    def _load_oauthwebconfig(self, client_secrets_file: str) -> OAuthClientConfig:
-        """Loads and validates the client configuration from a JSON file."""
+    def load_credentials(self, json_path: str) -> GeminiCLICredentials:
+        """Loads and validates the application credentials from a JSON file."""
+        if not os.path.exists(json_path):
+            raise FileNotFoundError(f"Client secrets file not found at: {json_path}")
         try:
-            with open(client_secrets_file, "r") as f:
+            with open(json_path, "r") as f:
                 config_data = json.load(f)
-            return OAuthClientConfig(**config_data)
+            return GeminiCLICredentials(**config_data)
         except (IOError, json.JSONDecodeError, BaseModel.ValidationError) as e:
             print(f"Error loading client secrets file: {e}")
             raise
 
-    def _load_credentials(self):
-        stored_creds = self._load_stored_credentials()
-        if not stored_creds:
-            return None
+    def load_authorization(self, json_path: str) -> GeminiCLIAuthorization:
+        """Loads, validates, and sets the user's authorization from a JSON file."""
+        if not os.path.exists(json_path):
+            raise FileNotFoundError(f"Authorization file not found at: {json_path}")
+
+        try:
+            with open(json_path, "r") as f:
+                cred_data = json.load(f)
+            auth_model = GeminiCLIAuthorization(**cred_data)
+        except (IOError, json.JSONDecodeError, BaseModel.ValidationError) as e:
+            print(f"Error loading authorization file: {e}")
+            raise
 
         creds = google.oauth2.credentials.Credentials(
-            token=stored_creds.access_token,
-            refresh_token=stored_creds.refresh_token,
-            token_uri=self.client_config["web"]["token_uri"],
-            client_id=self.client_config["web"]["client_id"],
-            client_secret=self.client_config["web"]["client_secret"],
+            token=auth_model.access_token,
+            refresh_token=auth_model.refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=self.OAUTH_CLIENT_ID,
+            client_secret=self.OAUTH_CLIENT_SECRET,
             scopes=self.OAUTH_SCOPE,
         )
-        creds.expiry = datetime.datetime.fromisoformat(stored_creds.expiry_date)
-        return creds
+        creds.expiry = datetime.datetime.fromisoformat(auth_model.expiry_date)
 
-    def _load_stored_credentials(self) -> Optional[StoredCredentials]:
-        """Loads and validates stored user credentials from a JSON file."""
-        if not os.path.exists(self.credentials_file):
-            return None
-        try:
-            with open(self.credentials_file, "r") as f:
-                cred_data = json.load(f)
-            return StoredCredentials(**cred_data)
-        except (IOError, json.JSONDecodeError, BaseModel.ValidationError) as e:
-            # Handle corrupted or invalid credentials file
-            print(f"Error loading credentials: {e}")
-            return None
+        if creds.expired and creds.refresh_token:
+            creds.refresh(AuthRequest(requests.Session()))
+            self._save_authorization(creds, json_path)
 
-    def _save_credentials(self):
-        if not self.credentials:
-            return
+        self.authorization = creds
+        self.credentials_file_path = json_path
+        return self._get_authorization_model()
 
-        stored_creds = StoredCredentials(
-            access_token=self.credentials.token,
-            refresh_token=self.credentials.refresh_token,
-            expiry_date=self.credentials.expiry.isoformat(),
+    def _get_authorization_model(self) -> GeminiCLIAuthorization:
+        """Creates a GeminiCLIAuthorization model from the active credentials."""
+        if not self.authorization:
+            raise Exception("No active authorization.")
+        return GeminiCLIAuthorization(
+            access_token=self.authorization.token,
+            refresh_token=self.authorization.refresh_token,
+            token_type="Bearer",
+            expiry_date=self.authorization.expiry.isoformat(),
         )
 
-        with open(self.credentials_file, "w") as f:
-            f.write(stored_creds.model_dump_json(indent=2))
-
-    def get_authorization_url(self):
-        authorization_url, state = self.flow.authorization_url(
-            access_type="offline", include_granted_scopes="true"
+    def _save_authorization(self, credentials, json_path: str):
+        """Saves the active credentials to a JSON file."""
+        auth_model = GeminiCLIAuthorization(
+            access_token=credentials.token,
+            refresh_token=credentials.refresh_token,
+            token_type="Bearer",
+            expiry_date=credentials.expiry.isoformat(),
         )
-        return authorization_url
+        with open(json_path, "w") as f:
+            f.write(auth_model.model_dump_json(indent=2))
 
-    def fetch_token(self, code):
-        self.flow.fetch_token(code=code)
-        self.credentials = self.flow.credentials
-        self._save_credentials()
+    def oauth(
+        self,
+        client_creds_path: Optional[str] = None,
+        auth_file_path: str = "credentials.json",
+    ) -> bool:
+        """Handles the interactive, browser-based login flow."""
+        client_config = self.load_credentials(client_creds_path).model_dump() if client_creds_path else {
+            "web": {
+                "client_id": self.OAUTH_CLIENT_ID,
+                "client_secret": self.OAUTH_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": ["http://localhost:8080/oauth2callback"],
+            }
+        }
+
+        flow = google_auth_oauthlib.flow.Flow.from_client_config(
+            client_config, scopes=self.OAUTH_SCOPE
+        )
+        flow.redirect_uri = client_config["web"]["redirect_uris"][0]
+        
+        auth_url, _ = flow.authorization_url(prompt="select_account")
+        print("Please go to this URL: %s" % auth_url)
+
+        code = input("Enter the authorization code: ")
+        flow.fetch_token(code=code)
+
+        self.authorization = flow.credentials
+        self._save_authorization(self.authorization, auth_file_path)
+        return True
 
     def _get_method_url(self, method: str) -> str:
         return f"{self.CODE_ASSIST_ENDPOINT}/{self.CODE_ASSIST_API_VERSION}:{method}"
 
     async def _request_post(self, method: str, payload: dict):
-        if not self.credentials or not self.credentials.valid:
-            if self.credentials and self.credentials.expired and self.credentials.refresh_token:
+        if not self.authorization:
+            raise Exception(
+                "User not authenticated. Please call 'oauth' or 'load_authorization' first."
+            )
+        if not self.authorization.valid:
+            if self.authorization.expired and self.authorization.refresh_token:
+                import requests
                 try:
-                    self.credentials.refresh(AuthRequest(self.client))
-                    self._save_credentials()
+                    await asyncio.to_thread(self.authorization.refresh, AuthRequest(requests.Session()))
+                    if self.credentials_file_path:
+                        self._save_authorization(self.authorization, self.credentials_file_path)
                 except RefreshError as e:
-                    # If refresh fails, re-authentication is needed
                     raise Exception("Token refresh failed. Please re-authenticate.") from e
             else:
-                raise Exception("User not authenticated or credentials expired.")
+                raise Exception("Credentials expired and no refresh token available.")
 
         headers = {
-            "Authorization": f"Bearer {self.credentials.token}",
+            "Authorization": f"Bearer {self.authorization.token}",
             "Content-Type": "application/json",
         }
         url = self._get_method_url(method)
