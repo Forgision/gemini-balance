@@ -6,7 +6,6 @@ import asyncio
 import datetime
 from typing import List, Optional
 import requests
-from google.auth.credentials import Credentials
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from google.auth.transport.requests import Request as AuthRequest
@@ -47,7 +46,7 @@ class GeminiCLIService:
     CODE_ASSIST_API_VERSION = "v1internal"
 
     def __init__(self):
-        self.authorization: Optional[Credentials] = None
+        self.authorization: Optional[google.oauth2.credentials.Credentials] = None
         self.credentials_file_path: Optional[str] = None
         self.client = httpx.AsyncClient()
 
@@ -98,8 +97,10 @@ class GeminiCLIService:
         """Creates a GeminiCLIAuthorization model from the active credentials."""
         if not self.authorization:
             raise Exception("No active authorization.")
-        if not self.authorization.expiry:
-            raise ValueError("Authorization credentials do not have an expiry date.")
+        if not self.authorization.token or not self.authorization.expiry:
+            raise ValueError(
+                "Cannot create authorization model from incomplete credentials."
+            )
         return GeminiCLIAuthorization(
             access_token=self.authorization.token,
             refresh_token=self.authorization.refresh_token,
@@ -107,10 +108,10 @@ class GeminiCLIService:
             expiry_date=self.authorization.expiry.isoformat(),
         )
 
-    def _save_authorization(self, credentials: Credentials, json_path: str):
+    def _save_authorization(self, credentials: google.oauth2.credentials.Credentials, json_path: str):
         """Saves the active credentials to a JSON file."""
-        if not credentials or not credentials.expiry:
-            raise ValueError("Cannot save credentials without an expiry date.")
+        if not credentials or not credentials.token or not credentials.expiry:
+            raise ValueError("Cannot save incomplete credentials.")
         auth_model = GeminiCLIAuthorization(
             access_token=credentials.token,
             refresh_token=credentials.refresh_token,
@@ -148,6 +149,8 @@ class GeminiCLIService:
         flow.fetch_token(code=code)
 
         self.authorization = flow.credentials
+        if not self.authorization:
+            raise Exception("OAuth flow failed to produce credentials.")
         self._save_authorization(self.authorization, auth_file_path)
         return True
 
@@ -160,10 +163,6 @@ class GeminiCLIService:
                 "User not authenticated. Please call 'oauth' or 'load_authorization' first."
             )
 
-        if not isinstance(self.authorization, Credentials):
-            raise TypeError(
-                "Authorization is not a valid Credentials object."
-            )
 
         if not self.authorization.valid:
             if self.authorization.expired and self.authorization.refresh_token:
