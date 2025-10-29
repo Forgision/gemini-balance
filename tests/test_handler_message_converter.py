@@ -220,9 +220,10 @@ def test_convert_system_message_with_non_text():
         }
     ]
     converted, system_instruction = converter.convert(messages, "gemini-pro")
-    assert converted == []
+    assert converted == []  # System messages are not added to converted_messages
+    assert system_instruction is not None
     assert len(system_instruction["parts"]) == 1
-    assert system_instruction["parts"][0]["text"] == "You are a helpful assistant."
+    assert system_instruction["parts"] == [{"text": "You are a helpful assistant."}]
 
 @pytest.mark.skip(reason="Skipping due to persistent KeyError")
 def test_convert_oversized_media_data():

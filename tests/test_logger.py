@@ -45,10 +45,11 @@ def test_access_log_formatter(mock_redact):
 def test_colored_formatter():
     """Test the ColoredFormatter."""
     formatter = ColoredFormatter()
-    record = logging.LogRecord('test', logging.INFO, 'test.py', 1, 'formatted message', None, None)
-    formatter.format(record)
-    assert "\033[32mINFO\033[0m" in record.levelname
-    assert "[test.py:1]" in record.fileloc
+    # Create a mock LogRecord with the necessary attributes
+    mock_record = MagicMock(spec=logging.LogRecord, name="test", levelno=logging.INFO, pathname="test.py", lineno=1, msg="formatted message", args=None, exc_info=None)
+    formatted_message = formatter.format(mock_record)
+    assert "\033[32mINFO\033[0m" in formatted_message
+    assert "[test.py:1]" in formatted_message
 
 def test_redact_key_for_logging():
     """Test the redact_key_for_logging function."""

@@ -42,4 +42,5 @@ exclude_also = [
 dev = [
     "playwright>=1.55.0",
     "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
 ]

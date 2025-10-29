@@ -1,3 +1,4 @@
+import datetime
 import pytest
 from unittest.mock import AsyncMock, patch
 from app.database import services
@@ -55,7 +56,12 @@ async def test_create_file_record(mock_database):
     """Test the create_file_record function."""
     with patch("app.database.services.get_file_record_by_name", new_callable=AsyncMock) as mock_get_file_record_by_name:
         mock_get_file_record_by_name.return_value = {"name": "files/file_id"}
-        await services.create_file_record("files/file_id", "mime/type", 123, "api_key", "uri", "2024-01-01", "2024-01-01", "2025-01-01")
+        await services.create_file_record(
+            "files/file_id", "mime/type", 123, "api_key",
+            "uri", datetime.datetime(2024,1,1), 
+            datetime.datetime(2025,1,1),
+         datetime.datetime(2025,1,1),
+        )
         mock_database.execute.assert_called_once()
 
 @pytest.mark.asyncio

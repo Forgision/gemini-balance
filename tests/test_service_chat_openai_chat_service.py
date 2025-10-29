@@ -31,9 +31,11 @@ async def test_openai_chat_service_generate_content(mock_key_manager):
         }
         mock_generate_content.return_value = gemini_response
         service = OpenAIChatService("http://base.url", mock_key_manager)
-        request = ChatRequest(messages=[{"role": "user", "content": "Hello"}])
+        request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=False)
         response = await service.create_chat_completion(request, "test_api_key")
         mock_generate_content.assert_called_once()
+        assert response is not None
+        assert isinstance(response, dict)
         assert response["choices"][0]["message"]["content"] == "Hello"
 
 
@@ -47,7 +49,9 @@ async def test_openai_chat_service_stream_content(mock_key_manager):
         mock_stream_generate_content.return_value = mock_stream()
         service = OpenAIChatService("http://base.url", mock_key_manager)
         request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=True)
-        stream = await service.create_chat_completion(request, "test_api_key")
+        stream = service.create_chat_completion(request, "test_api_key")
+        assert stream is not None
+        assert isinstance(stream, AsyncMock)
         chunks = [chunk async for chunk in stream]
         mock_stream_generate_content.assert_called_once()
         assert len(chunks) > 0
@@ -78,6 +82,8 @@ async def test_openai_chat_service_stream_content_failure(mock_key_manager):
         request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=True)
         stream = await service.create_chat_completion(request, "test_api_key")
         with pytest.raises(Exception):
+            assert stream is not None
+            assert isinstance(stream, AsyncMock)
             _ = [chunk async for chunk in stream]
         mock_stream_generate_content.assert_called_once()
 
@@ -88,7 +94,9 @@ async def test_openai_chat_service_image_generation(mock_key_manager):
     with patch("app.service.image.image_create_service.ImageCreateService.generate_images_chat") as mock_image_generation:
         mock_image_generation.return_value = "http://image.url"
         service = OpenAIChatService("http://base.url", mock_key_manager)
-        request = ChatRequest(messages=[{"role": "user", "content": "A cat"}], model="imagen-3.0-generate-002")
+        request = ChatRequest(messages=[{"role": "user", "content": "A cat"}], model="imagen-3.0-generate-002", stream=False)
         response = await service.create_image_chat_completion(request, "test_api_key")
         mock_image_generation.assert_called_once()
+        assert response is not None
+        assert isinstance(response, dict)
         assert "http://image.url" in response["choices"][0]["message"]["content"]

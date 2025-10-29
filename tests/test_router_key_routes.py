@@ -4,10 +4,10 @@ import pytest
 
 def test_get_keys_paginated_success(client, mock_key_manager: KeyManager):
     """Test successful retrieval of paginated keys with default parameters."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {
+    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
         "valid_keys": {"test_key_1": 0, "test_key_2": 1},
         "invalid_keys": {"test_key_3": 10},
-    }
+    })
 
     response = client.get(
         "/api/keys",
@@ -31,10 +31,10 @@ def test_get_keys_paginated_unauthorized(client, mock_key_manager: KeyManager):
 
 def test_get_keys_paginated_filter_by_status(client, mock_key_manager: KeyManager):
     """Test filtering keys by status (valid/invalid)."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {
+    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
         "valid_keys": {"valid_key": 0},
         "invalid_keys": {"invalid_key": 5},
-    }
+    })
 
     # Test 'valid' status
     response_valid = client.get(
@@ -61,10 +61,10 @@ def test_get_keys_paginated_filter_by_status(client, mock_key_manager: KeyManage
 
 def test_get_keys_paginated_search(client, mock_key_manager: KeyManager):
     """Test searching for a specific key."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {
+    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
         "valid_keys": {"search_target_key": 0, "another_key": 1},
         "invalid_keys": {},
-    }
+    })
 
     response = client.get(
         "/api/keys?search=target",
@@ -80,10 +80,10 @@ def test_get_keys_paginated_search(client, mock_key_manager: KeyManager):
 
 def test_get_keys_paginated_fail_count_threshold(client, mock_key_manager: KeyManager):
     """Test filtering by fail count threshold."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {
+    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
         "valid_keys": {"key_low_fail": 1},
         "invalid_keys": {"key_high_fail": 15},
-    }
+    })
 
     response = client.get(
         "/api/keys?fail_count_threshold=10",
@@ -100,10 +100,10 @@ def test_get_keys_paginated_fail_count_threshold(client, mock_key_manager: KeyMa
 def test_get_keys_paginated_pagination(client, mock_key_manager: KeyManager):
     """Test the pagination logic."""
     keys = {f"key_{i}": i for i in range(20)}
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {
+    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
         "valid_keys": keys,
         "invalid_keys": {},
-    }
+    })
 
     # Get page 2 with a limit of 5
     response = client.get(
@@ -127,10 +127,10 @@ def test_get_keys_paginated_pagination(client, mock_key_manager: KeyManager):
 # Tests for get_all_keys
 def test_get_all_keys_success(client, mock_key_manager: KeyManager):
     """Test successful retrieval of all keys for bulk operations."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {
+    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
         "valid_keys": {"valid_1": 0, "valid_2": 1},
         "invalid_keys": {"invalid_1": 10},
-    }
+    })
 
     response = client.get(
         "/api/keys/all",
