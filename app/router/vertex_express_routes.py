@@ -11,7 +11,8 @@ from app.handler.error_handler import handle_route_errors
 from app.handler.retry_handler import RetryHandler
 from app.log.logger import get_vertex_express_logger
 from app.service.chat.vertex_express_chat_service import GeminiChatService
-from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.key.key_manager import KeyManager
+from app.dependencies import get_key_manager
 from app.service.model.model_service import ModelService
 from app.utils.helpers import redact_key_for_logging
 
@@ -20,11 +21,6 @@ logger = get_vertex_express_logger()
 
 security_service = SecurityService()
 model_service = ModelService()
-
-
-async def get_key_manager():
-    """Get the key manager instance."""
-    return await get_key_manager_instance()
 
 
 async def get_next_working_key(key_manager: KeyManager = Depends(get_key_manager)):

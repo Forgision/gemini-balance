@@ -4,7 +4,7 @@ from app.service.chat.openai_chat_service import OpenAIChatService
 from app.service.key.key_manager import KeyManager, get_key_manager_instance
 
 async def get_key_manager():
-    return await get_key_manager_instance()
+    return await get_key_manager_instance(settings.API_KEYS, settings.VERTEX_API_KEYS)
 
 from app.service.chat.gemini_chat_service import GeminiChatService
 

@@ -11,7 +11,8 @@ from app.domain.openai_models import (
 from app.handler.error_handler import handle_route_errors
 from app.handler.retry_handler import RetryHandler
 from app.log.logger import get_openai_compatible_logger
-from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.key.key_manager import KeyManager
+from app.dependencies import get_key_manager
 from app.service.openai_compatiable.openai_compatiable_service import (
     OpenAICompatiableService,
 )
@@ -21,10 +22,6 @@ router = APIRouter()
 logger = get_openai_compatible_logger()
 
 security_service = SecurityService()
-
-
-async def get_key_manager():
-    return await get_key_manager_instance()
 
 
 async def get_next_working_key_wrapper(

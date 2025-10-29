@@ -15,7 +15,8 @@ from app.log.logger import get_openai_logger
 from app.service.chat.openai_chat_service import OpenAIChatService
 from app.service.embedding.embedding_service import EmbeddingService
 from app.service.image.image_create_service import ImageCreateService
-from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.key.key_manager import KeyManager
+from app.dependencies import get_key_manager
 from app.service.model.model_service import ModelService
 from app.service.tts.tts_service import TTSService
 from app.utils.helpers import redact_key_for_logging
@@ -28,10 +29,6 @@ model_service = ModelService()
 embedding_service = EmbeddingService()
 image_create_service = ImageCreateService()
 tts_service = TTSService()
-
-
-async def get_key_manager():
-    return await get_key_manager_instance()
 
 
 async def get_next_working_key_wrapper(
