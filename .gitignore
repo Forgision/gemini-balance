@@ -260,3 +260,5 @@ $RECYCLE.BIN/
 tests/
 default_db
 .vscode/*.json
+client_secret.json
+credentials.json
