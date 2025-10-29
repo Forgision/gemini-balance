@@ -216,7 +216,7 @@ async def get_proxy_cache_stats(request: Request):
 
     try:
         proxy_service = get_proxy_check_service()
-        stats = proxy_service.get_cache_stats()
+        stats = await proxy_service.get_cache_stats()
         return stats
     except Exception as e:
         logger.error(f"Get proxy cache stats failed: {str(e)}", exc_info=True)
@@ -233,7 +233,7 @@ async def clear_proxy_cache(request: Request):
 
     try:
         proxy_service = get_proxy_check_service()
-        proxy_service.clear_cache()
+        await proxy_service.clear_cache()
         return {"success": True, "message": "Proxy check cache cleared"}
     except Exception as e:
         logger.error(f"Clear proxy cache failed: {str(e)}", exc_info=True)
