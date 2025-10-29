@@ -16,17 +16,23 @@ def RetryHandler(key_arg: str = "api_key"):
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
-            key_manager: KeyManager = kwargs.get("key_manager")
+            key_manager = kwargs.get("key_manager")
             if not key_manager:
                 # Fallback to singleton if not injected
                 key_manager = await get_key_manager_instance()
+
+            if key_manager is None:
+                raise ValueError("KeyManager instance is not available.")
 
             last_exception = None
 
             for attempt in range(settings.MAX_RETRIES):
                 retries = attempt + 1
                 try:
-                    return await func(*args, **kwargs)
+                    if asyncio.iscoroutinefunction(func):
+                        return await func(*args, **kwargs)
+                    else:
+                        return func(*args, **kwargs)
                 except Exception as e:
                     last_exception = e
                     logger.warning(

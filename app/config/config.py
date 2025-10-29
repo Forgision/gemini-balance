@@ -5,7 +5,7 @@ Application Configuration Module
 import datetime
 import json
 from typing import Any, Dict, List, Type, get_args, get_origin
-
+from pydantic.fields import FieldInfo
 from pydantic import Field, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, EnvSettingsSource
 from sqlalchemy import insert, select, update

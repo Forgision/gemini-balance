@@ -50,7 +50,9 @@ def get_config_service() -> ConfigService:
 
 from app.service.files.files_service import FilesService
 
-def get_error_log_service() -> any:
+from typing import Any
+
+def get_error_log_service() -> Any:
     """Get the error log service instance."""
     return error_log_service
 

@@ -1,6 +1,7 @@
 """
 Unit tests for API key redaction functionality
 """
+# Note: pytest is a development dependency and needs to be installed separately.
 import logging
 from unittest.mock import patch, MagicMock
 

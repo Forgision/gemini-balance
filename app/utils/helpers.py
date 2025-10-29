@@ -160,7 +160,7 @@ def is_valid_api_key(key: str) -> bool:
     return False
 
 
-def redact_key_for_logging(key: str) -> str:
+def redact_key_for_logging(key: Optional[str]) -> str:
     """
     Redacts API key for secure logging by showing only first and last 6 characters.
 
