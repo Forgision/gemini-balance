@@ -1,3 +1,8 @@
 {
-    "commentTranslate.source": "upupnoah.chatgpt-comment-translateX-chatgpt"
+    "commentTranslate.source": "upupnoah.chatgpt-comment-translateX-chatgpt",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
