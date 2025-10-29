@@ -876,39 +876,38 @@ async def update_usage_stats(api_key: str, model_name: str, token_count: int) ->
         now = datetime.now()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        async with database.transaction():
-            # Find the record for today
-            query = select(UsageStats).where(
-                UsageStats.api_key == api_key,
-                UsageStats.model_name == model_name,
-                UsageStats.timestamp >= start_of_day,
-            )
-            record = await database.fetch_one(query)
+        # Find the record for today
+        query = select(UsageStats).where(
+            UsageStats.api_key == api_key,
+            UsageStats.model_name == model_name,
+            UsageStats.timestamp >= start_of_day,
+        )
+        record = await database.fetch_one(query)
 
-            if record:
-                # Update existing record
-                update_query = (
-                    update(UsageStats)
-                    .where(UsageStats.id == record["id"])
-                    .values(
-                        rpm=UsageStats.rpm + 1,
-                        rpd=UsageStats.rpd + 1,
-                        token_count=UsageStats.token_count + token_count,
-                        timestamp=now,
-                    )
-                )
-                await database.execute(update_query)
-            else:
-                # Insert new record
-                insert_query = insert(UsageStats).values(
-                    api_key=api_key,
-                    model_name=model_name,
-                    rpm=1,
-                    rpd=1,
-                    token_count=token_count,
+        if record:
+            # Update existing record
+            update_query = (
+                update(UsageStats)
+                .where(UsageStats.id == record["id"])
+                .values(
+                    rpm=UsageStats.rpm + 1,
+                    rpd=UsageStats.rpd + 1,
+                    token_count=UsageStats.token_count + token_count,
                     timestamp=now,
                 )
-                await database.execute(insert_query)
+            )
+            await database.execute(update_query)
+        else:
+            # Insert new record
+            insert_query = insert(UsageStats).values(
+                api_key=api_key,
+                model_name=model_name,
+                rpm=1,
+                rpd=1,
+                token_count=token_count,
+                timestamp=now,
+            )
+            await database.execute(insert_query)
 
         return True
     except Exception as e:

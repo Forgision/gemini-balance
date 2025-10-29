@@ -1,0 +1,4 @@
+[run]
+omit =
+    app/static/*
+    app/templates/*

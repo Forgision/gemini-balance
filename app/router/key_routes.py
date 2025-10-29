@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Request
-from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.key.key_manager import KeyManager
+from app.dependencies import get_key_manager
 from app.core.security import verify_auth_token
 from fastapi.responses import JSONResponse
 
@@ -16,7 +17,7 @@ async def get_keys_paginated(
     search: Optional[str] = None,
     fail_count_threshold: Optional[int] = None,
     status: str = "all",  # 'valid', 'invalid', 'all'
-    key_manager: KeyManager = Depends(get_key_manager_instance),
+    key_manager: KeyManager = Depends(get_key_manager),
 ):
     """
     Get paginated, filtered, and searched keys.
@@ -71,7 +72,7 @@ async def get_keys_paginated(
 @router.get("/api/keys/all")
 async def get_all_keys(
     request: Request,
-    key_manager: KeyManager = Depends(get_key_manager_instance),
+    key_manager: KeyManager = Depends(get_key_manager),
 ):
     """
     Get all keys (both valid and invalid) for bulk operations.

@@ -40,9 +40,7 @@ async def get_next_working_key_wrapper(
     return await key_manager.get_next_working_key(model_name="gemini-pro")
 
 
-async def get_openai_chat_service(key_manager: KeyManager = Depends(get_key_manager)):
-    """Get the OpenAI chat service instance."""
-    return OpenAIChatService(settings.BASE_URL, key_manager)
+from app.dependencies import get_openai_chat_service
 
 
 async def get_tts_service():
