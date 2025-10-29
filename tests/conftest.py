@@ -2,13 +2,27 @@ import os
 import threading
 import time
 from pathlib import Path
-
+import sys
 import pytest
+
 import uvicorn
 from dotenv import load_dotenv
+from fastapi.testclient import TestClient
+from unittest.mock import MagicMock, AsyncMock
+
+from app.core.application import create_app
+from app.service.key.key_manager import KeyManager
+from app.router import (
+    gemini_routes,
+    openai_routes,
+    vertex_express_routes,
+    openai_compatible_routes,
+    key_routes,
+)
+from app.main import app
+from app.config.config import settings
 
 # Add the project root to the Python path to ensure app modules can be imported
-import sys
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -17,8 +31,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env.test", override=True)
 
 # Now, it's safe to import the application instance
-from app.main import app
-from app.config.config import settings
 
 # Define a fixed port and host for the test server
 TEST_SERVER_PORT = 8002
@@ -81,23 +93,6 @@ def base_url(live_server_url):
     so it can be used automatically by page objects.
     """
     return live_server_url
-from dotenv import load_dotenv
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, AsyncMock
-
-# Load test environment variables before any application code is imported
-load_dotenv(dotenv_path="tests/.env.test")
-
-from app.core.application import create_app
-from app.service.key.key_manager import KeyManager
-from app.router import (
-    gemini_routes,
-    openai_routes,
-    vertex_express_routes,
-    openai_compatible_routes,
-    key_routes,
-)
 
 @pytest.fixture
 def mock_key_manager():
