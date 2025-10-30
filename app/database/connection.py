@@ -2,7 +2,7 @@
 Database connection pool module
 """
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath, PurePosixPath
 from urllib.parse import quote_plus
 from databases import Database
 from sqlalchemy import create_engine, MetaData
@@ -19,6 +19,8 @@ if settings.DATABASE_TYPE == "sqlite":
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
     db_path = data_dir / settings.SQLITE_DATABASE
+    # Following is to avoid windows separator in windows
+    db_path = PureWindowsPath(db_path).as_posix()
     DATABASE_URL = f"sqlite:///{db_path}"
 elif settings.DATABASE_TYPE == "mysql":
     if settings.MYSQL_SOCKET:

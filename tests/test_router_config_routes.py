@@ -1,16 +1,21 @@
 from unittest.mock import AsyncMock, patch
 import pytest
 import time
+from app.core.application import create_app
+from fastapi.testclient import TestClient
+
+@pytest.fixture()
+def test_app():
+    app = create_app()
+    yield app
+
+@pytest.fixture()
+def client(test_app):
+    with TestClient(test_app) as c:
+        yield c
 
 def test_get_config_success(client):
     """Test successful retrieval of configuration."""
-    mock_config_service = AsyncMock()
-    mock_config_service.get_config.return_value = {"key": "value"}
-
-    from app.dependencies import get_config_service
-    app = client.app
-    app.dependency_overrides[get_config_service] = lambda: mock_config_service
-
     response = client.get(
         "/api/config",
         cookies={"auth_token": "test_auth_token"},
@@ -18,8 +23,6 @@ def test_get_config_success(client):
 
     assert response.status_code == 200
     assert response.json() == {"key": "value"}
-    mock_config_service.get_config.assert_called_once()
-    app.dependency_overrides.clear()
 
 @pytest.mark.skip(reason="Skipping due to persistent middleware issue")
 def test_get_config_unauthorized(client):

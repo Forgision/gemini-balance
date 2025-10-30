@@ -188,6 +188,7 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
         """Extract the model name from the request to build the Gemini API URL"""
         # 1. Extract from the request body
         try:
+            #TODO: request is async so await should be used while calling request.json it must await
             if hasattr(request, "_body") and request._body:
                 import json
 

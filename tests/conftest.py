@@ -96,7 +96,7 @@ def base_url(live_server_url):
     """
     return live_server_url
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def mock_key_manager():
     """Fixture to create a mock KeyManager."""
     mock = MagicMock(spec=KeyManager)
@@ -104,9 +104,8 @@ def mock_key_manager():
     mock.get_next_working_key = AsyncMock(return_value="test_api_key_for_model")
     return mock
 
-@pytest.fixture
-def client(mock_key_manager):
-    """Fixture to create a TestClient with dependencies overridden."""
+@pytest.fixture(scope="session")
+def test_app(mock_key_manager):
     app = create_app()
 
     async def override_get_key_manager():
@@ -121,7 +120,11 @@ def client(mock_key_manager):
         openai_compatible_routes.get_key_manager
     ] = override_get_key_manager
     app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
+    yield app
 
+@pytest.fixture(scope="session")
+def client(test_app):
+    """Fixture to create a TestClient with dependencies overridden."""
     with TestClient(app) as test_client:
         yield test_client
 
