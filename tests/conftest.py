@@ -9,6 +9,7 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import patch
 
 from app.core.application import create_app
 from app.service.key.key_manager import KeyManager
@@ -64,6 +65,7 @@ def live_server_url():
     """
     Session-scoped fixture to start and stop a live FastAPI server.
     """
+    
     config = uvicorn.Config(
         app,
         host=TEST_SERVER_HOST,
@@ -122,3 +124,11 @@ def client(mock_key_manager):
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture(autouse=True)
+def mock_verify_auth_token():
+    """Fixture to patch verify_auth_token to always return True."""
+    with patch("app.core.security.verify_auth_token", return_value=True) as mock:
+        yield mock
+
