@@ -48,5 +48,4 @@ dev = [
     "pytest-asyncio>=1.2.0",
     "pytest-tornasync>=0.6.0.post2",
     "pytest-trio>=0.8.0",
-    "pytest-twisted>=1.14.3",
 ]
