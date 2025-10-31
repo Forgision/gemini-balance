@@ -8,8 +8,8 @@ import logging
 async def handle_route_errors(
     logger: logging.Logger,
     operation_name: str,
-    success_message: Optional[str] = '',
-    failure_message: Optional[str] = '',
+    success_message: Optional[str] = "",
+    failure_message: Optional[str] = "",
 ):
     """
     An asynchronous context manager for handling common errors and logging in FastAPI routes.

@@ -3,6 +3,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config.config import settings
 from app.core.security import SecurityService
+from app.dependencies import get_key_manager
+from app.dependencies import get_openai_compatible_chat_service as get_openai_service
 from app.domain.openai_models import (
     ChatRequest,
     EmbeddingRequest,
@@ -12,7 +14,6 @@ from app.handler.error_handler import handle_route_errors
 from app.handler.retry_handler import RetryHandler
 from app.log.logger import get_openai_compatible_logger
 from app.service.key.key_manager import KeyManager
-from app.dependencies import get_key_manager
 from app.service.openai_compatiable.openai_compatiable_service import (
     OpenAICompatiableService,
 )
@@ -28,9 +29,6 @@ async def get_next_working_key_wrapper(
     key_manager: KeyManager = Depends(get_key_manager),
 ):
     return await key_manager.get_next_working_key(model_name="gemini-pro")
-
-
-from app.dependencies import get_openai_compatible_chat_service as get_openai_service
 
 
 @router.get("/openai/v1/models")
@@ -89,7 +87,9 @@ async def chat_completion(
                 first_chunk = await raw_response.__anext__()
             except StopAsyncIteration:
                 # If the stream ends directly, return a standard SSE output
-                return StreamingResponse((c for c in []), media_type="text/event-stream")
+                return StreamingResponse(
+                    (c for c in []), media_type="text/event-stream"
+                )
             except Exception as e:
                 # Initialization stream exception, return a 500 error directly
                 return JSONResponse(
@@ -141,7 +141,9 @@ async def embedding(
         api_key = await key_manager.get_next_working_key(model_name=request.model)
         logger.info(f"Using allowed token: {allowed_token}")
         logger.info(f"Using API key: {redact_key_for_logging(api_key)}")
-        input_text = request.input if isinstance(request.input, str) else " ".join(request.input)
+        input_text = (
+            request.input if isinstance(request.input, str) else " ".join(request.input)
+        )
         return await openai_service.create_embeddings(
             input_text=input_text, model=request.model, api_key=api_key
         )

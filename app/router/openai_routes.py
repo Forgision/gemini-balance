@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config.config import settings
 from app.core.security import SecurityService
+from app.dependencies import get_key_manager, get_openai_chat_service
 from app.domain.openai_models import (
     ChatRequest,
     EmbeddingRequest,
@@ -16,7 +17,6 @@ from app.service.chat.openai_chat_service import OpenAIChatService
 from app.service.embedding.embedding_service import EmbeddingService
 from app.service.image.image_create_service import ImageCreateService
 from app.service.key.key_manager import KeyManager
-from app.dependencies import get_key_manager
 from app.service.model.model_service import ModelService
 from app.service.tts.tts_service import TTSService
 from app.utils.helpers import redact_key_for_logging
@@ -35,9 +35,6 @@ async def get_next_working_key_wrapper(
     key_manager: KeyManager = Depends(get_key_manager),
 ):
     return await key_manager.get_next_working_key(model_name="gemini-pro")
-
-
-from app.dependencies import get_openai_chat_service
 
 
 async def get_tts_service():
@@ -107,7 +104,9 @@ async def chat_completion(
                 first_chunk = await raw_response.__anext__()
             except StopAsyncIteration:
                 # If the stream ends directly, return standard SSE output
-                return StreamingResponse((c for c in []), media_type="text/event-stream")
+                return StreamingResponse(
+                    (c for c in []), media_type="text/event-stream"
+                )
             except Exception as e:
                 # If stream initialization fails, return a 500 error directly
                 return JSONResponse(

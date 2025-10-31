@@ -1,12 +1,10 @@
-import asyncio
 import inspect
 from functools import wraps
 from typing import Any, Callable, TypeVar, cast
 
-from fastapi import Depends
 from app.config.config import settings
 from app.log.logger import get_retry_logger
-from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.key.key_manager import get_key_manager_instance
 from app.utils.helpers import redact_key_for_logging
 
 T = TypeVar("T")
@@ -58,7 +56,9 @@ def RetryHandler(key_arg: str = "api_key"):
 
             if last_exception is None:
                 # This should not happen if MAX_RETRIES > 0
-                last_exception = RuntimeError("Retry handler failed without an exception.")
+                last_exception = RuntimeError(
+                    "Retry handler failed without an exception."
+                )
             logger.error(
                 f"All retry attempts failed, raising final exception: {str(last_exception)}"
             )

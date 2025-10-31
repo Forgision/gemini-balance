@@ -6,13 +6,13 @@ import asyncio
 import datetime
 from typing import List, Optional, Union
 import requests
-from google.auth.external_account_authorized_user import \
-    Credentials as ExternalAccountCredentials
+from google.auth.external_account_authorized_user import (
+    Credentials as ExternalAccountCredentials,
+)
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from google.auth.transport.requests import Request as AuthRequest
 from google.auth.exceptions import RefreshError
-from googleapiclient.discovery import build
 import httpx
 from pydantic import BaseModel, ValidationError
 from dotenv import load_dotenv
@@ -26,6 +26,7 @@ class GeminiCLIAuthorization(BaseModel):
     token_type: str = "Bearer"
     expiry_date: str
 
+
 class GeminiCLICredentialsWeb(BaseModel):
     client_id: str
     client_secret: str
@@ -33,8 +34,10 @@ class GeminiCLICredentialsWeb(BaseModel):
     auth_uri: str
     token_uri: str
 
+
 class GeminiCLICredentials(BaseModel):
     web: GeminiCLICredentialsWeb
+
 
 class GeminiCLIService:
     OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID")
@@ -48,7 +51,9 @@ class GeminiCLIService:
     CODE_ASSIST_API_VERSION = "v1internal"
 
     def __init__(self):
-        self.authorization: Optional[Union[google.oauth2.credentials.Credentials, ExternalAccountCredentials]] = None
+        self.authorization: Optional[
+            Union[google.oauth2.credentials.Credentials, ExternalAccountCredentials]
+        ] = None
         self.credentials_file_path: Optional[str] = None
         self.client = httpx.AsyncClient()
 
@@ -110,7 +115,13 @@ class GeminiCLIService:
             expiry_date=self.authorization.expiry.isoformat(),
         )
 
-    def _save_authorization(self, credentials: Union[google.oauth2.credentials.Credentials, ExternalAccountCredentials], json_path: str):
+    def _save_authorization(
+        self,
+        credentials: Union[
+            google.oauth2.credentials.Credentials, ExternalAccountCredentials
+        ],
+        json_path: str,
+    ):
         """Saves the active credentials to a JSON file."""
         if not credentials or not credentials.token or not credentials.expiry:
             raise ValueError("Cannot save incomplete credentials.")
@@ -129,21 +140,25 @@ class GeminiCLIService:
         auth_file_path: str = "credentials.json",
     ) -> bool:
         """Handles the interactive, browser-based login flow."""
-        client_config = self.load_credentials(client_creds_path).model_dump() if client_creds_path else {
-            "web": {
-                "client_id": self.OAUTH_CLIENT_ID,
-                "client_secret": self.OAUTH_CLIENT_SECRET,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": ["http://localhost:8080/oauth2callback"],
+        client_config = (
+            self.load_credentials(client_creds_path).model_dump()
+            if client_creds_path
+            else {
+                "web": {
+                    "client_id": self.OAUTH_CLIENT_ID,
+                    "client_secret": self.OAUTH_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": ["http://localhost:8080/oauth2callback"],
+                }
             }
-        }
+        )
 
         flow = google_auth_oauthlib.flow.Flow.from_client_config(
             client_config, scopes=self.OAUTH_SCOPE
         )
         flow.redirect_uri = client_config["web"]["redirect_uris"][0]
-        
+
         auth_url, _ = flow.authorization_url(prompt="select_account")
         print("Please go to this URL: %s" % auth_url)
 
@@ -165,16 +180,22 @@ class GeminiCLIService:
                 "User not authenticated. Please call 'oauth' or 'load_authorization' first."
             )
 
-
         if not self.authorization.valid:
             if self.authorization.expired and self.authorization.refresh_token:
                 import requests
+
                 try:
-                    await asyncio.to_thread(self.authorization.refresh, AuthRequest(requests.Session()))
+                    await asyncio.to_thread(
+                        self.authorization.refresh, AuthRequest(requests.Session())
+                    )
                     if self.credentials_file_path:
-                        self._save_authorization(self.authorization, self.credentials_file_path)
+                        self._save_authorization(
+                            self.authorization, self.credentials_file_path
+                        )
                 except RefreshError as e:
-                    raise Exception("Token refresh failed. Please re-authenticate.") from e
+                    raise Exception(
+                        "Token refresh failed. Please re-authenticate."
+                    ) from e
             else:
                 raise Exception("Credentials expired and no refresh token available.")
 

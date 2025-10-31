@@ -74,7 +74,9 @@ class SecurityService:
     ) -> str:
         """Verify the key in the URL or the x-goog-api-key in the request header"""
         # If the key in the URL is valid, return it directly
-        if key is not None and (key in settings.ALLOWED_TOKENS or key == settings.AUTH_TOKEN):
+        if key is not None and (
+            key in settings.ALLOWED_TOKENS or key == settings.AUTH_TOKEN
+        ):
             return key
 
         # Otherwise, check the x-goog-api-key in the request header

@@ -58,7 +58,7 @@ async def test_create_file_record(mock_database):
         mock_get_file_record_by_name.return_value = {"name": "files/file_id"}
         await services.create_file_record(
             "files/file_id", "mime/type", 123, "api_key",
-            "uri", datetime.datetime(2024,1,1), 
+            "uri", datetime.datetime(2024,1,1),
             datetime.datetime(2025,1,1),
          datetime.datetime(2025,1,1),
         )
@@ -116,12 +116,53 @@ async def test_get_all_usage_stats(mock_database):
 async def test_update_usage_stats_new_record(mock_database):
     """Test the update_usage_stats function for a new record."""
     mock_database.fetch_one.return_value = None
-    await services.update_usage_stats("api_key", "model_name", 100)
+    await services.update_usage_stats("api_key", "model_name", 100, 100)
     assert mock_database.execute.call_count == 1
 
 @pytest.mark.asyncio
 async def test_update_usage_stats_existing_record(mock_database):
     """Test the update_usage_stats function for an existing record."""
+    now = datetime.datetime.now()
+    mock_database.fetch_one.return_value = {
+        "id": 1,
+        "rpm_timestamp": now,
+        "tpm_timestamp": now,
+        "rpd_timestamp": now,
+    }
+    await services.update_usage_stats("api_key", "model_name", 100, 100)
+    assert mock_database.execute.call_count == 1
+
+@pytest.mark.asyncio
+async def test_update_usage_stats_reset_rpm_tpm(mock_database):
+    """Test the update_usage_stats function resets RPM and TPM."""
+    now = datetime.datetime.now()
+    last_minute = now - datetime.timedelta(minutes=1)
+    mock_database.fetch_one.return_value = {
+        "id": 1,
+        "rpm_timestamp": last_minute,
+        "tpm_timestamp": last_minute,
+        "rpd_timestamp": now,
+    }
+    await services.update_usage_stats("api_key", "model_name", 100, 100)
+    assert mock_database.execute.call_count == 1
+
+@pytest.mark.asyncio
+async def test_update_usage_stats_reset_rpd(mock_database):
+    """Test the update_usage_stats function resets RPD."""
+    now = datetime.datetime.now()
+    last_day = now - datetime.timedelta(days=1)
+    mock_database.fetch_one.return_value = {
+        "id": 1,
+        "rpm_timestamp": now,
+        "tpm_timestamp": now,
+        "rpd_timestamp": last_day,
+    }
+    await services.update_usage_stats("api_key", "model_name", 100, 100)
+    assert mock_database.execute.call_count == 1
+
+@pytest.mark.asyncio
+async def test_set_key_exhausted_status(mock_database):
+    """Test the set_key_exhausted_status function."""
     mock_database.fetch_one.return_value = {"id": 1}
-    await services.update_usage_stats("api_key", "model_name", 100)
+    await services.set_key_exhausted_status("api_key", "model_name", True)
     assert mock_database.execute.call_count == 1

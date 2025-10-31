@@ -12,6 +12,7 @@ from app.database.services import (
     add_error_log,
     add_request_log,
     get_file_api_key,
+    set_key_exhausted_status,
     update_usage_stats,
 )
 from app.domain.gemini_models import GeminiRequest
@@ -328,6 +329,7 @@ class GeminiChatService:
             api_key=api_key,
             model_name=model_name,
             token_count=token_count,
+            tpm=token_count,
         )
 
     def _extract_text_from_response(self, response: Dict[str, Any]) -> str:
@@ -389,6 +391,8 @@ class GeminiChatService:
         except Exception as e:
             is_success = False
             status_code = e.args[0] if e.args else 500
+            if status_code == 429:
+                await set_key_exhausted_status(api_key, model, True)
             error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
             logger.error(f"Normal API call failed with error: {error_log_msg}")
 
@@ -527,6 +531,8 @@ class GeminiChatService:
                 retries += 1
                 is_success = False
                 status_code = e.args[0] if e.args else 500
+                if status_code == 429:
+                    await set_key_exhausted_status(current_attempt_key, model, True)
                 error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
                 logger.warning(
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
@@ -545,7 +551,7 @@ class GeminiChatService:
                 )
 
                 api_key = await self.key_manager.handle_api_failure(
-                    current_attempt_key, retries
+                    current_attempt_key, model, retries
                 )
                 if api_key:
                     logger.info(

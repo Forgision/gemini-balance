@@ -232,7 +232,9 @@ class ConfigService:
     async def fetch_ui_models() -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """Get the list of models for UI display"""
         try:
-            key_manager = await get_key_manager_instance(settings.API_KEYS, settings.VERTEX_API_KEYS)
+            key_manager = await get_key_manager_instance(
+                settings.API_KEYS, settings.VERTEX_API_KEYS
+            )
             model_service = ModelService()
 
             api_key = await key_manager.get_random_valid_key()

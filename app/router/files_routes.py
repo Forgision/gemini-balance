@@ -7,10 +7,10 @@ from fastapi import APIRouter, Request, Query, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.config.config import settings
+from app.dependencies import get_files_service
 from app.domain.file_models import FileMetadata, ListFilesResponse, DeleteFileResponse
 from app.log.logger import get_files_logger
 from app.core.security import SecurityService
-from app.service.files.files_service import get_files_service
 from app.service.files.file_upload_handler import get_upload_handler
 from app.utils.helpers import redact_key_for_logging
 
@@ -20,8 +20,6 @@ router = APIRouter()
 security_service = SecurityService()
 
 
-from app.dependencies import get_files_service
-
 @router.post("/upload/v1beta/files")
 async def upload_file_init(
     request: Request,
@@ -30,7 +28,7 @@ async def upload_file_init(
     x_goog_upload_command: Optional[str] = Header(None),
     x_goog_upload_header_content_length: Optional[str] = Header(None),
     x_goog_upload_header_content_type: Optional[str] = Header(None),
-    files_service = Depends(get_files_service),
+    files_service=Depends(get_files_service),
 ):
     """Initialize file upload"""
     logger.debug(
@@ -112,7 +110,7 @@ async def list_files(
         None, description="Page token", alias="pageToken"
     ),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
-    files_service = Depends(get_files_service),
+    files_service=Depends(get_files_service),
 ) -> Union[ListFilesResponse, JSONResponse]:
     """List files"""
     logger.debug(f"List files: {page_size=}, {page_token=}, {auth_token=}")
@@ -140,7 +138,7 @@ async def list_files(
 async def get_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
-    files_service = Depends(get_files_service),
+    files_service=Depends(get_files_service),
 ) -> Union[FileMetadata, JSONResponse]:
     """Get file information"""
     logger.debug(f"Get file request: {file_id=}, {auth_token=}")
@@ -166,7 +164,7 @@ async def get_file(
 async def delete_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
-    files_service = Depends(get_files_service),
+    files_service=Depends(get_files_service),
 ) -> Union[DeleteFileResponse, JSONResponse]:
     """Delete file"""
     logger.info(f"Delete file: {file_id=}, {auth_token=}")
@@ -200,7 +198,7 @@ async def handle_upload(
     request: Request,
     key: Optional[str] = Query(None),  # Get key from query parameters
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
-    files_service = Depends(get_files_service),
+    files_service=Depends(get_files_service),
 ):
     """Handle file upload requests"""
     try:

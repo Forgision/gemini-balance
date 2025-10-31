@@ -2,7 +2,7 @@
 Database connection pool module
 """
 
-from pathlib import Path, PureWindowsPath, PurePosixPath
+from pathlib import Path, PureWindowsPath
 from urllib.parse import quote_plus
 from databases import Database
 from sqlalchemy import create_engine, MetaData

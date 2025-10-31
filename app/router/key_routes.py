@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Request
 from app.service.key.key_manager import KeyManager
 from app.dependencies import get_key_manager
@@ -6,8 +8,6 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
-
-from typing import Optional
 
 @router.get("/api/keys")
 async def get_keys_paginated(

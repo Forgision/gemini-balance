@@ -118,8 +118,10 @@ def _build_tools(
                 function = deepcopy(item.get("function"))
                 if function:
                     parameters = function.get("parameters", {})
-                    if parameters and parameters.get("type") == "object" and not parameters.get(
-                        "properties", {}
+                    if (
+                        parameters
+                        and parameters.get("type") == "object"
+                        and not parameters.get("properties", {})
                     ):
                         function.pop("parameters", None)
 
@@ -477,9 +479,7 @@ class OpenAIChatService:
                             optimized_chunk_data
                         ) in openai_optimizer.optimize_stream_output(
                             text,
-                            lambda t: self._create_char_openai_chunk(
-                                openai_chunk, t
-                            ),
+                            lambda t: self._create_char_openai_chunk(openai_chunk, t),
                             lambda c: f"data: {json.dumps(c)}\n\n",
                         ):
                             yield optimized_chunk_data

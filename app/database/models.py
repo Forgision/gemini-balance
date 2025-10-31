@@ -90,6 +90,7 @@ class RequestLog(Base):
     latency_ms = Column(
         Integer, nullable=True, comment="Request latency (milliseconds)"
     )
+    token_count = Column(Integer, nullable=True, comment="Token count for the request")
 
     def __repr__(self):
         return f"<RequestLog(id='{self.id}', key='{self.api_key[:4]}...', success='{self.is_success}')>"
@@ -194,6 +195,11 @@ class UsageStats(Base):
     token_count = Column(Integer, nullable=False, default=0)
     rpm = Column(Integer, nullable=False, default=0)
     rpd = Column(Integer, nullable=False, default=0)
+    tpm = Column(Integer, nullable=False, default=0)
+    exhausted = Column(Boolean, nullable=False, default=False)
+    rpm_timestamp = Column(DateTime, nullable=True)
+    tpm_timestamp = Column(DateTime, nullable=True)
+    rpd_timestamp = Column(DateTime, nullable=True)
     timestamp = Column(
         DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now
     )

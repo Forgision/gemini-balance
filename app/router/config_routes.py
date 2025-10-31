@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.core.security import verify_auth_token
+from app.dependencies import get_config_service
 from app.log.logger import Logger, get_config_routes_logger
 from app.service.config.config_service import ConfigService
 from app.service.proxy.proxy_check_service import (
@@ -22,10 +23,10 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 logger = get_config_routes_logger()
 
 
-from app.dependencies import get_config_service
-
 @router.get("", response_model=Dict[str, Any])
-async def get_config(request: Request, config_service: ConfigService = Depends(get_config_service)):
+async def get_config(
+    request: Request, config_service: ConfigService = Depends(get_config_service)
+):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to config page")
@@ -34,7 +35,11 @@ async def get_config(request: Request, config_service: ConfigService = Depends(g
 
 
 @router.put("", response_model=Dict[str, Any])
-async def update_config(config_data: Dict[str, Any], request: Request, config_service: ConfigService = Depends(get_config_service)):
+async def update_config(
+    config_data: Dict[str, Any],
+    request: Request,
+    config_service: ConfigService = Depends(get_config_service),
+):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to config page")
@@ -51,7 +56,9 @@ async def update_config(config_data: Dict[str, Any], request: Request, config_se
 
 
 @router.post("/reset", response_model=Dict[str, Any])
-async def reset_config(request: Request, config_service: ConfigService = Depends(get_config_service)):
+async def reset_config(
+    request: Request, config_service: ConfigService = Depends(get_config_service)
+):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning("Unauthorized access attempt to config page")
@@ -67,7 +74,11 @@ class DeleteKeysRequest(BaseModel):
 
 
 @router.delete("/keys/{key_to_delete}", response_model=Dict[str, Any])
-async def delete_single_key(key_to_delete: str, request: Request, config_service: ConfigService = Depends(get_config_service)):
+async def delete_single_key(
+    key_to_delete: str,
+    request: Request,
+    config_service: ConfigService = Depends(get_config_service),
+):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
         logger.warning(
@@ -99,7 +110,9 @@ async def delete_single_key(key_to_delete: str, request: Request, config_service
 
 @router.post("/keys/delete-selected", response_model=Dict[str, Any])
 async def delete_selected_keys_route(
-    delete_request: DeleteKeysRequest, request: Request, config_service: ConfigService = Depends(get_config_service)
+    delete_request: DeleteKeysRequest,
+    request: Request,
+    config_service: ConfigService = Depends(get_config_service),
 ):
     auth_token = request.cookies.get("auth_token")
     if not auth_token or not verify_auth_token(auth_token):
@@ -128,7 +141,9 @@ async def delete_selected_keys_route(
 
 
 @router.get("/ui/models")
-async def get_ui_models(request: Request, config_service: ConfigService = Depends(get_config_service)):
+async def get_ui_models(
+    request: Request, config_service: ConfigService = Depends(get_config_service)
+):
     auth_token_cookie = request.cookies.get("auth_token")
     if not auth_token_cookie or not verify_auth_token(auth_token_cookie):
         logger.warning("Unauthorized access attempt to /api/config/ui/models")

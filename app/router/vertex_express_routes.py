@@ -6,13 +6,14 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.config.config import settings
 from app.core.constants import API_VERSION
 from app.core.security import SecurityService
+from app.dependencies import get_key_manager
+from app.dependencies import get_vertex_express_chat_service as get_chat_service
 from app.domain.gemini_models import GeminiRequest
 from app.handler.error_handler import handle_route_errors
 from app.handler.retry_handler import RetryHandler
 from app.log.logger import get_vertex_express_logger
 from app.service.chat.vertex_express_chat_service import GeminiChatService
 from app.service.key.key_manager import KeyManager
-from app.dependencies import get_key_manager
 from app.service.model.model_service import ModelService
 from app.utils.helpers import redact_key_for_logging
 
@@ -26,9 +27,6 @@ model_service = ModelService()
 async def get_next_working_key(key_manager: KeyManager = Depends(get_key_manager)):
     """Get the next available API key."""
     return await key_manager.get_next_working_vertex_key()
-
-
-from app.dependencies import get_vertex_express_chat_service as get_chat_service
 
 
 @router.get("/models")

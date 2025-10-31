@@ -122,16 +122,35 @@ async def get_usage_stats_by_key_and_model(
         Optional[Dict[str, Any]]: The usage statistics, or None if not found.
     """
     try:
-        query = (
-            select(UsageStats)
-            .where(
-                UsageStats.api_key == api_key,
-                UsageStats.model_name == model_name,
-            )
-            .order_by(desc(UsageStats.timestamp))
+        query = select(UsageStats).where(
+            UsageStats.api_key == api_key,
+            UsageStats.model_name == model_name,
         )
         result = await database.fetch_one(query)
-        return dict(result) if result else None
+        if not result:
+            return None
+
+        record = dict(result)
+        now = datetime.now()
+
+        # Check if RPM and TPM need to be reset
+        if (
+            record["rpm_timestamp"]
+            and (now - record["rpm_timestamp"]).total_seconds() > 60
+        ):
+            record["rpm"] = 0
+            record["tpm"] = 0
+
+        # Check if RPD needs to be reset (Pacific Time)
+        pacific_tz = timezone(timedelta(hours=-7))
+        if (
+            record["rpd_timestamp"]
+            and record["rpd_timestamp"].astimezone(pacific_tz).date()
+            < now.astimezone(pacific_tz).date()
+        ):
+            record["rpd"] = 0
+
+        return record
     except Exception as e:
         logger.error(f"Failed to get usage stats: {str(e)}")
         raise
@@ -200,7 +219,9 @@ async def add_error_log(
             request_time=(request_datetime if request_datetime else datetime.now()),
         )
         await database.execute(query)
-        logger.info(f"Added error log for key: {redact_key_for_logging(gemini_key if gemini_key is not None else 'N/A')}")
+        logger.info(
+            f"Added error log for key: {redact_key_for_logging(gemini_key if gemini_key is not None else 'N/A')}"
+        )
         return True
     except Exception as e:
         logger.error(f"Failed to add error log: {str(e)}")
@@ -557,6 +578,7 @@ async def add_request_log(
     status_code: Optional[int] = None,
     latency_ms: Optional[int] = None,
     request_time: Optional[datetime] = None,
+    token_count: Optional[int] = None,
 ) -> bool:
     """
     Add API request log
@@ -568,9 +590,7 @@ async def add_request_log(
         status_code: API response status code
         latency_ms: Request latency (milliseconds)
         request_time: Time of request (if None, current time is used)
-
-    Returns:
-        bool: Whether the addition was successful
+        token_count: Token count for the request
     """
     try:
         log_time = request_time if request_time else datetime.now()
@@ -582,6 +602,7 @@ async def add_request_log(
             is_success=is_success,
             status_code=status_code,
             latency_ms=latency_ms,
+            token_count=token_count,
         )
         await database.execute(query)
         return True
@@ -860,7 +881,9 @@ async def get_file_api_key(name: str) -> Optional[str]:
         raise
 
 
-async def update_usage_stats(api_key: str, model_name: str, token_count: int) -> bool:
+async def update_usage_stats(
+    api_key: str, model_name: str, token_count: int, tpm: int
+) -> bool:
     """
     Update usage statistics.
 
@@ -868,33 +891,54 @@ async def update_usage_stats(api_key: str, model_name: str, token_count: int) ->
         api_key: The API key used.
         model_name: The model name used.
         token_count: The number of tokens used.
+        tpm: The number of tokens per minute.
 
     Returns:
         bool: Whether the update was successful.
     """
     try:
         now = datetime.now()
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        pacific_tz = timezone(timedelta(hours=-7))
+        now_pacific = now.astimezone(pacific_tz)
 
-        # Find the record for today
         query = select(UsageStats).where(
             UsageStats.api_key == api_key,
             UsageStats.model_name == model_name,
-            UsageStats.timestamp >= start_of_day,
         )
         record = await database.fetch_one(query)
 
         if record:
-            # Update existing record
+            values = {
+                "token_count": UsageStats.token_count + token_count,
+                "timestamp": now,
+            }
+
+            # Check if RPM and TPM need to be reset
+            if (
+                record["rpm_timestamp"]
+                and (now - record["rpm_timestamp"]).total_seconds() > 60
+            ):
+                values["rpm"] = 1
+                values["tpm"] = tpm
+                values["rpm_timestamp"] = now
+                values["tpm_timestamp"] = now
+            else:
+                values["rpm"] = UsageStats.rpm + 1
+                values["tpm"] = UsageStats.tpm + tpm
+
+            # Check if RPD needs to be reset
+            if (
+                record["rpd_timestamp"]
+                and record["rpd_timestamp"].astimezone(pacific_tz).date()
+                < now_pacific.date()
+            ):
+                values["rpd"] = 1
+                values["rpd_timestamp"] = now
+            else:
+                values["rpd"] = UsageStats.rpd + 1
+
             update_query = (
-                update(UsageStats)
-                .where(UsageStats.id == record["id"])
-                .values(
-                    rpm=UsageStats.rpm + 1,
-                    rpd=UsageStats.rpd + 1,
-                    token_count=UsageStats.token_count + token_count,
-                    timestamp=now,
-                )
+                update(UsageStats).where(UsageStats.id == record["id"]).values(**values)
             )
             await database.execute(update_query)
         else:
@@ -905,11 +949,57 @@ async def update_usage_stats(api_key: str, model_name: str, token_count: int) ->
                 rpm=1,
                 rpd=1,
                 token_count=token_count,
+                tpm=tpm,
                 timestamp=now,
+                rpm_timestamp=now,
+                tpm_timestamp=now,
+                rpd_timestamp=now,
             )
             await database.execute(insert_query)
 
         return True
     except Exception as e:
         logger.error(f"Failed to update usage stats: {str(e)}")
+        return False
+
+
+async def set_key_exhausted_status(
+    api_key: str, model_name: str, exhausted: bool
+) -> bool:
+    """
+    Set the exhausted status for a given API key and model.
+
+    Args:
+        api_key: The API key.
+        model_name: The model name.
+        exhausted: The exhausted status.
+
+    Returns:
+        bool: Whether the update was successful.
+    """
+    try:
+        query = select(UsageStats).where(
+            UsageStats.api_key == api_key,
+            UsageStats.model_name == model_name,
+        )
+        record = await database.fetch_one(query)
+
+        if record:
+            update_query = (
+                update(UsageStats)
+                .where(UsageStats.id == record["id"])
+                .values(exhausted=exhausted)
+            )
+            await database.execute(update_query)
+        else:
+            insert_query = insert(UsageStats).values(
+                api_key=api_key,
+                model_name=model_name,
+                exhausted=exhausted,
+            )
+            await database.execute(insert_query)
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to set key exhausted status: {str(e)}")
         return False

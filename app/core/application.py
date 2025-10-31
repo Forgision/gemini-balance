@@ -131,7 +131,7 @@ def create_app() -> FastAPI:
         from starlette.datastructures import State
 
         app.state = State()
-        
+
     app.state.update_info = {
         "update_available": False,
         "latest_version": None,

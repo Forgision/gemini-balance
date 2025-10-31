@@ -2,9 +2,13 @@ import asyncio
 import random
 from itertools import cycle
 from typing import Any, Dict, Optional, Union
+from datetime import datetime
 
 from app.config.config import settings
-from app.database.services import get_usage_stats_by_key_and_model
+from app.database.services import (
+    get_usage_stats_by_key_and_model,
+    set_key_exhausted_status,
+)
 from app.log.logger import get_key_manager_logger
 from app.utils.helpers import redact_key_for_logging
 
@@ -91,26 +95,66 @@ class KeyManager:
             )
             return False
 
-    async def get_usage_stats(self, api_key: str, model_name: str) -> Optional[Dict[str, Any]]:
+    async def get_usage_stats(
+        self, api_key: str, model_name: str
+    ) -> Optional[Dict[str, Any]]:
         """Get usage statistics for a given key and model."""
         return await get_usage_stats_by_key_and_model(api_key, model_name)
 
     async def get_next_working_key(self, model_name: str) -> str:
-        """Get the next available API key with the lowest RPM."""
-        valid_keys = [key for key in self.api_keys if await self.is_key_valid(key)]
+        """Get the next available API key with the lowest RPM, RPD, and TPM."""
+        key_usage_stats = {}
+        for key in self.api_keys:
+            key_usage_stats[key] = await self.get_usage_stats(key, model_name)
+
+        valid_keys = []
+        for key, usage in key_usage_stats.items():
+            is_exhausted = usage and usage.get("exhausted", False)
+            if is_exhausted:
+                timestamp = usage.get("rpm_timestamp")
+                if timestamp and (datetime.now() - timestamp).total_seconds() > 60:
+                    await set_key_exhausted_status(key, model_name, False)
+                    key_usage_stats[key] = {
+                        "rpd": 0,
+                        "rpm": 0,
+                        "tpm": 0,
+                        "exhausted": False,
+                    }
+                    if await self.is_key_valid(key):
+                        valid_keys.append(key)
+            elif await self.is_key_valid(key):
+                valid_keys.append(key)
 
         if not valid_keys:
             return await self.get_next_key()
 
-        key_usage = {}
-        for key in valid_keys:
-            usage = await self.get_usage_stats(key, model_name)
-            key_usage[key] = usage["rpm"] if usage and "rpm" in usage else 0
+        valid_key_usage = {
+            key: {
+                "rpd": key_usage_stats[key]["rpd"]
+                if key_usage_stats[key] and "rpd" in key_usage_stats[key]
+                else 0,
+                "rpm": key_usage_stats[key]["rpm"]
+                if key_usage_stats[key] and "rpm" in key_usage_stats[key]
+                else 0,
+                "tpm": key_usage_stats[key]["tpm"]
+                if key_usage_stats[key] and "tpm" in key_usage_stats[key]
+                else 0,
+            }
+            for key in valid_keys
+        }
 
-        # Select the key with the lowest RPM
-        if not key_usage:
+        if not valid_key_usage:
             return await self.get_next_key()
-        best_key = min(key_usage, key=lambda k: key_usage[k])
+
+        # Select the key with the lowest combined usage
+        best_key = min(
+            valid_key_usage,
+            key=lambda k: (
+                valid_key_usage[k]["rpd"],
+                valid_key_usage[k]["rpm"],
+                valid_key_usage[k]["tpm"],
+            ),
+        )
         return best_key
 
     async def get_next_working_vertex_key(self) -> str:
@@ -126,7 +170,9 @@ class KeyManager:
             if current_key == initial_key:
                 return current_key
 
-    async def handle_api_failure(self, api_key: str, retries: int) -> str:
+    async def handle_api_failure(
+        self, api_key: str, model_name: str, retries: int
+    ) -> str:
         """Handle API call failure."""
         async with self.failure_count_lock:
             self.key_failure_counts[api_key] += 1
@@ -134,6 +180,7 @@ class KeyManager:
                 logger.warning(
                     f"API key {redact_key_for_logging(api_key)} has failed {self.MAX_FAILURES} times"
                 )
+                await set_key_exhausted_status(api_key, model_name, True)
         if retries < settings.MAX_RETRIES:
             return await self.get_random_valid_key()
         else:

@@ -59,11 +59,7 @@ class TTSService:
                 },
             )
             content = response.candidates[0].content if response.candidates else None
-            if (
-                content
-                and content.parts
-                and content.parts[0].inline_data
-            ):
+            if content and content.parts and content.parts[0].inline_data:
                 raw_audio_data = content.parts[0].inline_data.data
                 is_success = True
                 status_code = 200

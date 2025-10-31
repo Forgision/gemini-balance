@@ -25,7 +25,7 @@ class ProxyCheckResult(BaseModel):
     checked_at: float
 
 
-#TODO: make following code async compatible
+# TODO: make following code async compatible
 class ProxyCheckService:
     """Proxy detection service class"""
 
@@ -43,7 +43,9 @@ class ProxyCheckService:
         """Validate proxy format"""
         try:
             parsed = urlparse(proxy)
-            return parsed.scheme in ["http", "https", "socks5"] and bool(parsed.hostname)
+            return parsed.scheme in ["http", "https", "socks5"] and bool(
+                parsed.hostname
+            )
         except Exception:
             return False
 
@@ -221,7 +223,8 @@ class ProxyCheckService:
 # Global instance
 _proxy_check_service: Optional[ProxyCheckService] = None
 
-#TODO: convert to async method
+
+# TODO: convert to async method
 def get_proxy_check_service() -> ProxyCheckService:
     """Get proxy check service instance"""
     global _proxy_check_service

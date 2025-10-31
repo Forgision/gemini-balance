@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.config.config import settings
 from app.core.constants import API_VERSION
 from app.core.security import SecurityService
+from app.dependencies import get_gemini_chat_service as get_chat_service
 from app.domain.gemini_models import (
     GenerationConfig,
     GeminiBatchEmbedRequest,
@@ -45,9 +46,6 @@ async def get_next_working_key(
 ):
     """Get the next available API key."""
     return await key_manager.get_next_working_key(model_name)
-
-
-from app.dependencies import get_gemini_chat_service as get_chat_service
 
 
 async def get_embedding_service(key_manager: KeyManager = Depends(get_key_manager)):
@@ -343,7 +341,7 @@ async def batch_embed_contents(
 
 @router.post("/reset-all-fail-counts")
 async def reset_all_key_fail_counts(
-    key_type: Optional[str] = '', key_manager: KeyManager = Depends(get_key_manager)
+    key_type: Optional[str] = "", key_manager: KeyManager = Depends(get_key_manager)
 ):
     """Batch reset the failure count of Gemini API keys, optionally resetting only valid or invalid keys."""
     logger.info("-" * 50 + "reset_all_gemini_key_fail_counts" + "-" * 50)
