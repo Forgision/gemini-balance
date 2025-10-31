@@ -107,41 +107,40 @@ def mock_key_manager():
 
 @pytest.fixture(scope="session")
 def test_app(mock_key_manager):
-    with (
-        patch("app.core.security.verify_auth_token", return_value=True)
-        and patch("app.middleware.middleware.verify_auth_token", return_value=True)
-        and patch("app.router.config_routes.verify_auth_token", return_value=True)
-        and patch("app.router.error_log_routes.verify_auth_token", return_value=True)
-        and patch("app.router.key_routes.verify_auth_token", return_value=True)
-        and patch("app.router.routes.verify_auth_token", return_value=True)
-        and patch("app.router.scheduler_routes.verify_auth_token", return_value=True)
-        and patch("app.router.stats_routes.verify_auth_token", return_value=True)
-    ):
-        app = create_app()
+    app = create_app()
 
-        async def override_get_key_manager():
-            return mock_key_manager
+    async def override_get_key_manager():
+        return mock_key_manager
 
-        app.dependency_overrides[gemini_routes.get_key_manager] = (
-            override_get_key_manager
-        )
-        app.dependency_overrides[openai_routes.get_key_manager] = (
-            override_get_key_manager
-        )
-        app.dependency_overrides[vertex_express_routes.get_key_manager] = (
-            override_get_key_manager
-        )
-        app.dependency_overrides[openai_compatible_routes.get_key_manager] = (
-            override_get_key_manager
-        )
-        app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
-        yield app
+    app.dependency_overrides[gemini_routes.get_key_manager] = (
+        override_get_key_manager
+    )
+    app.dependency_overrides[openai_routes.get_key_manager] = (
+        override_get_key_manager
+    )
+    app.dependency_overrides[vertex_express_routes.get_key_manager] = (
+        override_get_key_manager
+    )
+    app.dependency_overrides[openai_compatible_routes.get_key_manager] = (
+        override_get_key_manager
+    )
+    app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
+    yield app
 
 
-# @pytest.fixture(autouse=True)
-# def mock_auth():
-#     with patch("app.core.security.verify_auth_token", return_value=True):
-#         yield
+@pytest.fixture(autouse=True)
+def mock_verify_auth_token(request, mocker):
+    if "no_mock_auth" in request.keywords:
+        return
+
+    mocker.patch("app.core.security.verify_auth_token", return_value=True)
+    mocker.patch("app.middleware.middleware.verify_auth_token", return_value=True)
+    mocker.patch("app.router.config_routes.verify_auth_token", return_value=True)
+    mocker.patch("app.router.error_log_routes.verify_auth_token", return_value=True)
+    mocker.patch("app.router.key_routes.verify_auth_token", return_value=True)
+    mocker.patch("app.router.routes.verify_auth_token", return_value=True)
+    mocker.patch("app.router.scheduler_routes.verify_auth_token", return_value=True)
+    mocker.patch("app.router.stats_routes.verify_auth_token", return_value=True)
 
 
 @pytest.fixture(scope="session")
@@ -161,8 +160,3 @@ def client(test_app):
 #         yield mock
 
 
-# @pytest.fixture()
-# def mock_unauthorized_access(mock_verify_auth_token):
-#     """Fixture to simulate unauthorized access."""
-#     mock_verify_auth_token.return_value = False
-#     yield mock_verify_auth_token
