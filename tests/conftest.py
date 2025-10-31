@@ -129,9 +129,18 @@ def client(test_app):
         yield test_client
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def mock_verify_auth_token():
-    """Fixture to patch verify_auth_token to always return True."""
-    with patch("app.core.security.verify_auth_token", return_value=True) as mock:
+    """Fixture to patch verify_auth_token.
+    By default, it allows authorization. Can be overridden for unauthorized tests.
+    """
+    with patch("app.core.security.verify_auth_token") as mock:
+        mock.return_value = True  # Default to authorized
         yield mock
+
+@pytest.fixture()
+def mock_unauthorized_access(mock_verify_auth_token):
+    """Fixture to simulate unauthorized access."""
+    mock_verify_auth_token.return_value = False
+    yield mock_verify_auth_token
 
