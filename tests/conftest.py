@@ -43,6 +43,7 @@ class TestServer(uvicorn.Server):
     Custom uvicorn server to run in a background thread.
     Disables signal handlers to allow it to run in a non-main thread.
     """
+
     def install_signal_handlers(self):
         pass
 
@@ -65,12 +66,9 @@ def live_server_url():
     """
     Session-scoped fixture to start and stop a live FastAPI server.
     """
-    
+
     config = uvicorn.Config(
-        app,
-        host=TEST_SERVER_HOST,
-        port=TEST_SERVER_PORT,
-        log_level="info"
+        app, host=TEST_SERVER_HOST, port=TEST_SERVER_PORT, log_level="info"
     )
     server = TestServer(config=config)
     server.run_in_thread()
@@ -88,6 +86,7 @@ def live_server_url():
         except OSError as e:
             print(f"Error removing test database file {db_file}: {e}")
 
+
 @pytest.fixture(scope="session")
 def base_url(live_server_url):
     """
@@ -95,6 +94,7 @@ def base_url(live_server_url):
     so it can be used automatically by page objects.
     """
     return live_server_url
+
 
 @pytest.fixture(scope="session")
 def mock_key_manager():
@@ -104,23 +104,45 @@ def mock_key_manager():
     mock.get_next_working_key = AsyncMock(return_value="test_api_key_for_model")
     return mock
 
+
 @pytest.fixture(scope="session")
 def test_app(mock_key_manager):
-    app = create_app()
+    with (
+        patch("app.core.security.verify_auth_token", return_value=True)
+        and patch("app.middleware.middleware.verify_auth_token", return_value=True)
+        and patch("app.router.config_routes.verify_auth_token", return_value=True)
+        and patch("app.router.error_log_routes.verify_auth_token", return_value=True)
+        and patch("app.router.key_routes.verify_auth_token", return_value=True)
+        and patch("app.router.routes.verify_auth_token", return_value=True)
+        and patch("app.router.scheduler_routes.verify_auth_token", return_value=True)
+        and patch("app.router.stats_routes.verify_auth_token", return_value=True)
+    ):
+        app = create_app()
 
-    async def override_get_key_manager():
-        return mock_key_manager
+        async def override_get_key_manager():
+            return mock_key_manager
 
-    app.dependency_overrides[gemini_routes.get_key_manager] = override_get_key_manager
-    app.dependency_overrides[openai_routes.get_key_manager] = override_get_key_manager
-    app.dependency_overrides[
-        vertex_express_routes.get_key_manager
-    ] = override_get_key_manager
-    app.dependency_overrides[
-        openai_compatible_routes.get_key_manager
-    ] = override_get_key_manager
-    app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
-    yield app
+        app.dependency_overrides[gemini_routes.get_key_manager] = (
+            override_get_key_manager
+        )
+        app.dependency_overrides[openai_routes.get_key_manager] = (
+            override_get_key_manager
+        )
+        app.dependency_overrides[vertex_express_routes.get_key_manager] = (
+            override_get_key_manager
+        )
+        app.dependency_overrides[openai_compatible_routes.get_key_manager] = (
+            override_get_key_manager
+        )
+        app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
+        yield app
+
+
+# @pytest.fixture(autouse=True)
+# def mock_auth():
+#     with patch("app.core.security.verify_auth_token", return_value=True):
+#         yield
+
 
 @pytest.fixture(scope="session")
 def client(test_app):
@@ -129,9 +151,18 @@ def client(test_app):
         yield test_client
 
 
-@pytest.fixture(autouse=True)
-def mock_verify_auth_token():
-    """Fixture to patch verify_auth_token to always return True."""
-    with patch("app.core.security.verify_auth_token", return_value=True) as mock:
-        yield mock
+# @pytest.fixture()
+# def mock_verify_auth_token():
+#     """Fixture to patch verify_auth_token.
+#     By default, it allows authorization. Can be overridden for unauthorized tests.
+#     """
+#     with patch("app.core.security.verify_auth_token") as mock:
+#         mock.return_value = True  # Default to authorized
+#         yield mock
 
+
+# @pytest.fixture()
+# def mock_unauthorized_access(mock_verify_auth_token):
+#     """Fixture to simulate unauthorized access."""
+#     mock_verify_auth_token.return_value = False
+#     yield mock_verify_auth_token
