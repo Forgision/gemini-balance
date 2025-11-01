@@ -22,11 +22,11 @@ def test_get_keys_paginated_success(client, mock_key_manager: KeyManager):
     assert data["keys"]["test_key_1"] == 0
 
 
-@pytest.mark.skip(reason="Skipping due to persistent authorization issue")
+@pytest.mark.no_mock_auth
 def test_get_keys_paginated_unauthorized(client, mock_key_manager: KeyManager):
     """Test unauthorized access to paginated keys."""
-    # TODO: Fix middleware patching to correctly test unauthorized access
-    pass
+    response = client.get("/api/keys")
+    assert response.status_code == 401
 
 
 def test_get_keys_paginated_filter_by_status(client, mock_key_manager: KeyManager):
@@ -146,8 +146,8 @@ def test_get_all_keys_success(client, mock_key_manager: KeyManager):
     assert len(data["invalid_keys"]) == 1
 
 
-@pytest.mark.skip(reason="Skipping due to persistent authorization issue")
+@pytest.mark.no_mock_auth
 def test_get_all_keys_unauthorized(client, mock_key_manager: KeyManager):
     """Test unauthorized access to the get_all_keys endpoint."""
-    # TODO: Fix middleware patching to correctly test unauthorized access
-    pass
+    response = client.get("/api/keys/all")
+    assert response.status_code == 401

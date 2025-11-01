@@ -32,8 +32,7 @@ def test_get_config_unauthorized(mock_router_auth, mock_middleware_auth, client)
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.config.config_service.ConfigService.update_config")
@@ -65,8 +64,7 @@ def test_update_config_unauthorized(mock_router_auth, mock_middleware_auth, clie
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.config.config_service.ConfigService.update_config")
@@ -109,8 +107,7 @@ def test_reset_config_unauthorized(mock_router_auth, mock_middleware_auth, clien
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.config.config_service.ConfigService.reset_config")
@@ -153,8 +150,7 @@ def test_delete_single_key_unauthorized(mock_router_auth, mock_middleware_auth, 
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.config.config_service.ConfigService.delete_key")
@@ -198,8 +194,7 @@ def test_delete_selected_keys_unauthorized(mock_router_auth, mock_middleware_aut
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.config.config_service.ConfigService.delete_selected_keys")
@@ -249,8 +244,7 @@ def test_check_single_proxy_unauthorized(mock_router_auth, mock_middleware_auth,
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.check_multiple_proxies")
@@ -291,8 +285,7 @@ def test_check_all_proxies_unauthorized(mock_router_auth, mock_middleware_auth, 
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.get_cache_stats")
@@ -320,8 +313,7 @@ def test_get_proxy_cache_stats_unauthorized(mock_router_auth, mock_middleware_au
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.clear_cache", new_callable=MagicMock)
@@ -349,8 +341,7 @@ def test_clear_proxy_cache_unauthorized(mock_router_auth, mock_middleware_auth, 
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 # Tests for UI models endpoint
@@ -379,8 +370,7 @@ def test_get_ui_models_unauthorized(mock_router_auth, mock_middleware_auth, clie
         cookies={"auth_token": "invalid_token"},
         follow_redirects=False,
     )
-    assert response.status_code == 307
-    assert response.headers["location"] == "/"
+    assert response.status_code == 401
 
 
 @patch("app.service.config.config_service.ConfigService.delete_key")

@@ -4,7 +4,7 @@ Middleware configuration module, responsible for setting up and configuring the 
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # from app.middleware.request_logging_middleware import RequestLoggingMiddleware
@@ -39,6 +39,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             auth_token = request.cookies.get("auth_token")
             if not auth_token or not verify_auth_token(auth_token):
                 logger.warning(f"Unauthorized access attempt to {request.url.path}")
+                if request.url.path.startswith("/api"):
+                    return JSONResponse(
+                        status_code=401,
+                        content={"detail": "Not authenticated"},
+                    )
                 return RedirectResponse(url="/")
             logger.debug("Request authenticated successfully")
 
