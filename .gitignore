@@ -262,3 +262,4 @@ default_db
 client_secret.json
 credentials.json
 test.db
+data/:memory:

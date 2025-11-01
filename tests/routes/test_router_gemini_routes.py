@@ -29,6 +29,9 @@ def test_list_models_success(mock_get_gemini_models, client):
 
 def test_list_models_unauthorized(client):
     """Test unauthorized access to list_models."""
+    # This test is a special case. It needs to test the security dependency failure itself.
+    # The safest way to do this without interfering with other tests is to keep the local override,
+    # but it's critical that the try/finally block is used to restore the original state.
     original_overrides = client.app.dependency_overrides.copy()
     try:
         async def override_security():
@@ -42,24 +45,14 @@ def test_list_models_unauthorized(client):
         # clean up
         client.app.dependency_overrides = original_overrides
 
-def test_list_models_no_valid_key(client):
+def test_list_models_no_valid_key(client, mock_key_manager):
     """Test list_models when no valid API key is available."""
-    original_overrides = client.app.dependency_overrides.copy()
-    try:
-        mock_key_manager = MagicMock()
-        mock_key_manager.get_random_valid_key = AsyncMock(return_value=None)
+    # Configure the global mock to simulate the desired scenario for this test
+    mock_key_manager.get_random_valid_key.return_value = None
 
-        async def override_get_key_manager():
-            return mock_key_manager
-
-        client.app.dependency_overrides[gemini_routes.get_key_manager] = override_get_key_manager
-
-        response = client.get("/gemini/v1beta/models")
-        assert response.status_code == 503
-        assert "No valid API keys available" in response.text
-    finally:
-        # clean up
-        client.app.dependency_overrides = original_overrides
+    response = client.get("/gemini/v1beta/models")
+    assert response.status_code == 503
+    assert "No valid API keys available" in response.text
 
 def test_list_models_derived_models(client):
     """Test that derived models are correctly added."""
@@ -67,36 +60,23 @@ def test_list_models_derived_models(client):
 
 # Tests for content generation
 @patch("app.service.model.model_service.ModelService.check_model_support", new_callable=AsyncMock)
-def test_generate_content_success(mock_check_model_support, client):
+def test_generate_content_success(mock_check_model_support, client, mock_chat_service):
     """Test successful content generation."""
     mock_check_model_support.return_value = True
-    original_overrides = client.app.dependency_overrides.copy()
-    try:
-        mock_chat_service = MagicMock()
-        mock_chat_service.generate_content = AsyncMock(return_value={"candidates": [{"content": {"parts": [{"text": "Hello, world!"}]}}]})
 
-        async def override_get_chat_service():
-            return mock_chat_service
+    request_payload = {
+        "contents": [
+            {"parts": [{"text": "Hello"}]}
+        ]
+    }
+    response = client.post("/gemini/v1beta/models/gemini-pro:generateContent", json=request_payload)
 
-        client.app.dependency_overrides[gemini_routes.get_chat_service] = override_get_chat_service
-
-        request_payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": "Hello"}
-                    ]
-                }
-            ]
-        }
-        response = client.post("/gemini/v1beta/models/gemini-pro:generateContent", json=request_payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "candidates" in data
-        assert data["candidates"][0]["content"]["parts"][0]["text"] == "Hello, world!"
-    finally:
-        client.app.dependency_overrides = original_overrides
+    assert response.status_code == 200
+    data = response.json()
+    assert "candidates" in data
+    assert data["candidates"][0]["content"]["parts"][0]["text"] == "Hello, world!"
+    # Verify that the correct service method was called
+    mock_chat_service.generate_content.assert_called_once()
 
 @patch("app.service.model.model_service.ModelService.check_model_support", new_callable=AsyncMock)
 def test_generate_content_unsupported_model(mock_check_model_support, client):
@@ -104,11 +84,7 @@ def test_generate_content_unsupported_model(mock_check_model_support, client):
     mock_check_model_support.return_value = False
     request_payload = {
         "contents": [
-            {
-                "parts": [
-                    {"text": "Hello"}
-                ]
-            }
+            {"parts": [{"text": "Hello"}]}
         ]
     }
     response = client.post("/gemini/v1beta/models/unsupported-model:generateContent", json=request_payload)
@@ -122,74 +98,48 @@ def test_stream_generate_content_success(client):
 
 # Tests for token counting
 @patch("app.service.model.model_service.ModelService.check_model_support", new_callable=AsyncMock)
-def test_count_tokens_success(mock_check_model_support, client):
+def test_count_tokens_success(mock_check_model_support, client, mock_chat_service):
     """Test successful token counting."""
     mock_check_model_support.return_value = True
-    original_overrides = client.app.dependency_overrides.copy()
-    try:
-        mock_chat_service = MagicMock()
-        mock_chat_service.count_tokens = AsyncMock(return_value={"totalTokens": 123})
 
-        async def override_get_chat_service():
-            return mock_chat_service
+    request_payload = {
+        "contents": [
+            {"parts": [{"text": "Count these tokens"}]}
+        ]
+    }
+    response = client.post("/gemini/v1beta/models/gemini-pro:countTokens", json=request_payload)
 
-        client.app.dependency_overrides[gemini_routes.get_chat_service] = override_get_chat_service
-
-        request_payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": "Count these tokens"}
-                    ]
-                }
-            ]
-        }
-        response = client.post("/gemini/v1beta/models/gemini-pro:countTokens", json=request_payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "totalTokens" in data
-        assert data["totalTokens"] == 123
-    finally:
-        client.app.dependency_overrides = original_overrides
+    assert response.status_code == 200
+    data = response.json()
+    assert "totalTokens" in data
+    assert data["totalTokens"] == 123
+    mock_chat_service.count_tokens.assert_called_once()
 
 # Tests for embedding
 @patch("app.service.model.model_service.ModelService.check_model_support", new_callable=AsyncMock)
-def test_embed_content_success(mock_check_model_support, client):
+def test_embed_content_success(mock_check_model_support, client, mock_embedding_service):
     """Test successful content embedding."""
     mock_check_model_support.return_value = True
-    original_overrides = client.app.dependency_overrides.copy()
-    try:
-        mock_embedding_service = MagicMock()
-        mock_embedding_service.embed_content = AsyncMock(return_value={"embedding": {"values": [0.1, 0.2, 0.3]}})
 
-        async def override_get_embedding_service():
-            return mock_embedding_service
-
-        client.app.dependency_overrides[gemini_routes.get_embedding_service] = override_get_embedding_service
-
-        request_payload = {
-            "content": {
-                "parts": [
-                    {"text": "Embed this!"}
-                ]
-            }
+    request_payload = {
+        "content": {
+            "parts": [{"text": "Embed this!"}]
         }
-        response = client.post("/gemini/v1beta/models/gemini-pro:embedContent", json=request_payload)
+    }
+    response = client.post("/gemini/v1beta/models/gemini-pro:embedContent", json=request_payload)
 
-        assert response.status_code == 200
-        data = response.json()
-        assert "embedding" in data
-        assert "values" in data["embedding"]
-        assert len(data["embedding"]["values"]) == 3
-    finally:
-        client.app.dependency_overrides = original_overrides
+    assert response.status_code == 200
+    data = response.json()
+    assert "embedding" in data
+    assert "values" in data["embedding"]
+    assert len(data["embedding"]["values"]) == 3
+    mock_embedding_service.embed_content.assert_called_once()
 
 def test_batch_embed_contents_success(client):
     """Test successful batch content embedding."""
     pass
 
-# Tests for key management
+# Tests for key management (These tests do not use the global key manager, they are for a different purpose)
 def test_reset_all_key_fail_counts_success(client):
     """Test successful reset of all key fail counts."""
     original_overrides = client.app.dependency_overrides.copy()

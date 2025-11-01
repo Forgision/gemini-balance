@@ -17,7 +17,7 @@ def mock_logger():
 
 
 @pytest.fixture
-def test_app():
+def logging_middleware_app():
     """Fixture to create a FastAPI app with the logging middleware."""
     app = FastAPI()
 
@@ -35,18 +35,18 @@ def test_app():
 
 
 @pytest.fixture
-def client(test_app):
+def logging_middleware_client(logging_middleware_app):
     """Fixture to create a TestClient for the app."""
-    return TestClient(test_app)
+    return TestClient(logging_middleware_app)
 
 
-def test_logging_middleware_logs_request(client, mock_logger):
+def test_logging_middleware_logs_request(logging_middleware_client, mock_logger):
     # Given
     test_body = {"key": "value"}
     test_body_bytes = json.dumps(test_body).encode()
 
     # When
-    response = client.post("/test", content=test_body_bytes)
+    response = logging_middleware_client.post("/test", content=test_body_bytes)
 
     # Then
     assert response.status_code == 200
@@ -57,12 +57,12 @@ def test_logging_middleware_logs_request(client, mock_logger):
     )
 
 
-def test_logging_middleware_invalid_json(client, mock_logger):
+def test_logging_middleware_invalid_json(logging_middleware_client, mock_logger):
     # Given
     invalid_json_body = b'{"key": "value"'
 
     # When
-    response = client.post("/test", content=invalid_json_body)
+    response = logging_middleware_client.post("/test", content=invalid_json_body)
 
     # Then
     assert response.status_code == 200
@@ -70,9 +70,9 @@ def test_logging_middleware_invalid_json(client, mock_logger):
     mock_logger.error.assert_called_with("Request body is not valid JSON.")
 
 
-def test_logging_middleware_no_body(client, mock_logger):
+def test_logging_middleware_no_body(logging_middleware_client, mock_logger):
     # When
-    response = client.post("/no_body")
+    response = logging_middleware_client.post("/no_body")
 
     # Then
     assert response.status_code == 200
@@ -108,9 +108,9 @@ async def test_logging_middleware_body_read_error(mock_logger):
     mock_logger.error.assert_called_once_with("Error reading request body: Test error")
 
 
-def test_request_body_can_be_read_after_middleware(client):
+def test_request_body_can_be_read_after_middleware(logging_middleware_client):
     # Given
-    app = client.app
+    app = logging_middleware_client.app
 
     @app.post("/read_body")
     async def read_body_endpoint(request: Request):
@@ -121,7 +121,7 @@ def test_request_body_can_be_read_after_middleware(client):
     test_body_bytes = json.dumps(test_body).encode()
 
     # When
-    response = client.post("/read_body", content=test_body_bytes)
+    response = logging_middleware_client.post("/read_body", content=test_body_bytes)
 
     # Then
     assert response.status_code == 200

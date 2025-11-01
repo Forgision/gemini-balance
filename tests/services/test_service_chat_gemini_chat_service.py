@@ -3,11 +3,6 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from app.service.chat.gemini_chat_service import GeminiChatService
 from app.domain.gemini_models import GeminiRequest, GeminiContent
 
-@pytest.fixture
-def mock_key_manager():
-    """Fixture for KeyManager."""
-    return MagicMock()
-
 @pytest.mark.asyncio
 async def test_gemini_chat_service_generate_content(mock_key_manager):
     """Test the GeminiChatService.generate_content method."""

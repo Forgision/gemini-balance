@@ -5,14 +5,6 @@ from app.service.chat.vertex_express_chat_service import GeminiChatService
 from app.domain.gemini_models import GeminiContent, GeminiRequest
 
 
-@pytest.fixture
-def mock_key_manager():
-    """Fixture for KeyManager."""
-    mock = MagicMock()
-    mock.get_key = AsyncMock(return_value="test_api_key")
-    return mock
-
-
 @pytest.mark.asyncio
 async def test_vertex_express_chat_service_generate_content(mock_key_manager):
     """Test the GeminiChatService (from vertex file) generate_content method."""

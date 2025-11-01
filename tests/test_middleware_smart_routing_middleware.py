@@ -13,7 +13,7 @@ from app.middleware.smart_routing_middleware import SmartRoutingMiddleware
 
 
 @pytest.fixture
-def test_app():
+def smart_routing_app():
     app = FastAPI()
 
     @app.api_route("/{path:path}", methods=["GET", "POST"])
@@ -29,8 +29,8 @@ def test_app():
 
 
 @pytest.fixture
-def client(test_app):
-    return TestClient(test_app)
+def smart_routing_client(smart_routing_app):
+    return TestClient(smart_routing_app)
 
 
 @pytest.mark.parametrize(
@@ -47,8 +47,8 @@ def client(test_app):
         ("/chat/completions", "/v1/chat/completions"),
     ],
 )
-def test_post_requests_are_normalized(client, original_path, expected_path):
-    response = client.post(original_path)
+def test_post_requests_are_normalized(smart_routing_client, original_path, expected_path):
+    response = smart_routing_client.post(original_path)
     assert response.json()["path"] == expected_path
 
 
@@ -60,32 +60,32 @@ def test_post_requests_are_normalized(client, original_path, expected_path):
         "/v1/chat/completions",
     ],
 )
-def test_correct_paths_are_not_changed(client, original_path):
-    response = client.post(original_path)
+def test_correct_paths_are_not_changed(smart_routing_client, original_path):
+    response = smart_routing_client.post(original_path)
     assert response.json()["path"] == original_path
 
 
-def test_get_requests_for_models_are_normalized(client):
-    response = client.get("/gemini/v1beta/models")
+def test_get_requests_for_models_are_normalized(smart_routing_client):
+    response = smart_routing_client.get("/gemini/v1beta/models")
     assert response.json()["path"] == "/gemini/v1beta/models"
 
 
-def test_get_requests_for_non_models_are_not_normalized(client):
-    response = client.get("/v1/chat/completions")
+def test_get_requests_for_non_models_are_not_normalized(smart_routing_client):
+    response = smart_routing_client.get("/v1/chat/completions")
     assert response.json()["path"] == "/v1/chat/completions"
 
 
-def test_url_normalization_disabled(test_app):
+def test_url_normalization_disabled(smart_routing_app):
     with patch("app.middleware.smart_routing_middleware.settings") as mock_settings:
         mock_settings.URL_NORMALIZATION_ENABLED = False
-        client = TestClient(test_app)
+        client = TestClient(smart_routing_app)
         response = client.post("/chat/completions")
         assert response.json()["path"] == "/chat/completions"
 
 
 @pytest.mark.asyncio
-async def test_model_extraction_from_body(client):
-    response = client.post(
+async def test_model_extraction_from_body(smart_routing_client):
+    response = smart_routing_client.post(
         "/gemini/generateContent", json={"model": "gemini-pro-vision"}
     )
     assert response.status_code == 200
