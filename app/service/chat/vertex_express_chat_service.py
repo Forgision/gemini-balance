@@ -160,14 +160,14 @@ def _build_tools(model: str, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _get_real_model(model: str) -> str:
+    if "-search" in model and "-non-thinking" in model:
+        model = model[:-20]
     if model.endswith("-search"):
         model = model[:-7]
     if model.endswith("-image"):
         model = model[:-6]
     if model.endswith("-non-thinking"):
         model = model[:-13]
-    if "-search" in model and "-non-thinking" in model:
-        model = model[:-20]
     return model
 
 
