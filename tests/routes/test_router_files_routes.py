@@ -1,6 +1,6 @@
 from unittest.mock import patch, AsyncMock
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 from app.dependencies import get_files_service
 from app.domain.file_models import FileMetadata, ListFilesResponse
 
@@ -13,6 +13,17 @@ def override_dependencies(client):
     yield
     client.app.dependency_overrides.clear()
 
+@pytest.fixture
+def mock_initialize_upload(client):
+    """Mock the initialize_upload method of the files_service."""
+    mock_files_service = AsyncMock()
+    response_data = {"upload_id": "test_upload_id", "upload_uri": "http://example.com/upload"}
+    response_headers = {"X-Upload-ID": "test_upload_id"}
+    mock_files_service.initialize_upload.return_value = (response_data, response_headers)
+    
+    client.app.dependency_overrides[get_files_service] = lambda: mock_files_service
+    yield response_data, response_headers
+    client.app.dependency_overrides.clear()
 
 @patch("app.core.security.settings.ALLOWED_TOKENS", ["test_auth_token"])
 async def test_list_files_success(client, mock_key_manager):
@@ -94,19 +105,23 @@ async def test_gemini_prefixed_routes(client, mock_key_manager):
 
 
 @patch("app.core.security.settings.ALLOWED_TOKENS", ["test_auth_token"])
-async def test_upload_file_init_success(client, mock_key_manager):
+async def test_upload_file_init_success(client, mock_key_manager, mock_initialize_upload):
     """Test successful file upload initialization."""
-    mock_files_service = AsyncMock()
-    mock_files_service.initialize_upload.return_value = ({}, {})
-    client.app.dependency_overrides[get_files_service] = lambda: mock_files_service
+    response_data, response_headers = mock_initialize_upload
 
-    response = client.post("/upload/v1beta/files", json={}, headers={"x-goog-api-key": "test_auth_token"})
+    response = client.post(
+        "/upload/v1beta/files",
+        json={"file": {"displayName": "test_file"}},
+        headers={"x-goog-api-key": "test_auth_token"},
+    )
     assert response.status_code == 200
+    assert response.json() == response_data
+    assert response.headers["X-Upload-ID"] == response_headers["X-Upload-ID"]
 
 
 @patch("app.core.security.settings.ALLOWED_TOKENS", ["test_auth_token"])
 @patch("app.router.files_routes.get_upload_handler")
-async def test_handle_upload_success(mock_get_upload_handler, client, mock_key_manager):
+async def test_handle_upload_success(mock_get_upload_handler, client):
     """Test successful handling of a file upload."""
     mock_files_service = AsyncMock()
     mock_files_service.get_upload_session.return_value = {
@@ -116,8 +131,15 @@ async def test_handle_upload_success(mock_get_upload_handler, client, mock_key_m
     client.app.dependency_overrides[get_files_service] = lambda: mock_files_service
 
     mock_upload_handler = AsyncMock()
-    mock_upload_handler.proxy_upload_request.return_value = {}
+    mock_upload_handler.proxy_upload_request.return_value = Response(status_code=200)
     mock_get_upload_handler.return_value = mock_upload_handler
 
-    response = client.post("/upload/v1beta/files?upload_id=test_upload_id", headers={"x-goog-api-key": "test_auth_token"})
+    response = client.post(
+        "/upload/v1beta/files",
+        params={"upload_id": "test_upload_id"},
+        headers={
+            "x-goog-api-key": "test_auth_token",
+            "x-goog-upload-command": "upload",
+        },
+    )
     assert response.status_code == 200

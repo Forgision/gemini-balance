@@ -39,6 +39,7 @@ class FilesService:
                 settings.API_KEYS, settings.VERTEX_API_KEYS
             )
         return self.key_manager
+    
 
     async def initialize_upload(
         self,

@@ -48,6 +48,7 @@ async def upload_file_init(
             request=request,
             key=request.query_params.get("key"),
             auth_token=auth_token,
+            files_service=files_service,
         )
 
     try:
@@ -76,7 +77,6 @@ async def upload_file_init(
             )
 
         # Call the service
-        files_service = await get_files_service()
         response_data, response_headers = await files_service.initialize_upload(
             headers=headers,
             body=body,

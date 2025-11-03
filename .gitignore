@@ -263,3 +263,5 @@ client_secret.json
 credentials.json
 test.db
 data/:memory:
+.vscode/launch.json
+.vscode/settings.json
