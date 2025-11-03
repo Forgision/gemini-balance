@@ -24,7 +24,7 @@ security_service = SecurityService()
 model_service = ModelService()
 
 
-async def get_next_working_key(key_manager: KeyManager = Depends(get_key_manager)):
+async def dep_get_next_working_vertex_key(key_manager: KeyManager = Depends(get_key_manager)):
     """Get the next available API key."""
     return await key_manager.get_next_working_vertex_key()
 
@@ -102,7 +102,7 @@ async def generate_content(
     model_name: str,
     request: GeminiRequest,
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
-    api_key: str = Depends(get_next_working_key),
+    api_key: str = Depends(dep_get_next_working_vertex_key),
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
 ):
@@ -135,7 +135,7 @@ async def stream_generate_content(
     model_name: str,
     request: GeminiRequest,
     allowed_token=Depends(security_service.verify_key_or_goog_api_key),
-    api_key: str = Depends(get_next_working_key),
+    api_key: str = Depends(dep_get_next_working_vertex_key),
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
 ):

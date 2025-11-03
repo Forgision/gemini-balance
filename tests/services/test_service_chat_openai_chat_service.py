@@ -1,3 +1,4 @@
+from typing import AsyncGenerator
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -41,9 +42,8 @@ async def test_openai_chat_service_stream_content(mock_key_manager):
         mock_stream_generate_content.return_value = mock_stream()
         service = OpenAIChatService("http://base.url", mock_key_manager)
         request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=True)
-        stream = service.create_chat_completion(request, "test_api_key")
-        assert stream is not None
-        assert isinstance(stream, AsyncMock)
+        stream = await service.create_chat_completion(request, "test_api_key")
+        assert stream is not None and isinstance(stream, AsyncGenerator)
         chunks = [chunk async for chunk in stream]
         mock_stream_generate_content.assert_called_once()
         assert len(chunks) > 0
@@ -64,12 +64,19 @@ async def test_openai_chat_service_generate_content_failure(mock_key_manager):
 @pytest.mark.asyncio
 async def test_openai_chat_service_stream_content_failure(mock_key_manager):
     """Test the OpenAIChatService.stream_generate_content method when the stream fails."""
-    async def mock_stream():
+    async def mock_stream_failure():
         raise Exception(500, "Internal Server Error")
         yield # this will never be reached
 
-    with patch("app.service.chat.openai_chat_service.GeminiApiClient.stream_generate_content") as mock_stream_generate_content:
-        mock_stream_generate_content.return_value = mock_stream()
+    with patch("app.service.chat.openai_chat_service.GeminiApiClient.stream_generate_content", side_effect=mock_stream_failure) as mock_stream_generate_content, \
+         patch("app.config.config.settings.MAX_RETRIES", 1):
+        service = OpenAIChatService("http://base.url", mock_key_manager)
+        request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=True)
+        stream = await service.create_chat_completion(request, "test_api_key")
+        with pytest.raises(Exception):
+            async for _ in stream:
+                pass
+        mock_stream_generate_content.assert_called_once()
         service = OpenAIChatService("http://base.url", mock_key_manager)
         request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=True)
         stream = await service.create_chat_completion(request, "test_api_key")
