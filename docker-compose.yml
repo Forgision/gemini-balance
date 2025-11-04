@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     container_name: gemini-balance-test
     ports:
-      - "8080:8000"
+      - "8989:8000"
     env_file:
       - .env
     volumes:
