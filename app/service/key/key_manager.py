@@ -38,12 +38,24 @@ class KeyManager:
     async def get_next_key(self) -> str:
         """Get the next API key."""
         async with self.key_cycle_lock:
-            return next(self.key_cycle)
+            try:
+                return next(self.key_cycle)
+            except StopIteration:
+                logger.warning(
+                    "API key cycle is empty. This may happen if the initial list of API keys was empty."
+                )
+                return ""
 
     async def get_next_vertex_key(self) -> str:
         """Get the next Vertex Express API key."""
         async with self.vertex_key_cycle_lock:
-            return next(self.vertex_key_cycle)
+            try:
+                return next(self.vertex_key_cycle)
+            except StopIteration:
+                logger.warning(
+                    "Vertex Express API key cycle is empty. This may happen if the initial list of Vertex keys was empty."
+                )
+                return ""
 
     async def is_key_valid(self, key: str) -> bool:
         """Check if the key is valid."""
@@ -196,13 +208,15 @@ class KeyManager:
                 )
         return ""
 
-    def get_fail_count(self, key: str) -> int:
+    async def get_fail_count(self, key: str) -> int:
         """Get the failure count for a specific key."""
-        return self.key_failure_counts.get(key, 0)
+        async with self.failure_count_lock:
+            return self.key_failure_counts.get(key, 0)
 
-    def get_vertex_fail_count(self, key: str) -> int:
+    async def get_vertex_fail_count(self, key: str) -> int:
         """Get the failure count for a specific Vertex key."""
-        return self.vertex_key_failure_counts.get(key, 0)
+        async with self.vertex_failure_count_lock:
+            return self.vertex_key_failure_counts.get(key, 0)
 
     async def get_all_keys_with_fail_count(self) -> dict:
         """Get all API keys and their failure counts."""

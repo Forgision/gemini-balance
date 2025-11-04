@@ -289,10 +289,10 @@ async def test_reset_and_recreate_preserves_failures():
 
     # Recreate with a different set of keys, but including the failed ones
     km2 = await get_key_manager_instance(["key1", "key3"], ["vkey1", "vkey3"])
-    assert km2.get_fail_count("key1") == 1
-    assert km2.get_fail_count("key3") == 0
-    assert km2.get_vertex_fail_count("vkey1") == 1
-    assert km2.get_vertex_fail_count("vkey3") == 0
+    assert await km2.get_fail_count("key1") == 1
+    assert await km2.get_fail_count("key3") == 0
+    assert await km2.get_vertex_fail_count("vkey1") == 1
+    assert await km2.get_vertex_fail_count("vkey3") == 0
     # Check that keys not in the new list are gone
     assert "key2" not in km2.key_failure_counts
 
@@ -319,5 +319,9 @@ async def test_initialization_with_empty_keys():
     assert km.vertex_api_keys == []
     assert await km.get_first_valid_key() == ""
     assert await km.get_random_valid_key() == ""
-    with pytest.raises(RuntimeError):
-        await km.get_next_key()
+    k = await km.get_next_key()
+    assert k == ""
+    v = await km.get_next_vertex_key()
+    assert v == ""
+
+

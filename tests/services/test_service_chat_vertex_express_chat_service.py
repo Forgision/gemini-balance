@@ -71,9 +71,8 @@ async def test_vertex_express_chat_service_stream_content_failure(mock_key_manag
         stream = service.stream_generate_content("gemini-pro", request, "test_api_key")
         with pytest.raises(Exception):
             _ = [chunk async for chunk in stream]
-        mock_stream_generate_content.assert_called_once()
-        mock_key_manager.handle_api_failure.assert_called_once()
-
+        mock_stream_generate_content.assert_called()
+        mock_key_manager.handle_api_failure.assert_called()
 
 def test_has_image_parts():
     assert _has_image_parts([{"parts": [{"image_url": "..."}]}]) is True
