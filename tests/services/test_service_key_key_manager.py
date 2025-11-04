@@ -83,6 +83,53 @@ async def test_get_next_working_key_with_combined_usage(key_manager):
         best_key = await key_manager.get_next_working_key("some_model")
         assert best_key == "key2"
 
+
+@pytest.mark.asyncio
+async def test_get_next_working_key_with_exhausted_key(key_manager):
+    """Test that exhausted keys are not selected."""
+    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage:
+        mock_get_usage.side_effect = [
+            {"rpd": 100, "rpm": 10, "tpm": 1000, "exhausted": True, "rpm_timestamp": datetime.now()},  # key1
+            {"rpd": 50, "rpm": 5, "tpm": 500, "exhausted": False},   # key2
+            {"rpd": 200, "rpm": 20, "tpm": 2000, "exhausted": False},  # key3
+        ]
+        best_key = await key_manager.get_next_working_key("some_model")
+        assert best_key == "key2"
+
+@pytest.mark.asyncio
+async def test_get_next_working_key_with_cooldown(key_manager):
+    """Test that exhausted keys are re-activated after a cooldown."""
+    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage, \
+         patch("app.service.key.key_manager.set_key_exhausted_status", new_callable=AsyncMock) as mock_set_exhausted:
+        mock_get_usage.side_effect = [
+            {"rpd": 100, "rpm": 10, "tpm": 1000, "exhausted": True, "rpm_timestamp": datetime.now() - timedelta(minutes=2)},  # key1
+            {"rpd": 50, "rpm": 5, "tpm": 500, "exhausted": False},   # key2
+            {"rpd": 200, "rpm": 20, "tpm": 2000, "exhausted": False},  # key3
+        ]
+        best_key = await key_manager.get_next_working_key("some_model")
+        assert best_key == "key1"
+        mock_set_exhausted.assert_called_once_with("key1", "some_model", False)
+
+@pytest.mark.asyncio
+async def test_get_next_working_key_no_valid_keys(key_manager):
+    """Test get_next_working_key when all keys have failed."""
+    key_manager.MAX_FAILURES = 1
+    await key_manager.handle_api_failure("key1", "some_model", 1)
+    await key_manager.handle_api_failure("key2", "some_model", 1)
+    await key_manager.handle_api_failure("key3", "some_model", 1)
+    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage:
+        mock_get_usage.return_value = {"rpd": 0, "rpm": 0, "tpm": 0, "exhausted": False}
+        # Should cycle and return the next key in order
+        assert await key_manager.get_next_working_key("some_model") == "key1"
+
+@pytest.mark.asyncio
+async def test_get_next_working_key_no_usage_stats(key_manager):
+    """Test get_next_working_key when usage stats are not available."""
+    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage:
+        mock_get_usage.return_value = None
+        # Should return the key with the lowest index
+        assert await key_manager.get_next_working_key("some_model") == "key1"
+
 @pytest.mark.asyncio
 async def test_get_random_valid_key(key_manager):
     """Test getting a random valid key."""
@@ -146,32 +193,6 @@ async def test_get_all_keys_with_fail_count(key_manager):
     assert all_keys["all_keys"]["key3"] == 2
 
 @pytest.mark.asyncio
-async def test_get_next_working_key_with_exhausted_key(key_manager):
-    """Test that exhausted keys are not selected."""
-    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage:
-        mock_get_usage.side_effect = [
-            {"rpd": 100, "rpm": 10, "tpm": 1000, "exhausted": True, "rpm_timestamp": datetime.now()},  # key1
-            {"rpd": 50, "rpm": 5, "tpm": 500, "exhausted": False},   # key2
-            {"rpd": 200, "rpm": 20, "tpm": 2000, "exhausted": False},  # key3
-        ]
-        best_key = await key_manager.get_next_working_key("some_model")
-        assert best_key == "key2"
-
-@pytest.mark.asyncio
-async def test_get_next_working_key_with_cooldown(key_manager):
-    """Test that exhausted keys are re-activated after a cooldown."""
-    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage, \
-         patch("app.service.key.key_manager.set_key_exhausted_status", new_callable=AsyncMock) as mock_set_exhausted:
-        mock_get_usage.side_effect = [
-            {"rpd": 100, "rpm": 10, "tpm": 1000, "exhausted": True, "rpm_timestamp": datetime.now() - timedelta(minutes=2)},  # key1
-            {"rpd": 50, "rpm": 5, "tpm": 500, "exhausted": False},   # key2
-            {"rpd": 200, "rpm": 20, "tpm": 2000, "exhausted": False},  # key3
-        ]
-        best_key = await key_manager.get_next_working_key("some_model")
-        assert best_key == "key1"
-        mock_set_exhausted.assert_called_once_with("key1", "some_model", False)
-
-@pytest.mark.asyncio
 async def test_get_first_valid_key(key_manager):
     """Test getting the first valid key."""
     key_manager.MAX_FAILURES = 1
@@ -192,26 +213,6 @@ async def test_get_random_valid_key_no_valid_keys(key_manager):
     await key_manager.handle_api_failure("key3", "some_model", 1)
     # All keys are invalid, should return the first key as fallback
     assert await key_manager.get_random_valid_key() == "key1"
-
-@pytest.mark.asyncio
-async def test_get_next_working_key_no_valid_keys(key_manager):
-    """Test get_next_working_key when all keys have failed."""
-    key_manager.MAX_FAILURES = 1
-    await key_manager.handle_api_failure("key1", "some_model", 1)
-    await key_manager.handle_api_failure("key2", "some_model", 1)
-    await key_manager.handle_api_failure("key3", "some_model", 1)
-    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage:
-        mock_get_usage.return_value = {"rpd": 0, "rpm": 0, "tpm": 0, "exhausted": False}
-        # Should cycle and return the next key in order
-        assert await key_manager.get_next_working_key("some_model") == "key1"
-
-@pytest.mark.asyncio
-async def test_get_next_working_key_no_usage_stats(key_manager):
-    """Test get_next_working_key when usage stats are not available."""
-    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage:
-        mock_get_usage.return_value = None
-        # Should return the key with the lowest index
-        assert await key_manager.get_next_working_key("some_model") == "key1"
 
 # Vertex Tests
 @pytest.mark.asyncio
