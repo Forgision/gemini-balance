@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# IDEs
+.idea
+.vscode
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Tests
+tests/
+test.py
+
+# Other
+.DS_Store
+README.md
+LICENSE
+docker-compose.yml
+Dockerfile
+alembic.ini
+pyproject.toml
+requirements-dev.txt
+uv.lock

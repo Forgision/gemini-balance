@@ -2,15 +2,16 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Copy the required files into the container
-COPY ./requirements.txt /app
-COPY ./VERSION /app
+# Copy the entire application
+COPY . /app/
 
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-COPY ./app /app/app
-ENV API_KEYS='["your_api_key_1"]'
-ENV ALLOWED_TOKENS='["your_token_1"]'
-ENV TZ='Asia/Shanghai'
+
+# Set environment variables
+ENV API_KEYS='[]'
+ENV ALLOWED_TOKENS='[]'
+ENV TZ='Asia/Kolkata'
 
 # Expose port
 EXPOSE 8000
