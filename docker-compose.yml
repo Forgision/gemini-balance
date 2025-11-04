@@ -1,13 +1,17 @@
-volumes:
-  mysql_data:
+
 services:
-  gemini-balance:
+  gemini-balance-test:
     build: .
     restart: unless-stopped
+    container_name: gemini-balance-test
     ports:
-      - "8000:8000"
+      - "8080:8000"
     env_file:
       - .env
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ../docker/volumes/gemini:/app/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -17,25 +21,26 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-  mysql:
-    image: mysql:8
-    container_name: gemini-balance-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: your_root_password
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    # ports:
-    #   - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
-      interval: 10s # Check every 10 seconds
-      timeout: 5s   # Timeout for each check is 5 seconds
-      retries: 3    # Mark as unhealthy after 3 failed retries
-      start_period: 30s # Wait 30 seconds after container startup before starting the first health check
+
+  # mysql:
+  #   image: mysql:8
+  #   container_name: gemini-balance-mysql
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: your_root_password
+  #     MYSQL_DATABASE: ${MYSQL_DATABASE}
+  #     MYSQL_USER: ${MYSQL_USER}
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+  #   # ports:
+  #   #   - "3306:3306"
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+  #     interval: 10s # Check every 10 seconds
+  #     timeout: 5s   # Timeout for each check is 5 seconds
+  #     retries: 3    # Mark as unhealthy after 3 failed retries
+  #     start_period: 30s # Wait 30 seconds after container startup before starting the first health check
   # adminer:
   #   image: adminer:latest
   #   container_name: gemini-balance-adminer
