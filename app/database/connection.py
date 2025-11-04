@@ -34,6 +34,7 @@ else:
 
 # Create database engine
 # pool_pre_ping=True: Perform a simple "ping" test before getting a connection from the pool to ensure the connection is valid
+# TODO: implement sqlite+aiosqlite
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # Create metadata object

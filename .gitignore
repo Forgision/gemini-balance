@@ -265,3 +265,4 @@ test.db
 data/:memory:
 .vscode/launch.json
 .vscode/settings.json
+test.py

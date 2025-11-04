@@ -80,3 +80,4 @@ def initialize_database():
     except Exception as e:
         logger.error(f"Failed to initialize database: {str(e)}")
         raise
+

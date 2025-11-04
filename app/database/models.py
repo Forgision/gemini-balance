@@ -205,4 +205,15 @@ class UsageStats(Base):
     )
 
     def __repr__(self):
-        return f"<UsageStats(api_key='{self.api_key}', model_name='{self.model_name}', token_count='{self.token_count}')>"
+        return (
+            f"<UsageStats(api_key='{self.api_key}', "
+            f"model_name='{self.model_name}', "
+            f"token_count='{self.token_count}'"
+            f"rpm='{self.rpm}', "
+            f"rpm_timestamp='{self.rpm_timestamp}', "
+            f"rpd='{self.rpd}', "
+            f"rpd_timestamp='{self.rpd_timestamp}', "
+            f"tpm='{self.tpm}', "
+            f"tpm_timestamp='{self.tpm_timestamp}', "
+            f"exhausted='{self.exhausted}')>"
+        )
