@@ -128,9 +128,39 @@ def _process_text_with_image(text: str, model: str) -> List[Dict[str, Any]]:
         parts.append({"text": text})
     return parts
 
-
+#TODO: Convert class to functions class isn't needed here.
 class OpenAIMessageConverter(MessageConverter):
-    """OpenAI message format converter."""
+    """OpenAI message format converter.
+
+    A class responsible for converting messages between different formats, specifically
+    handling OpenAI's message format requirements. It supports various content types
+    including text, images, audio, and video.
+
+    Attributes:
+
+    Methods:
+        convert(messages: List[Dict[str, Any]], model: str) -> tuple[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
+            Converts a list of messages to OpenAI's format, handling various content types.
+            
+        _validate_media_data(format: str, data: str, supported_formats: List[str], max_size: int) -> tuple[Optional[str], Optional[str]]:
+            Internal method to validate media format and size constraints.
+
+    Example:
+        converter = OpenAIMessageConverter()
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there"}
+        ]
+        converted_messages, system_instruction = converter.convert(messages, "gpt-4")
+
+    Notes:
+        - Supports multiple content types: text, image_url, input_audio, input_video
+        - Handles Base64 encoded media data validation
+        - Processes system instructions separately from regular messages
+        - Converts tool calls and function calls
+        - Implements role validation and normalization
+        - Handles error cases for media processing with appropriate logging
+    """
 
     def _validate_media_data(
         self, format: str, data: str, supported_formats: List[str], max_size: int

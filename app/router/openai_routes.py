@@ -48,7 +48,21 @@ async def list_models(
     allowed_token=Depends(security_service.verify_authorization),
     key_manager: KeyManager = Depends(get_key_manager),
 ):
-    """Get the list of available OpenAI models (compatible with Gemini and OpenAI)."""
+    """Get the list of available OpenAI models (compatible with Gemini and OpenAI).
+
+    This asynchronous endpoint retrieves a list of available AI models that are compatible
+    with both Gemini and OpenAI APIs.
+
+    Args:
+        allowed_token (str): A token obtained from security service verification through dependency injection.
+        key_manager (KeyManager): An instance of KeyManager obtained through dependency injection.
+
+    Returns:
+        list: A list of compatible AI models with their details.
+
+    Raises:
+        HTTPException: If there are any errors during the API request or authentication.
+    """
     operation_name = "list_models"
     async with handle_route_errors(logger, operation_name):
         logger.info("Handling models list request")
