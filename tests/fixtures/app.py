@@ -13,6 +13,7 @@ from app.router import (
     vertex_express_routes,
     openai_compatible_routes,
     key_routes,
+    claude_routes,
 )
 
 TEST_SERVER_PORT = 8002
@@ -122,6 +123,12 @@ def test_app(
     app.dependency_overrides[
         openai_compatible_routes.security_service.verify_authorization
     ] = mock_security_dependency
+
+    async def override_claude_proxy_service():
+        return mock_chat_service
+
+    app.dependency_overrides[claude_routes.ClaudeProxyService] = override_claude_proxy_service
+    app.dependency_overrides[claude_routes.verify_auth_token] = mock_security_dependency
 
     yield app
 

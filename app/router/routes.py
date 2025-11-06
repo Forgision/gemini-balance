@@ -10,6 +10,7 @@ from app.config.config import settings
 from app.core.security import verify_auth_token
 from app.log.logger import get_routes_logger
 from app.router import (
+    claude_routes,
     config_routes,
     error_log_routes,
     files_routes,
@@ -54,6 +55,7 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(files_routes.router)
     app.include_router(key_routes.router)
     app.include_router(usage_stats_routes.router)
+    app.include_router(claude_routes.router)
 
     setup_page_routes(app)
 
