@@ -58,6 +58,7 @@ async def test_get_file_success(client, mock_key_manager):
         expirationTime="2025-11-30T12:00:00Z",
         uri="http://example.com/test_file",
         state="ACTIVE",
+        sha256Hash="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2", # Added sha256Hash
     )
     client.app.dependency_overrides[get_files_service] = lambda: mock_files_service
 

@@ -4,6 +4,8 @@ from itertools import cycle
 from typing import Any, Dict, Optional, Union
 from datetime import datetime
 
+import pandas as pd
+
 from app.config.config import settings
 from app.database.services import (
     get_usage_stats_by_key_and_model,
@@ -29,8 +31,9 @@ class KeyManager:
         self.vertex_key_failure_counts: Dict[str, int] = {
             key: 0 for key in vertex_api_keys
         }
-        self.MAX_FAILURES = settings.MAX_FAILURES
         self.paid_key = settings.PAID_KEY
+        self.usage: pd.DataFrame = pd.DataFrame(columns = ['key', 'model', 'rpd', 'rpm', 'tpm', 'exhausted', 'rpm_timestamp', 'tpm_timestamp', 'rpd_timestamp'])
+
 
     async def get_paid_key(self) -> str:
         return self.paid_key
@@ -60,12 +63,12 @@ class KeyManager:
     async def is_key_valid(self, key: str) -> bool:
         """Check if the key is valid."""
         async with self.failure_count_lock:
-            return self.key_failure_counts[key] < self.MAX_FAILURES
+            return self.key_failure_counts[key] < settings.MAX_FAILURES
 
     async def is_vertex_key_valid(self, key: str) -> bool:
         """Check if the Vertex key is valid."""
         async with self.vertex_failure_count_lock:
-            return self.vertex_key_failure_counts[key] < self.MAX_FAILURES
+            return self.vertex_key_failure_counts[key] < settings.MAX_FAILURES
 
     async def reset_failure_counts(self):
         """Reset the failure count for all keys."""
@@ -188,9 +191,9 @@ class KeyManager:
         """Handle API call failure."""
         async with self.failure_count_lock:
             self.key_failure_counts[api_key] += 1
-            if self.key_failure_counts[api_key] >= self.MAX_FAILURES:
+            if self.key_failure_counts[api_key] >= settings.MAX_FAILURES:
                 logger.warning(
-                    f"API key {redact_key_for_logging(api_key)} has failed {self.MAX_FAILURES} times"
+                    f"API key {redact_key_for_logging(api_key)} has failed {settings.MAX_FAILURES} times"
                 )
                 await set_key_exhausted_status(api_key, model_name, True)
         if retries < settings.MAX_RETRIES:
@@ -202,9 +205,9 @@ class KeyManager:
         """Handle Vertex Express API call failure."""
         async with self.vertex_failure_count_lock:
             self.vertex_key_failure_counts[api_key] += 1
-            if self.vertex_key_failure_counts[api_key] >= self.MAX_FAILURES:
+            if self.vertex_key_failure_counts[api_key] >= settings.MAX_FAILURES:
                 logger.warning(
-                    f"Vertex Express API key {redact_key_for_logging(api_key)} has failed {self.MAX_FAILURES} times"
+                    f"Vertex Express API key {redact_key_for_logging(api_key)} has failed {settings.MAX_FAILURES} times"
                 )
         return ""
 
@@ -225,8 +228,8 @@ class KeyManager:
             for key in self.api_keys:
                 all_keys[key] = self.key_failure_counts.get(key, 0)
 
-        valid_keys = {k: v for k, v in all_keys.items() if v < self.MAX_FAILURES}
-        invalid_keys = {k: v for k, v in all_keys.items() if v >= self.MAX_FAILURES}
+        valid_keys = {k: v for k, v in all_keys.items() if v < settings.MAX_FAILURES}
+        invalid_keys = {k: v for k, v in all_keys.items() if v >= settings.MAX_FAILURES}
 
         return {
             "valid_keys": valid_keys,
@@ -242,7 +245,7 @@ class KeyManager:
         async with self.failure_count_lock:
             for key in self.api_keys:
                 fail_count = self.key_failure_counts[key]
-                if fail_count < self.MAX_FAILURES:
+                if fail_count < settings.MAX_FAILURES:
                     valid_keys[key] = fail_count
                 else:
                     invalid_keys[key] = fail_count
@@ -257,7 +260,7 @@ class KeyManager:
         async with self.vertex_failure_count_lock:
             for key in self.vertex_api_keys:
                 fail_count = self.vertex_key_failure_counts[key]
-                if fail_count < self.MAX_FAILURES:
+                if fail_count < settings.MAX_FAILURES:
                     valid_keys[key] = fail_count
                 else:
                     invalid_keys[key] = fail_count
@@ -267,7 +270,7 @@ class KeyManager:
         """Get the first valid API key."""
         async with self.failure_count_lock:
             for key in self.key_failure_counts:
-                if self.key_failure_counts[key] < self.MAX_FAILURES:
+                if self.key_failure_counts[key] < settings.MAX_FAILURES:
                     return key
         if self.api_keys:
             return self.api_keys[0]
@@ -281,7 +284,7 @@ class KeyManager:
         valid_keys = []
         async with self.failure_count_lock:
             for key in self.key_failure_counts:
-                if self.key_failure_counts[key] < self.MAX_FAILURES:
+                if self.key_failure_counts[key] < settings.MAX_FAILURES:
                     valid_keys.append(key)
 
         if valid_keys:
