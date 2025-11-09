@@ -266,5 +266,3 @@ data/:memory:
 .vscode/launch.json
 .vscode/settings.json
 test.py
-.vscode/launch.json
-.vscode/settings.json
