@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pytest tests/test_router_gemini_routes.py)",
+      "Bash(pytest tests/test_router_key_routes.py)",
+      "Bash(pytest tests/test_router_openai_routes.py)",
+      "Bash(pytest tests/test_router_openai_compatible_routes.py)",
+      "Bash(pytest tests/test_router_error_log_routes.py)",
+      "Bash(pytest /config/mnt/vault/@work-station/Python/gemini-balance/tests/routes/)",
+      "Bash(pytest tests/routes/test_router_config_routes.py)",
+      "Bash(pytest tests/routes/test_router_vertex_express_routes.py)",
+      "Bash(pytest)",
+      "Bash(pytest tests/routes/test_router_gemini_routes.py::test_list_models_success)",
+      "Bash(pytest tests/routes/)",
+      "Bash(pytest tests/routes/test_router_gemini_routes.py::test_list_models_no_valid_key)",
+      "Bash(pytest tests/routes/test_router_gemini_routes.py::test_generate_content_success)",
+      "Bash(pytest tests/routes/test_router_gemini_routes.py::test_generate_content_unsupported_model)",
+      "Bash(pytest tests/routes/test_router_gemini_routes.py::test_count_tokens_success)",
+      "Bash(pytest tests/routes/test_router_gemini_routes.py::test_embed_content_success)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//config/mnt/vault/@work-station/Python/gemini-balance/app/router/**)",
+      "Bash(pytest test_router_error_log_routes.py)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
