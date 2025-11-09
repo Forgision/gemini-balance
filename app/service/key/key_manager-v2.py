@@ -1,5 +1,3 @@
-# TODO Fix KeyManager class
-
 import asyncio
 import random
 from itertools import cycle
