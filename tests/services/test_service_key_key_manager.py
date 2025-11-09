@@ -130,6 +130,19 @@ async def test_get_next_working_key_no_usage_stats(key_manager):
         # Should return the key with the lowest index
         assert await key_manager.get_next_working_key("some_model") == "key1"
 
+
+@pytest.mark.asyncio
+async def test_get_next_working_key_with_mixed_usage_stats(key_manager):
+    """Test get_next_working_key with some keys having no usage stats."""
+    with patch("app.service.key.key_manager.get_usage_stats_by_key_and_model", new_callable=AsyncMock) as mock_get_usage:
+        mock_get_usage.side_effect = [
+            {"rpd": 100, "rpm": 10, "tpm": 1000, "exhausted": False},  # key1
+            None,                                                    # key2
+            {"rpd": 200, "rpm": 20, "tpm": 2000, "exhausted": False},  # key3
+        ]
+        best_key = await key_manager.get_next_working_key("some_model")
+        assert best_key == "key2"
+
 @pytest.mark.asyncio
 async def test_get_random_valid_key(key_manager):
     """Test getting a random valid key."""
