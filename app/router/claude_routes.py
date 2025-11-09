@@ -2,7 +2,7 @@
 Claude Proxy Routes
 """
 
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Depends
 from app.service.claude_proxy_service import ClaudeProxyService, MessagesRequest
 from app.core.security import verify_auth_token
 

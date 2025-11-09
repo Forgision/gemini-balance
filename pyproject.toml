@@ -16,6 +16,7 @@ dependencies = [
     "google-genai>=1.46.0",
     "httpx[socks]>=0.28.1",
     "jinja2>=3.1.6",
+    "litellm>=1.79.3",
     "openai>=2.6.0",
     "packaging>=25.0",
     "pydantic>=2.12.3",

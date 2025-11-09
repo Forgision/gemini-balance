@@ -11,7 +11,7 @@ T = TypeVar("T")
 logger = get_retry_logger()
 
 
-def RetryHandler(key_arg: str = "api_key"):
+def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
@@ -42,7 +42,17 @@ def RetryHandler(key_arg: str = "api_key"):
                         logger.error("No API key found in arguments for retry handler.")
                         break
 
-                    new_key = await key_manager.handle_api_failure(old_key, retries)
+                    # TODO: test that model_name works with routes from openai_routes.py and vertext_express_routes.py
+                    model_name = kwargs.get(model_arg)
+                    if not model_name:
+                        logger.error(
+                            "No model name found in arguments for retry handler."
+                        )
+                        break
+
+                    new_key = await key_manager.handle_api_failure(
+                        old_key, model_name, retries
+                    )
                     if new_key:
                         kwargs[key_arg] = new_key
                         logger.info(

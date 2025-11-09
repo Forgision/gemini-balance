@@ -8,7 +8,7 @@ from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union
 import litellm
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 
 from app.config.config import settings
 from app.log.logger import get_gemini_logger
@@ -201,7 +201,7 @@ class ClaudeProxyService:
 
     def _convert_litellm_to_anthropic(self, litellm_response: Union[Dict[str, Any], Any], original_request: MessagesRequest) -> MessagesResponse:
         try:
-            if hasattr(litellm_response, 'choices'):
+            if not isinstance(litellm_response, dict):
                 choice = litellm_response.choices[0]
                 message = choice.message
                 content_text = message.content or ""
@@ -237,7 +237,7 @@ class ClaudeProxyService:
                         input=arguments
                     ))
 
-            stop_reason_map = {
+            stop_reason_map: Dict[str, Literal["end_turn", "max_tokens", "tool_use"]] = {
                 "stop": "end_turn",
                 "length": "max_tokens",
                 "tool_calls": "tool_use",
@@ -261,7 +261,7 @@ class ClaudeProxyService:
             logger.error(f"Error converting litellm response to anthropic: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error converting response from upstream provider.")
 
-    async def _handle_streaming(self, response_generator: AsyncGenerator, original_request: MessagesRequest) -> AsyncGenerator[str, None]:
+    async def _handle_streaming(self, response_generator: Any, original_request: MessagesRequest) -> AsyncGenerator[str, None]:
         message_id = f"msg_{uuid.uuid4().hex[:24]}"
 
         message_start_data = {
@@ -296,7 +296,7 @@ class ClaudeProxyService:
                 yield f"event: content_block_delta\ndata: {json.dumps(delta_data)}\n\n"
 
             if choice.finish_reason:
-                stop_reason_map = {
+                stop_reason_map: Dict[str, Literal["end_turn", "max_tokens", "tool_use"]] = {
                     "stop": "end_turn",
                     "length": "max_tokens",
                     "tool_calls": "tool_use",
@@ -319,13 +319,13 @@ class ClaudeProxyService:
             raise HTTPException(status_code=429, detail="All API keys are currently exhausted.")
 
         litellm_request = self._convert_anthropic_to_litellm(request)
-        litellm_request["api_key"] = api_key_info.key
+        litellm_request["api_key"] = api_key_info
 
         try:
             if request.stream:
                 response_generator = await litellm.acompletion(**litellm_request)
                 return StreamingResponse(
-                    self._handle_streaming(response_generator, request),
+                    self._handle_streaming(response_generator, request), # type: ignore
                     media_type="text/event-stream"
                 )
             else:
@@ -333,5 +333,5 @@ class ClaudeProxyService:
                 return self._convert_litellm_to_anthropic(litellm_response, request)
         except Exception as e:
             logger.error(f"Error calling litellm: {e}", exc_info=True)
-            await key_manager.update_key_failure_status(api_key_info.key)
+            await key_manager.handle_api_failure(api_key=api_key_info, model_name=request.model, retries=0) # type: ignore
             raise HTTPException(status_code=500, detail=str(e))

@@ -97,7 +97,7 @@ async def list_models(
 
 
 @router.post("/models/{model_name}:generateContent")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="model_name") # TODO: test that new model_arg works or not
 async def generate_content(
     model_name: str,
     request: GeminiRequest,
@@ -128,9 +128,9 @@ async def generate_content(
         )
         return response
 
-
+# TODO: test that new model_arg works or not
 @router.post("/models/{model_name}:streamGenerateContent")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="model_name") # TODO: test that new model_arg works or not
 async def stream_generate_content(
     model_name: str,
     request: GeminiRequest,

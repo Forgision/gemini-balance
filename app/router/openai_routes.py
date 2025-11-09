@@ -74,7 +74,7 @@ async def list_models(
 
 @router.post("/v1/chat/completions")
 @router.post("/hf/v1/chat/completions")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="request.model") # TODO: test that new model_arg works or not
 async def chat_completion(
     request: ChatRequest,
     allowed_token=Depends(security_service.verify_authorization),

@@ -370,7 +370,7 @@ class GeminiChatService:
                 )
 
                 api_key = await self.key_manager.handle_api_failure(
-                    current_attempt_key, retries
+                    current_attempt_key, model, retries
                 )
                 if api_key:
                     logger.info(

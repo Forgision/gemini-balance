@@ -562,7 +562,7 @@ class OpenAIChatService:
 
                 if self.key_manager:
                     new_api_key = await self.key_manager.handle_api_failure(
-                        current_attempt_key, retries
+                        current_attempt_key, model, retries
                     )
                     if new_api_key and new_api_key != current_attempt_key:
                         final_api_key = new_api_key

@@ -123,7 +123,7 @@ async def list_models(
 
 @router.post("/models/{model_name}:generateContent")
 @router_v1beta.post("/models/{model_name}:generateContent")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="model_name")
 async def generate_content(
     model_name: str,
     request: GeminiRequest,
@@ -187,7 +187,7 @@ async def generate_content(
 
 @router.post("/models/{model_name}:streamGenerateContent")
 @router_v1beta.post("/models/{model_name}:streamGenerateContent")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="model_name")
 async def stream_generate_content(
     model_name: str,
     request: GeminiRequest,
@@ -243,7 +243,7 @@ async def stream_generate_content(
 
 @router.post("/models/{model_name}:countTokens")
 @router_v1beta.post("/models/{model_name}:countTokens")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="model_name")
 async def count_tokens(
     model_name: str,
     request: GeminiRequest,
@@ -275,7 +275,7 @@ async def count_tokens(
 
 @router.post("/models/{model_name}:embedContent")
 @router_v1beta.post("/models/{model_name}:embedContent")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="model_name")
 async def embed_content(
     model_name: str,
     request: GeminiEmbedRequest,
@@ -307,7 +307,7 @@ async def embed_content(
 
 @router.post("/models/{model_name}:batchEmbedContents")
 @router_v1beta.post("/models/{model_name}:batchEmbedContents")
-@RetryHandler(key_arg="api_key")
+@RetryHandler(key_arg="api_key", model_arg="model_name")
 async def batch_embed_contents(
     model_name: str,
     request: GeminiBatchEmbedRequest,
