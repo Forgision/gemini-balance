@@ -142,15 +142,9 @@ class KeyManager:
 
         valid_key_usage = {
             key: {
-                "rpd": key_usage_stats[key]["rpd"]
-                if key_usage_stats[key] and "rpd" in key_usage_stats[key]
-                else 0,
-                "rpm": key_usage_stats[key]["rpm"]
-                if key_usage_stats[key] and "rpm" in key_usage_stats[key]
-                else 0,
-                "tpm": key_usage_stats[key]["tpm"]
-                if key_usage_stats[key] and "tpm" in key_usage_stats[key]
-                else 0,
+                "rpd": (key_usage_stats.get(key) or {}).get("rpd", 0),
+                "rpm": (key_usage_stats.get(key) or {}).get("rpm", 0),
+                "tpm": (key_usage_stats.get(key) or {}).get("tpm", 0),
             }
             for key in valid_keys
         }

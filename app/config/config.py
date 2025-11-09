@@ -194,6 +194,11 @@ class Settings(BaseSettings):
         description="Admin session expiration time in seconds (5 minutes to 24 hours)",
     )
 
+    # Claude Proxy Configuration
+    CLAUDE_BIG_MODEL: str = "gemini-2.5-pro"
+    CLAUDE_SMALL_MODEL: str = "gemini-2.5-flash"
+    CLAUDE_PREFERRED_PROVIDER: str = "google"
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Set default AUTH_TOKEN (if not provided)

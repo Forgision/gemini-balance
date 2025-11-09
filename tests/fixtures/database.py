@@ -4,6 +4,7 @@ import importlib
 
 from app.config.config import settings
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture(scope="session")
@@ -35,23 +36,16 @@ def db_engine():
 
 
 @pytest.fixture(scope="session")
-def db_session(db_engine):
+async def db_session(db_engine):
     """
     Function-scoped fixture to provide a transactional session for each test.
     Rolls back the transaction after the test is complete.
     """
-    connection = db_engine.connect()
+    async_session = sessionmaker(
+        db_engine, class_=AsyncSession, expire_on_commit=False
+    )
 
-    # Begin a transaction
-    trans = connection.begin()
-
-    # Bind an individual session to the connection
-    Session = sessionmaker(bind=connection)
-    session = Session()
-
-    yield session
-
-    # Rollback the transaction and close the connection
-    session.close()
-    trans.rollback()
-    connection.close()
+    async with async_session() as session:
+        await session.begin()
+        yield session
+        await session.rollback()
