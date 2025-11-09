@@ -206,7 +206,33 @@ settings = Settings()
 
 
 def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
-    """Attempt to parse a database string value into the target Python type"""
+    """
+    Attempts to parse a string value retrieved from a database into the specified Python target type.
+    This function handles various common data types and complex generic types like lists and dictionaries,
+    including nested structures. It employs robust error handling, logging warnings or errors for
+    parsing failures and attempting graceful fallbacks where appropriate (e.g., comma-separated strings
+    for List[str], or returning empty collections for failed JSON parsing of lists/dicts).
+    Supported target types include:
+    - `List[str]`: Parses JSON arrays of strings or comma-separated strings.
+    - `List[Dict[str, str]]`: Parses JSON arrays where each element is a dictionary with string keys and values.
+    - `Dict[str, str]`: Parses JSON objects with string keys and values.
+    - `Dict[str, float]`: Parses JSON objects with string keys and float values. Includes a retry mechanism
+      to replace single quotes with double quotes for JSON parsing.
+    - `bool`: Parses "true", "1", "yes", "on" (case-insensitive) as True, others as False.
+    - `int`: Converts to an integer.
+    - `float`: Converts to a float.
+    - Other types: Returns the original string value, allowing Pydantic or other mechanisms to handle it.
+    Args:
+        key (str): The configuration key associated with the database value, used for logging context.
+        db_value (str): The string value retrieved from the database.
+        target_type (Type): The target Python type to which `db_value` should be converted.
+                            This can be a primitive type or a generic type from the `typing` module.
+    Returns:
+        Any: The parsed value in the `target_type` if successful. If parsing fails for a specific type,
+             it may return an empty collection (for lists/dicts) or the original `db_value` string
+             (for primitives or unhandled types), with a warning or error logged.
+    """
+    
     from app.log.logger import get_config_logger
 
     logger = get_config_logger()
@@ -337,11 +363,37 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
 
 
 async def sync_initial_settings():
-    """
+    """Synchronizes application settings on startup.
     Synchronize settings on application startup:
     1. Load settings from the database.
     2. Merge database settings into memory settings (database takes precedence).
     3. Synchronize the final memory settings back to the database.
+
+    This function performs a three-step synchronization process:
+    1.  **Loads settings from the database**: It queries the `SettingsModel` to retrieve
+        all existing key-value pairs. If the database is unreachable or fetching fails,
+        it proceeds with environment/dotenv settings.
+    2.  **Merges database settings into memory settings**: It iterates through the
+        fetched database settings and updates the global `settings` object (a Pydantic model).
+        Database values take precedence over existing memory values. It attempts to parse
+        and convert database values to the correct type defined in the `Settings` model
+        annotations, logging warnings for type mismatches or unknown keys.
+        The `DATABASE_TYPE` setting is explicitly skipped from being updated from the database.
+        If any settings are updated in memory, the `settings` object is re-validated.
+    3.  **Synchronizes final memory settings back to the database**: After merging,
+        the current state of the `settings` object in memory is compared against the
+        initial database state. New settings found in memory are inserted into the database,
+        and existing settings with changed values are updated. Values are serialized
+        appropriately (e.g., lists/dicts to JSON, booleans to 'true'/'false').
+        The `DATABASE_TYPE` setting is explicitly skipped from being written to the database.
+        All database operations (inserts and updates) are performed within a transaction.
+
+    The function also handles:
+    -   Establishing a database connection if not already connected.
+    -   Robust error logging at each stage of the synchronization process.
+    -   Updating application-wide log levels based on the final `LOG_LEVEL` setting.
+    -   Ensuring descriptions for settings are preserved during updates/inserts.
+    -   Deferred imports to prevent circular dependencies and ensure database initialization.
     """
     from app.log.logger import get_config_logger
 
