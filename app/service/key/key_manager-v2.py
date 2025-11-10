@@ -1,593 +1,394 @@
 import asyncio
-import random
-from itertools import cycle
-from typing import Any, Dict, Optional, Union
-from datetime import datetime
-
 import pandas as pd
+import pytz
+from datetime import datetime, date
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.sql import text
+import logging
 
-from app.config.config import settings
-from app.database.services import (
-    get_usage_stats_by_key_and_model,
-    set_key_exhausted_status,
-)
-from app.log.logger import get_key_manager_logger
-from app.utils.helpers import redact_key_for_logging
-
-logger = get_key_manager_logger()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 
 class KeyManager:
-    def __init__(self, api_keys: list, vertex_api_keys: list):
-        self.api_keys = api_keys
-        self.vertex_api_keys = vertex_api_keys
-        self.key_cycle = cycle(api_keys)
-        self.vertex_key_cycle = cycle(vertex_api_keys)
-        self.key_cycle_lock = asyncio.Lock()
-        self.vertex_key_cycle_lock = asyncio.Lock()
-        self.failure_count_lock = asyncio.Lock()
-        self.vertex_failure_count_lock = asyncio.Lock()
-        self.key_failure_counts: Dict[str, int] = {key: 0 for key in api_keys}
-        self.vertex_key_failure_counts: Dict[str, int] = {
-            key: 0 for key in vertex_api_keys
-        }
-        self.paid_key = settings.PAID_KEY
-        self.usage: pd.DataFrame = pd.DataFrame(columns = ['key', 'model', 'rpd', 'rpm', 'tpm', 'exhausted', 'rpm_timestamp', 'tpm_timestamp', 'rpd_timestamp'])
+    """
+    Manages API key usage, rate limiting, and automatic resets.
 
+    This class is designed to be async-native and thread-safe for use
+    with FastAPI. It must be instantiated using the KeyManager.create()
+    classmethod.
+    """
 
-    async def get_paid_key(self) -> str:
-        return self.paid_key
+    def __init__(
+        self,
+        async_session_maker: async_sessionmaker,
+        rate_limit_data: dict,
+        commit_interval: int,
+        minute_reset_interval: int,
+        tz_name: str,
+    ):
+        """
+        !WARNING: Do not call this directly. Use KeyManager.create()
+        """
+        # --- Configuration ---
+        self.db_maker = async_session_maker
+        self.rate_limit_data = rate_limit_data
+        self.tz = pytz.timezone(tz_name)
+        self.commit_interval_sec = commit_interval
+        self.minute_reset_interval_sec = minute_reset_interval
 
-    async def get_next_key(self) -> str:
-        """Get the next API key."""
-        async with self.key_cycle_lock:
-            try:
-                return next(self.key_cycle)
-            except StopIteration:
-                logger.warning(
-                    "API key cycle is empty. This may happen if the initial list of API keys was empty."
-                )
-                return ""
+        # --- Core Data ---
+        # This DataFrame is the "brain" and holds all state.
+        self.key_model_metrics_df: pd.DataFrame | None = None
+        self.lock = asyncio.Lock()
 
-    async def get_next_vertex_key(self) -> str:
-        """Get the next Vertex Express API key."""
-        async with self.vertex_key_cycle_lock:
-            try:
-                return next(self.vertex_key_cycle)
-            except StopIteration:
-                logger.warning(
-                    "Vertex Express API key cycle is empty. This may happen if the initial list of Vertex keys was empty."
-                )
-                return ""
+        # --- State Management ---
+        self.is_ready = False
+        self._background_task: asyncio.Task | None = None
+        self._stop_event = asyncio.Event()
 
-    async def is_key_valid(self, key: str) -> bool:
-        """Check if the key is valid."""
-        async with self.failure_count_lock:
-            return self.key_failure_counts[key] < settings.MAX_FAILURES
+        # --- Timestamps for Resets ---
+        self.last_minute_reset_ts: float = 0.0
+        self.last_day_reset_date: date | None = None
+        self.last_db_commit_ts: float = 0.0
+        
+        # --- Key Caching (for get_key stickiness) ---
+        self.last_key_cache: dict[str, str] = {}
+        self.last_key_cache_ts: dict[str, float] = {}
 
-    async def is_vertex_key_valid(self, key: str) -> bool:
-        """Check if the Vertex key is valid."""
-        async with self.vertex_failure_count_lock:
-            return self.vertex_key_failure_counts[key] < settings.MAX_FAILURES
-
-    async def reset_failure_counts(self):
-        """Reset the failure count for all keys."""
-        async with self.failure_count_lock:
-            for key in self.key_failure_counts:
-                self.key_failure_counts[key] = 0
-
-    async def reset_vertex_failure_counts(self):
-        """Reset the failure count for all Vertex keys."""
-        async with self.vertex_failure_count_lock:
-            for key in self.vertex_key_failure_counts:
-                self.vertex_key_failure_counts[key] = 0
-
-    async def reset_key_failure_count(self, key: str) -> bool:
-        """Reset the failure count for a specific key."""
-        async with self.failure_count_lock:
-            if key in self.key_failure_counts:
-                self.key_failure_counts[key] = 0
-                logger.info(
-                    f"Reset failure count for key: {redact_key_for_logging(key)}"
-                )
-                return True
-            logger.warning(
-                f"Attempt to reset failure count for non-existent key: {key}"
-            )
-            return False
-
-    async def reset_vertex_key_failure_count(self, key: str) -> bool:
-        """Reset the failure count for a specific Vertex key."""
-        async with self.vertex_failure_count_lock:
-            if key in self.vertex_key_failure_counts:
-                self.vertex_key_failure_counts[key] = 0
-                logger.info(
-                    f"Reset failure count for Vertex key: {redact_key_for_logging(key)}"
-                )
-                return True
-            logger.warning(
-                f"Attempt to reset failure count for non-existent Vertex key: {key}"
-            )
-            return False
-
-    async def get_usage_stats(
-        self, api_key: str, model_name: str
-    ) -> Optional[Dict[str, Any]]:
-        """Get usage statistics for a given key and model."""
-        return await get_usage_stats_by_key_and_model(api_key, model_name)
-
-    async def get_next_working_key(self, model_name: str) -> str:
-        """Get the next available API key with the lowest RPM, RPD, and TPM."""
-        key_usage_stats = {}
-        for key in self.api_keys:
-            key_usage_stats[key] = await self.get_usage_stats(key, model_name)
-
-        valid_keys = []
-        for key, usage in key_usage_stats.items():
-            is_exhausted = usage and usage.get("exhausted", False)
-            if is_exhausted:
-                timestamp = usage.get("rpm_timestamp")
-                if timestamp and (datetime.now() - timestamp).total_seconds() > 60:
-                    await set_key_exhausted_status(key, model_name, False)
-                    key_usage_stats[key] = {
-                        "rpd": 0,
-                        "rpm": 0,
-                        "tpm": 0,
-                        "exhausted": False,
-                    }
-                    if await self.is_key_valid(key):
-                        valid_keys.append(key)
-            elif await self.is_key_valid(key):
-                valid_keys.append(key)
-
-        if not valid_keys:
-            return await self.get_next_key()
-
-        valid_key_usage = {
-            key: {
-                "rpd": key_usage_stats[key]["rpd"]
-                if key_usage_stats[key] and "rpd" in key_usage_stats[key]
-                else 0,
-                "rpm": key_usage_stats[key]["rpm"]
-                if key_usage_stats[key] and "rpm" in key_usage_stats[key]
-                else 0,
-                "tpm": key_usage_stats[key]["tpm"]
-                if key_usage_stats[key] and "tpm" in key_usage_stats[key]
-                else 0,
-            }
-            for key in valid_keys
-        }
-
-        if not valid_key_usage:
-            return await self.get_next_key()
-
-        # Select the key with the lowest combined usage
-        best_key = min(
-            valid_key_usage,
-            key=lambda k: (
-                valid_key_usage[k]["rpd"],
-                valid_key_usage[k]["rpm"],
-                valid_key_usage[k]["tpm"],
-            ),
+    @classmethod
+    async def create(
+        cls,
+        async_session_maker: async_sessionmaker,
+        rate_limit_data: dict,
+        commit_interval: int,
+        minute_reset_interval: int,
+        tz_name: str,
+    ):
+        """
+        Async factory for creating and initializing the KeyManager.
+        This runs the initial data load and starts background tasks.
+        """
+        log.info("Creating and initializing KeyManager...")
+        manager = cls(
+            async_session_maker,
+            rate_limit_data,
+            commit_interval,
+            minute_reset_interval,
+            tz_name,
         )
-        return best_key
 
-    async def get_next_working_vertex_key(self) -> str:
-        """Get the next available Vertex Express API key."""
-        initial_key = await self.get_next_vertex_key()
-        current_key = initial_key
+        # 1. Load data from the database
+        await manager._load_data()
 
-        while True:
-            if await self.is_vertex_key_valid(current_key):
-                return current_key
+        # 2. Run initial reset to set timestamps
+        await manager.reset_usage(level="all")
 
-            current_key = await self.get_next_vertex_key()
-            if current_key == initial_key:
-                return current_key
+        # 3. Start background resetter
+        manager._background_task = asyncio.create_task(manager.reset_usage_bg())
 
-    async def handle_api_failure(
-        self, api_key: str, model_name: str, retries: int
-    ) -> str:
-        """Handle API call failure."""
-        async with self.failure_count_lock:
-            self.key_failure_counts[api_key] += 1
-            if self.key_failure_counts[api_key] >= settings.MAX_FAILURES:
-                logger.warning(
-                    f"API key {redact_key_for_logging(api_key)} has failed {settings.MAX_FAILURES} times"
-                )
-                await set_key_exhausted_status(api_key, model_name, True)
-        if retries < settings.MAX_RETRIES:
-            return await self.get_random_valid_key()
-        else:
-            return ""
+        # 4. Set ready state
+        manager.is_ready = True
+        log.info("KeyManager is ready.")
+        return manager
 
-    async def handle_vertex_api_failure(self, api_key: str, retries: int) -> str:
-        """Handle Vertex Express API call failure."""
-        async with self.vertex_failure_count_lock:
-            self.vertex_key_failure_counts[api_key] += 1
-            if self.vertex_key_failure_counts[api_key] >= settings.MAX_FAILURES:
-                logger.warning(
-                    f"Vertex Express API key {redact_key_for_logging(api_key)} has failed {settings.MAX_FAILURES} times"
-                )
-        return ""
+    async def shutdown(self):
+        """
+        Gracefully shuts down the KeyManager.
+        """
+        log.info("Shutting down KeyManager...")
+        # 1. Signal background task to stop
+        self._stop_event.set()
 
-    async def get_fail_count(self, key: str) -> int:
-        """Get the failure count for a specific key."""
-        async with self.failure_count_lock:
-            return self.key_failure_counts.get(key, 0)
+        # 2. Wait for task to finish
+        if self._background_task:
+            await self._background_task
 
-    async def get_vertex_fail_count(self, key: str) -> int:
-        """Get the failure count for a specific Vertex key."""
-        async with self.vertex_failure_count_lock:
-            return self.vertex_key_failure_counts.get(key, 0)
+        # 3. Perform one final commit to the DB
+        log.info("Performing final database commit...")
+        await self._commit_to_db()
+        log.info("KeyManager shutdown complete.")
 
-    async def get_all_keys_with_fail_count(self) -> dict:
-        """Get all API keys and their failure counts."""
-        all_keys = {}
-        async with self.failure_count_lock:
-            for key in self.api_keys:
-                all_keys[key] = self.key_failure_counts.get(key, 0)
+    async def _load_data(self):
+        """
+        Loads all key/model configurations from the DB and merges
+        them with the provided rate_limit_data.
+        
+        This populates self.key_model_metrics_df
+        """
+        log.info("Loading key and usage data from database...")
+        
+        # --- This is a complex operation based on our previous conversation ---
+        # 1. Flatten the rate_limit_data
+        records = []
+        for api_key, models in self.rate_limit_data.items():
+            for model_name, limits in models.items():
+                records.append({
+                    "api_key": api_key,
+                    "model_name": model_name,
+                    **limits,
+                })
+        if not records:
+            raise ValueError("rate_limit_data is empty!")
+            
+        df = pd.DataFrame(records)
+        df.set_index(["api_key", "model_name"], inplace=True)
 
-        valid_keys = {k: v for k, v in all_keys.items() if v < settings.MAX_FAILURES}
-        invalid_keys = {k: v for k, v in all_keys.items() if v >= settings.MAX_FAILURES}
-
-        return {
-            "valid_keys": valid_keys,
-            "invalid_keys": invalid_keys,
-            "all_keys": all_keys,
-        }
-
-    async def get_keys_by_status(self) -> dict:
-        """Get a list of categorized API keys, including failure counts."""
-        valid_keys = {}
-        invalid_keys = {}
-
-        async with self.failure_count_lock:
-            for key in self.api_keys:
-                fail_count = self.key_failure_counts[key]
-                if fail_count < settings.MAX_FAILURES:
-                    valid_keys[key] = fail_count
-                else:
-                    invalid_keys[key] = fail_count
-
-        return {"valid_keys": valid_keys, "invalid_keys": invalid_keys}
-
-    async def get_vertex_keys_by_status(self) -> dict:
-        """Get a list of categorized Vertex Express API keys, including failure counts."""
-        valid_keys = {}
-        invalid_keys = {}
-
-        async with self.vertex_failure_count_lock:
-            for key in self.vertex_api_keys:
-                fail_count = self.vertex_key_failure_counts[key]
-                if fail_count < settings.MAX_FAILURES:
-                    valid_keys[key] = fail_count
-                else:
-                    invalid_keys[key] = fail_count
-        return {"valid_keys": valid_keys, "invalid_keys": invalid_keys}
-
-    async def get_first_valid_key(self) -> str:
-        """Get the first valid API key."""
-        async with self.failure_count_lock:
-            for key in self.key_failure_counts:
-                if self.key_failure_counts[key] < settings.MAX_FAILURES:
-                    return key
-        if self.api_keys:
-            return self.api_keys[0]
-        if not self.api_keys:
-            logger.warning("API key list is empty, cannot get first valid key.")
-            return ""
-        return self.api_keys[0]
-
-    async def get_random_valid_key(self) -> str:
-        """Get a random valid API key."""
-        valid_keys = []
-        async with self.failure_count_lock:
-            for key in self.key_failure_counts:
-                if self.key_failure_counts[key] < settings.MAX_FAILURES:
-                    valid_keys.append(key)
-
-        if valid_keys:
-            return random.choice(valid_keys)
-
-        # If there are no valid keys, return the first key as a fallback
-        if self.api_keys:
-            logger.warning("No valid keys available, returning first key as fallback.")
-            return self.api_keys[0]
-
-        logger.warning("API key list is empty, cannot get random valid key.")
-        return ""
-
-
-_singleton_instance = None
-_singleton_lock = asyncio.Lock()
-_preserved_failure_counts: Union[Dict[str, int], None] = None
-_preserved_vertex_failure_counts: Union[Dict[str, int], None] = None
-_preserved_old_api_keys_for_reset: Union[list, None] = None
-_preserved_vertex_old_api_keys_for_reset: Union[list, None] = None
-_preserved_next_key_in_cycle: Union[str, None] = None
-_preserved_vertex_next_key_in_cycle: Union[str, None] = None
-
-
-async def get_key_manager_instance(
-    api_keys: Optional[list] = None, vertex_api_keys: Optional[list] = None
-) -> KeyManager:
-    """
-    Get the KeyManager singleton instance.
-
-    If the instance has not been created, it will be initialized with the provided api_keys and vertex_api_keys.
-    If the instance has already been created, the api_keys parameter is ignored, and the existing singleton is returned.
-    If called after a reset, it will attempt to restore the previous state (failure counts, cycle position).
-    """
-    global \
-        _singleton_instance, \
-        _preserved_failure_counts, \
-        _preserved_vertex_failure_counts, \
-        _preserved_old_api_keys_for_reset, \
-        _preserved_vertex_old_api_keys_for_reset, \
-        _preserved_next_key_in_cycle, \
-        _preserved_vertex_next_key_in_cycle
-
-    async with _singleton_lock:
-        if _singleton_instance is None:
-            if api_keys is None:
-                raise ValueError(
-                    "API keys are required to initialize or re-initialize the KeyManager instance."
-                )
-            if vertex_api_keys is None:
-                raise ValueError(
-                    "Vertex Express API keys are required to initialize or re-initialize the KeyManager instance."
-                )
-
-            if not api_keys:
-                logger.warning(
-                    "Initializing KeyManager with an empty list of API keys."
-                )
-            if not vertex_api_keys:
-                logger.warning(
-                    "Initializing KeyManager with an empty list of Vertex Express API keys."
-                )
-
-            _singleton_instance = KeyManager(api_keys, vertex_api_keys)
-            logger.info(
-                f"KeyManager instance created/re-created with {len(api_keys)} API keys and {len(vertex_api_keys)} Vertex Express API keys."
-            )
-
-            # 1. Restore failure counts
-            if _preserved_failure_counts:
-                current_failure_counts = {
-                    key: 0 for key in _singleton_instance.api_keys
-                }
-                for key, count in _preserved_failure_counts.items():
-                    if key in current_failure_counts:
-                        current_failure_counts[key] = count
-                _singleton_instance.key_failure_counts = current_failure_counts
-                logger.info("Inherited failure counts for applicable keys.")
-            _preserved_failure_counts = None
-
-            if _preserved_vertex_failure_counts:
-                current_vertex_failure_counts = {
-                    key: 0 for key in _singleton_instance.vertex_api_keys
-                }
-                for key, count in _preserved_vertex_failure_counts.items():
-                    if key in current_vertex_failure_counts:
-                        current_vertex_failure_counts[key] = count
-                _singleton_instance.vertex_key_failure_counts = (
-                    current_vertex_failure_counts
-                )
-                logger.info("Inherited failure counts for applicable Vertex keys.")
-            _preserved_vertex_failure_counts = None
-
-            # 2. Adjust the starting point of the key_cycle
-            start_key_for_new_cycle = None
-            if (
-                _preserved_old_api_keys_for_reset
-                and _preserved_next_key_in_cycle
-                and _singleton_instance.api_keys
-            ):
-                try:
-                    start_idx_in_old = _preserved_old_api_keys_for_reset.index(
-                        _preserved_next_key_in_cycle
-                    )
-
-                    for i in range(len(_preserved_old_api_keys_for_reset)):
-                        current_old_key_idx = (start_idx_in_old + i) % len(
-                            _preserved_old_api_keys_for_reset
-                        )
-                        key_candidate = _preserved_old_api_keys_for_reset[
-                            current_old_key_idx
-                        ]
-                        if key_candidate in _singleton_instance.api_keys:
-                            start_key_for_new_cycle = key_candidate
-                            break
-                except ValueError:
-                    logger.warning(
-                        f"Preserved next key '{_preserved_next_key_in_cycle}' not found in preserved old API keys. "
-                        "New cycle will start from the beginning of the new list."
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error determining start key for new cycle from preserved state: {e}. "
-                        "New cycle will start from the beginning."
-                    )
-
-            if start_key_for_new_cycle and _singleton_instance.api_keys:
-                try:
-                    target_idx = _singleton_instance.api_keys.index(
-                        start_key_for_new_cycle
-                    )
-                    for _ in range(target_idx):
-                        next(_singleton_instance.key_cycle)
-                    logger.info(
-                        f"Key cycle in new instance advanced. Next call to get_next_key() will yield: {start_key_for_new_cycle}"
-                    )
-                except ValueError:
-                    logger.warning(
-                        f"Determined start key '{start_key_for_new_cycle}' not found in new API keys during cycle advancement. "
-                        "New cycle will start from the beginning."
-                    )
-                except StopIteration:
-                    logger.error(
-                        "StopIteration while advancing key cycle, implies empty new API key list previously missed."
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error advancing new key cycle: {e}. Cycle will start from beginning."
-                    )
+        # 2. Load persisted data from DB (is_active, today_requests)
+        # We assume a table 'model_key_usage'
+        query = """
+        SELECT api_key, model_name, is_active, today_requests 
+        FROM model_key_usage
+        """
+        
+        try:
+            async with self.db_maker() as session:
+                result = await session.execute(text(query))
+                db_data = result.fetchall()
+            
+            if db_data:
+                db_df = pd.DataFrame(db_data, columns=["api_key", "model_name", "is_active", "today_requests"])
+                db_df.set_index(["api_key", "model_name"], inplace=True)
+                
+                # 3. Join DB data onto our rate limit data
+                df = df.join(db_df, how="left")
+                
+                # Fill defaults for keys that are in rate_limit_data but not DB
+                df["is_active"] = df["is_active"].fillna(True).astype(bool)
+                df["today_requests"] = df["today_requests"].fillna(0).astype(int)
             else:
-                if _singleton_instance.api_keys:
-                    logger.info(
-                        "New key cycle will start from the beginning of the new API key list (no specific start key determined or needed)."
-                    )
-                else:
-                    logger.info(
-                        "New key cycle not applicable as the new API key list is empty."
-                    )
+                # No data in DB, just use defaults
+                log.warning("No data found in 'model_key_usage'. Using defaults.")
+                df["is_active"] = True
+                df["today_requests"] = 0
 
-            # Clean up all saved states
-            _preserved_old_api_keys_for_reset = None
-            _preserved_next_key_in_cycle = None
+        except Exception as e:
+            log.error(f"Failed to load from database: {e}. Using defaults.")
+            df["is_active"] = True
+            df["today_requests"] = 0
 
-            # 3. Adjust the starting point of the vertex_key_cycle
-            start_key_for_new_vertex_cycle = None
-            if (
-                _preserved_vertex_old_api_keys_for_reset
-                and _preserved_vertex_next_key_in_cycle
-                and _singleton_instance.vertex_api_keys
-            ):
+        # 4. Add all transient/tracking columns
+        df.rename(columns={"today_requests": "rpd"}, inplace=True)
+        df["rpm"] = 0
+        df["tpm"] = 0
+        df["is_exhausted"] = False
+        df["last_used_timestamp"] = 0.0
+        
+        # 5. Lock and set the main DataFrame
+        async with self.lock:
+            self.key_model_metrics_df = df
+            
+        log.info(f"Successfully loaded {len(df)} key/model combinations.")
+
+    async def get_key(self, model_name: str) -> str:
+        """
+        Finds and returns the best available API key for a given model.
+        Implements "sticky" key caching within a 1-minute window.
+        """
+        if not self.is_ready:
+            raise Exception("KeyManager is not ready.")
+
+        now = datetime.now(self.tz).timestamp()
+        
+        async with self.lock:
+            if self.key_model_metrics_df is None:
+                raise Exception("DataFrame not initialized.")
+
+            # 1. --- Fast Path (Cache Check) ---
+            last_key = self.last_key_cache.get(model_name)
+            last_ts = self.last_key_cache_ts.get(model_name, 0.0)
+            
+            # Check if cache is valid for this minute
+            if last_key and last_ts >= self.last_minute_reset_ts:
                 try:
-                    start_idx_in_old = _preserved_vertex_old_api_keys_for_reset.index(
-                        _preserved_vertex_next_key_in_cycle
-                    )
+                    idx = (last_key, model_name)
+                    # Explicitly type hint metrics_row as pd.Series
+                    metrics_row: pd.Series = self.key_model_metrics_df.loc[idx] # type: ignore
+                    
+                    # Check if key is still usable
+                    rpm_left = int(metrics_row["max_rpm"]) - int(metrics_row["rpm"]) # type: ignore
+                    if bool(metrics_row["is_active"]) and not bool(metrics_row["is_exhausted"]) and rpm_left >= 1: # type: ignore
+                        # Cache Hit!
+                        return last_key
+                except KeyError:
+                    # Key might have been removed, fall through to full path
+                    pass 
 
-                    for i in range(len(_preserved_vertex_old_api_keys_for_reset)):
-                        current_old_key_idx = (start_idx_in_old + i) % len(
-                            _preserved_vertex_old_api_keys_for_reset
-                        )
-                        key_candidate = _preserved_vertex_old_api_keys_for_reset[
-                            current_old_key_idx
-                        ]
-                        if key_candidate in _singleton_instance.vertex_api_keys:
-                            start_key_for_new_vertex_cycle = key_candidate
-                            break
-                except ValueError:
-                    logger.warning(
-                        f"Preserved next key '{_preserved_vertex_next_key_in_cycle}' not found in preserved old Vertex Express API keys. "
-                        "New cycle will start from the beginning of the new list."
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error determining start key for new Vertex key cycle from preserved state: {e}. "
-                        "New cycle will start from the beginning."
-                    )
+            # 2. --- Full Path (Query) ---
+            df = self.key_model_metrics_df.copy()
+            
+            # Calculate dynamic values
+            df["tpm_left"] = df["max_tpm"] - df["tpm"]
+            df["rpm_left"] = df["max_rpm"] - df["rpm"]
+            df["rpd_usage_percent"] = (df["rpd"] / df["max_rpd"]).fillna(0)
 
-            if start_key_for_new_vertex_cycle and _singleton_instance.vertex_api_keys:
-                try:
-                    target_idx = _singleton_instance.vertex_api_keys.index(
-                        start_key_for_new_vertex_cycle
-                    )
-                    for _ in range(target_idx):
-                        next(_singleton_instance.vertex_key_cycle)
-                    logger.info(
-                        f"Vertex key cycle in new instance advanced. Next call to get_next_vertex_key() will yield: {start_key_for_new_vertex_cycle}"
-                    )
-                except ValueError:
-                    logger.warning(
-                        f"Determined start key '{start_key_for_new_vertex_cycle}' not found in new Vertex Express API keys during cycle advancement. "
-                        "New cycle will start from the beginning."
-                    )
-                except StopIteration:
-                    logger.error(
-                        "StopIteration while advancing Vertex key cycle, implies empty new Vertex Express API key list previously missed."
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error advancing new Vertex key cycle: {e}. Cycle will start from beginning."
-                    )
-            else:
-                if _singleton_instance.vertex_api_keys:
-                    logger.info(
-                        "New Vertex key cycle will start from the beginning of the new Vertex Express API key list (no specific start key determined or needed)."
-                    )
-                else:
-                    logger.info(
-                        "New Vertex key cycle not applicable as the new Vertex Express API key list is empty."
-                    )
-
-            # Clean up all saved states
-            _preserved_vertex_old_api_keys_for_reset = None
-            _preserved_vertex_next_key_in_cycle = None
-
-        return _singleton_instance
-
-
-async def reset_key_manager_instance():
-    """
-    Reset the KeyManager singleton instance.
-    This will save the state of the current instance (failure counts, old API keys, next key hint)
-    to be restored on the next call to get_key_manager_instance.
-    """
-    global \
-        _singleton_instance, \
-        _preserved_failure_counts, \
-        _preserved_vertex_failure_counts, \
-        _preserved_old_api_keys_for_reset, \
-        _preserved_vertex_old_api_keys_for_reset, \
-        _preserved_next_key_in_cycle, \
-        _preserved_vertex_next_key_in_cycle
-    async with _singleton_lock:
-        if _singleton_instance:
-            # 1. Save failure counts
-            _preserved_failure_counts = _singleton_instance.key_failure_counts.copy()
-            _preserved_vertex_failure_counts = (
-                _singleton_instance.vertex_key_failure_counts.copy()
-            )
-
-            # 2. Save the old list of API keys
-            _preserved_old_api_keys_for_reset = _singleton_instance.api_keys.copy()
-            _preserved_vertex_old_api_keys_for_reset = (
-                _singleton_instance.vertex_api_keys.copy()
-            )
-
-            # 3. Save the next key hint for the key_cycle
+            # Filter for the specific model
             try:
-                if _singleton_instance.api_keys:
-                    _preserved_next_key_in_cycle = (
-                        await _singleton_instance.get_next_key()
-                    )
-                else:
-                    _preserved_next_key_in_cycle = None
-            except StopIteration:
-                logger.warning(
-                    "Could not preserve next key hint: key cycle was empty or exhausted in old instance."
-                )
-                _preserved_next_key_in_cycle = None
-            except Exception as e:
-                logger.error(f"Error preserving next key hint during reset: {e}")
-                _preserved_next_key_in_cycle = None
+                candidates = df.xs(model_name, level="model_name").copy()
+            except KeyError:
+                raise Exception(f"No keys configured for model: {model_name}")
 
-            # 4. Save the next key hint for the vertex_key_cycle
+            # Apply filters
+            candidates = candidates.query(
+                "is_active == True and "
+                "is_exhausted == False and "
+                "rpm_left >= 1 and "
+                "rpd_usage_percent < 0.3"
+            )
+
+            if candidates.empty:
+                raise Exception(f"No available keys for model {model_name}.")
+
+            # Sort by highest TPM left
+            candidates_sorted = candidates.sort_values(by="tpm_left", ascending=False)
+            
+            # Get the API key (which is the index)
+            best_key_string = candidates_sorted.index[0]
+
+            # 3. --- Update Cache ---
+            self.last_key_cache[model_name] = best_key_string
+            self.last_key_cache_ts[model_name] = now
+
+            return best_key_string
+
+    async def update_usage(
+        self,
+        key_value: str,
+        model_name: str,
+        tokens_used: int,
+        error: bool = False,
+        error_type: str | None = None,
+    ):
+        """
+        Updates the in-memory DataFrame with new usage data.
+        This is a fast, async, in-memory-only operation.
+        """
+        async with self.lock:
+            if self.key_model_metrics_df is None:
+                return # Not ready
+                
             try:
-                if _singleton_instance.vertex_api_keys:
-                    _preserved_vertex_next_key_in_cycle = (
-                        await _singleton_instance.get_next_vertex_key()
-                    )
-                else:
-                    _preserved_vertex_next_key_in_cycle = None
-            except StopIteration:
-                logger.warning(
-                    "Could not preserve next key hint: Vertex key cycle was empty or exhausted in old instance."
-                )
-                _preserved_vertex_next_key_in_cycle = None
-            except Exception as e:
-                logger.error(f"Error preserving next key hint during reset: {e}")
-                _preserved_vertex_next_key_in_cycle = None
+                idx = (key_value, model_name)
+                
+                if error:
+                    if error_type == "permanent":
+                        # Deactivate key for ALL models
+                        self.key_model_metrics_df.loc[key_value, "is_active"] = False
+                    elif error_type == "temporary":
+                        # Exhaust this specific model
+                        self.key_model_metrics_df.loc[idx, "is_exhausted"] = True
+                    return
 
-            _singleton_instance = None
-            logger.info(
-                "KeyManager instance has been reset. State (failure counts, old keys, next key hint) preserved for next instantiation."
-            )
-        else:
-            logger.info(
-                "KeyManager instance was not set (or already reset), no reset action performed."
-            )
+                # --- Update metrics on success ---
+                self.key_model_metrics_df.loc[idx, "rpd"] += 1 # type: ignore
+                self.key_model_metrics_df.loc[idx, "rpm"] += 1 # type: ignore
+                self.key_model_metrics_df.loc[idx, "tpm"] += tokens_used # type: ignore
+                self.key_model_metrics_df.loc[idx, "last_used_timestamp"] = datetime.now(self.tz).timestamp() # type: ignore
+                
+                # Check for self-exhaustion
+                if self.key_model_metrics_df.loc[idx, "rpm"] >= self.key_model_metrics_df.loc[idx, "max_rpm"]: # type: ignore
+                    self.key_model_metrics_df.loc[idx, "is_exhausted"] = True # type: ignore
+
+            except KeyError:
+                log.warning(f"Attempted to update non-existent key/model: {key_value}/{model_name}")
+            except Exception as e:
+                log.error(f"Error in update_usage: {e}")
+
+    async def reset_usage(self, level: str = "all"):
+        """
+        The core LOGIC for resetting metrics in the DataFrame.
+        This method is called by the background task.
+        """
+        async with self.lock:
+            if self.key_model_metrics_df is None:
+                return # Not ready
+
+            now = datetime.now(self.tz)
+            
+            if level == "all" or level == "minute":
+                log.info("Resetting minute-level metrics (rpm, tpm, exhausted)...")
+                self.key_model_metrics_df["rpm"] = 0
+                self.key_model_metrics_df["tpm"] = 0
+                self.key_model_metrics_df["is_exhausted"] = False
+                
+                # Clear the 1-minute key cache
+                self.last_key_cache.clear()
+                self.last_key_cache_ts.clear()
+                
+                self.last_minute_reset_ts = now.timestamp()
+            
+            if level == "all" or level == "day":
+                log.info("Resetting day-level metrics (rpd)...")
+                self.key_model_metrics_df["rpd"] = 0
+                self.last_day_reset_date = now.date()
+
+    async def _commit_to_db(self):
+        """
+        Saves the current state (rpd, is_active) to the database.
+        """
+        if self.key_model_metrics_df is None:
+            return
+
+        # 1. Get a thread-safe copy of the data to save
+        async with self.lock:
+            df_to_save = self.key_model_metrics_df[["rpd", "is_active"]].copy()
+        
+        # 2. Iterate and save
+        log.info(f"Committing {len(df_to_save)} records to database...")
+        try:
+            async with self.db_maker() as session:
+                for (api_key, model_name), row in df_to_save.iterrows(): # type: ignore
+                    # Use an "upsert" (INSERT OR REPLACE)
+                    stmt = text("""
+                        INSERT INTO model_key_usage (api_key, model_name, today_requests, is_active)
+                        VALUES (:api_key, :model_name, :rpd, :is_active)
+                        ON CONFLICT(api_key, model_name) DO UPDATE SET
+                            today_requests = :rpd,
+                            is_active = :is_active
+                    """)
+                    await session.execute(stmt, {
+                        "api_key": api_key,
+                        "model_name": model_name,
+                        "rpd": int(row["rpd"]),
+                        "is_active": bool(row["is_active"])
+                    })
+                await session.commit()
+            self.last_db_commit_ts = datetime.now(self.tz).timestamp()
+            log.info("Database commit successful.")
+        except Exception as e:
+            log.error(f"Database commit failed: {e}")
+
+    async def reset_usage_bg(self):
+        """
+        The main background task that runs the reset and commit loops.
+        """
+        log.info("Background reset/commit task started.")
+        while not self._stop_event.is_set():
+            try:
+                now = datetime.now(self.tz)
+                now_ts = now.timestamp()
+                
+                # 1. Check for Minute Reset
+                if (now_ts - self.last_minute_reset_ts) >= self.minute_reset_interval_sec:
+                    await self.reset_usage(level="minute")
+                
+                # 2. Check for Day Reset
+                if self.last_day_reset_date is None or now.date() > self.last_day_reset_date:
+                    await self.reset_usage(level="day")
+                    
+                # 3. Check for DB Commit
+                if (now_ts - self.last_db_commit_ts) >= self.commit_interval_sec:
+                    await self._commit_to_db()
+
+                # Wait for 1 second or until stop_event is set
+                await asyncio.wait_for(self._stop_event.wait(), timeout=1.0)
+            
+            except asyncio.TimeoutError:
+                continue # This is the normal loop
+            except Exception as e:
+                log.error(f"Error in background task: {e}")
+                # Don't crash the loop, just wait and retry
+                await asyncio.sleep(5) 
+                
+        log.info("Background reset/commit task stopped.")
