@@ -263,8 +263,7 @@ client_secret.json
 credentials.json
 test.db
 data/:memory:
-.vscode/launch.json
-.vscode/settings.json
+.vscode/*.json
 test.py
 gemini_rate_limits.json
 gemini_rate_limits.csv

@@ -1,19 +1,15 @@
 import asyncio
 import itertools
-import time
 from typing import AsyncGenerator, Optional
 import pandas as pd
 import pytz
-from datetime import datetime, date, timedelta
-from sqlalchemy import select, MetaData, Column, Integer, String, DateTime, Boolean, text
+from datetime import datetime, timedelta
+from sqlalchemy import select, MetaData, Column, Integer, String, DateTime, Boolean
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config.config import settings
 from app.log.logger import get_key_manager_logger
-from app.database.models import UsageStats
-from app.service.key import rate_limits
 from app.service.key.rate_limits import scrape_gemini_rate_limits
 
 
@@ -452,7 +448,7 @@ class KeyManager:
                 self.is_ready = True
             logger.info("KeyManager is ready.")
             return True
-        except Exception as e:
+        except Exception:
             logger.exception("KeyManager initialization is failed")
             return False
 
