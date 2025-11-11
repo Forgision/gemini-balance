@@ -16,6 +16,7 @@ import re
 import requests
 from bs4 import BeautifulSoup, Tag
 
+
 def _text_to_number(s: Optional[str]) -> Optional[int]:
     """
     Convert text like '1,000' or '1000' to int. Treat '*', '—', '', None as None.
@@ -39,7 +40,7 @@ def _text_to_number(s: Optional[str]) -> Optional[int]:
         return None
 
 
-def _flatten_header(header_rows: List[List[str]]|List[str]) -> List[str]:
+def _flatten_header(header_rows: List[List[str]] | List[str]) -> List[str]:
     """
     Flatten an HTML table header (multiple <tr> in <thead> or first rows in tbody)
     into column names by taking the last non-empty label in each column stack.
@@ -69,7 +70,9 @@ def _extract_table_rows(table: Tag) -> Tuple[List[str], List[List[str]]]:
     thead = table.find("thead")
     if thead:
         for tr in thead.find_all("tr"):
-            header_rows.append([td.get_text(" ", strip=True) for td in tr.find_all(["th", "td"])])
+            header_rows.append(
+                [td.get_text(" ", strip=True) for td in tr.find_all(["th", "td"])]
+            )
     else:
         # fallback: find first consecutive <tr>s with <th>, or take first 1-2 rows if no <th>
         trs = table.find_all("tr")
@@ -78,7 +81,9 @@ def _extract_table_rows(table: Tag) -> Tuple[List[str], List[List[str]]]:
         # collect initial rows that contain <th>
         for tr in trs[:3]:
             if tr.find("th"):
-                header_rows.append([td.get_text(" ", strip=True) for td in tr.find_all(["th", "td"])])
+                header_rows.append(
+                    [td.get_text(" ", strip=True) for td in tr.find_all(["th", "td"])]
+                )
 
     # extract body rows after header rows (guess)
     body_rows = []
@@ -109,22 +114,42 @@ def _find_col_index(possible_names: List[str], cols_norm: List[str]):
 
 
 def scrape_gemini_rate_limits(
-    url: str,
+    url: Optional[str] = None,
     session: Optional[requests.Session] = None,
-    to_json_path: Optional[str|Path] = (Path('data') / 'gemini_rate_limits.json'),
-) -> Dict[str, Dict[str, Dict[str, str|int|float|None]]]:
-    """
-    Scrape the given URL, find HTML tables that look like rate-limit tables, and
-    return a list of records with fields:
-        - source_url
-        - table_title (if available)
-        - tier (if deducible)
-        - model
-        - RPM (requests per minute) -> int or None
-        - TPM (tokens per minute) -> int or None
-        - RPD (requests per day) -> int or None
-        - raw_row (list of original cell text)
-    The function will also optionally write CSV/JSON files if paths provided.
+    to_json_path: Optional[str | Path] = (Path("data") / "gemini_rate_limits.json"),
+) -> Dict[str, Dict[str, Dict[str, str | int | float | None]]]:
+    """Scrape the Gemini API rate limits documentation page.
+
+    This function fetches the content from the specified URL, parses the HTML
+    to identify tables containing rate limit information, and extracts relevant
+    data such as model names, RPM (requests per minute), TPM (tokens per minute),
+    and RPD (requests per day) for different usage tiers.
+
+    Args:
+        url (Optional[str]): The URL of the Gemini API rate limits documentation page.
+                             Defaults to "https://ai.google.dev/gemini-api/docs/rate-limits#current-rate-limits".
+        session (Optional[requests.Session]): An optional requests session object to use for the HTTP request.
+                                              If None, a new session will be created.
+        to_json_path (Optional[str | Path]): The file path to save the scraped data as a JSON file.
+                                             If None, the data will not be saved to a file.
+                                             Defaults to 'data/gemini_rate_limits.json'.
+
+    Returns:
+        Dict[str, Dict[str, Dict[str, str | int | float | None]]]: A dictionary where top-level keys
+        represent usage tiers (e.g., 'Free Tier', 'Tier 1', 'Tier 2', 'Tier 3'). Each tier
+        contains a dictionary of models, with model names (normalized) as keys.
+        Each model entry is a dictionary with 'name', 'RPM', 'TPM', and 'RPD'.
+
+    Example:
+        {
+            'Free Tier': {
+                'gemini-2.5-pro': {'name': 'Gemini 2.5 Pro', 'RPM': 2, 'TPM': 125000, 'RPD': 50},
+                'gemini-1.5-flash': {'name': 'Gemini 1.5 Flash', 'RPM': 15, 'TPM': 1000000, 'RPD': 1000}
+            },
+            'Tier 1': {
+                'gemini-2.5-pro': {'name': 'Gemini 2.5 Pro', 'RPM': 10, 'TPM': 500000, 'RPD': 250}
+            }
+        }
     """
     url = url or "https://ai.google.dev/gemini-api/docs/rate-limits#current-rate-limits"
     s = session or requests.Session()
@@ -134,13 +159,15 @@ def scrape_gemini_rate_limits(
 
     # Heuristic: find all tables near headings that mention 'rate' or 'limits'
     tables = soup.find_all("table")
-    records  = defaultdict(dict)
-    
+    records = defaultdict(dict)
+
     for table in tables:
         # try to determine a friendly title for the table:
         # nearest previous <h1>-<h4> or <p> containing 'rate' or 'limit'
         table_title = None
-        prev = table.find_previous(lambda tag: tag.name in ["h1", "h2", "h3", "h4", "p"])
+        prev = table.find_previous(
+            lambda tag: tag.name in ["h1", "h2", "h3", "h4", "p"]
+        )
         if prev:
             txt = prev.get_text(" ", strip=True)
             if re.search(r"rate|limit|free", txt, re.I):
@@ -151,23 +178,35 @@ def scrape_gemini_rate_limits(
                     table_title = txt
 
         header_rows, body_rows = _extract_table_rows(table)
-        
+
         if not body_rows:
             continue
 
         # flatten header into column names
-        cols = _flatten_header(header_rows) if header_rows else [f"c{i}" for i in range(len(body_rows[0]))]
+        cols = (
+            _flatten_header(header_rows)
+            if header_rows
+            else [f"c{i}" for i in range(len(body_rows[0]))]
+        )
 
         # normalize column names: lower-case and strip
         cols_norm = [c.lower() if c else "" for c in cols]
 
         # try to detect which column corresponds to model/tier/RPM/TPM/RPD
         # Common column header tokens
-        model_idx = _find_col_index(["model", "model name", "model/version", "api model"], cols_norm)
+        model_idx = _find_col_index(
+            ["model", "model name", "model/version", "api model"], cols_norm
+        )
         tier_idx = _find_col_index(["tier", "usage tier", "plan"], cols_norm)
-        rpm_idx = _find_col_index(["rpm", "requests per minute", "requests/minute", "requests/min"], cols_norm)
-        tpm_idx = _find_col_index(["tpm", "tokens per minute", "tokens/minute", "tokens/min"], cols_norm)
-        rpd_idx = _find_col_index(["rpd", "requests per day", "requests/day", "daily"], cols_norm)
+        rpm_idx = _find_col_index(
+            ["rpm", "requests per minute", "requests/minute", "requests/min"], cols_norm
+        )
+        tpm_idx = _find_col_index(
+            ["tpm", "tokens per minute", "tokens/minute", "tokens/min"], cols_norm
+        )
+        rpd_idx = _find_col_index(
+            ["rpd", "requests per day", "requests/day", "daily"], cols_norm
+        )
 
         # fallback heuristics: if not found, try to guess positions by looking for numeric-looking columns
         if model_idx is None:
@@ -183,50 +222,76 @@ def scrape_gemini_rate_limits(
             if len(row) < len(cols):
                 row = row + [""] * (len(cols) - len(row))
 
-            
-            model  = row[model_idx].strip() if model_idx is not None and model_idx < len(row) else None
+            model = (
+                row[model_idx].strip()
+                if model_idx is not None and model_idx < len(row)
+                else None
+            )
 
             if model and isinstance(model, str):
-                rec: dict[str, str|int|float|None] = {
+                rec: dict[str, str | int | float | None] = {
                     "model": model,
                 }
-                
-                rpm = _text_to_number(row[rpm_idx]) if rpm_idx is not None and rpm_idx < len(row) else None
-                tpm = _text_to_number(row[tpm_idx]) if tpm_idx is not None and tpm_idx < len(row) else None
-                rpd = _text_to_number(row[rpd_idx]) if rpd_idx is not None and rpd_idx < len(row) else None
+
+                rpm = (
+                    _text_to_number(row[rpm_idx])
+                    if rpm_idx is not None and rpm_idx < len(row)
+                    else None
+                )
+                tpm = (
+                    _text_to_number(row[tpm_idx])
+                    if tpm_idx is not None and tpm_idx < len(row)
+                    else None
+                )
+                rpd = (
+                    _text_to_number(row[rpd_idx])
+                    if rpd_idx is not None and rpd_idx < len(row)
+                    else None
+                )
 
                 # if RPM/TPM/RPD not found by index, try to extract numbers by searching row cell-by-cell for common suffixes
                 if rpm is None:
                     for i, cell in enumerate(row):
-                        if re.search(r"rpm|requests per minute|req/min|requests/min", cols_norm[i] if i < len(cols_norm) else ""):
+                        if re.search(
+                            r"rpm|requests per minute|req/min|requests/min",
+                            cols_norm[i] if i < len(cols_norm) else "",
+                        ):
                             rpm = _text_to_number(cell)
                 if tpm is None:
                     for i, cell in enumerate(row):
-                        if re.search(r"tpm|tokens per minute|tokens/min", cols_norm[i] if i < len(cols_norm) else ""):
+                        if re.search(
+                            r"tpm|tokens per minute|tokens/min",
+                            cols_norm[i] if i < len(cols_norm) else "",
+                        ):
                             tpm = _text_to_number(cell)
 
                 # Add extra normalized model name if present (strip footnote markers)
                 model_normalized = re.sub(r"\[\d+\]|\*\s*$", "", model).strip()
-                model_normalized = model_normalized.strip().lower().replace(' ', '-')
-                
-                if all ([isinstance(rpm, int|float), isinstance(tpm, int|float), isinstance(rpd, int|float)]):
+                model_normalized = model_normalized.strip().lower().replace(" ", "-")
+
+                if all(
+                    [
+                        isinstance(rpm, int | float),
+                        isinstance(tpm, int | float),
+                        isinstance(rpd, int | float),
+                    ]
+                ):
                     records[table_title].update(
                         {
                             model_normalized: {
                                 "name": model,
                                 "RPM": rpm,
                                 "TPM": tpm,
-                                "RPD": rpd
+                                "RPD": rpd,
                             }
                         }
                     )
-                    
+
     if records and to_json_path:
-        with open(to_json_path, 'w') as f:
+        with open(to_json_path, "w") as f:
             json.dump(records, f, indent=2)
-    
+
     return records
-        
 
     # Post-process: drop duplicates (same model+tier) keeping first
     # seen = set()
@@ -244,10 +309,10 @@ def scrape_gemini_rate_limits(
     #     # flatten lists in raw_row to string for CSV
     #     if "raw_row" in df.columns:
     #         df["raw_row"] = df["raw_row"].apply(lambda rr: " | ".join(rr) if isinstance(rr, list) else rr)
-        
+
     #     if to_json_path:
     #         df.to_json(to_json_path, orient="records", indent=2)
-            
+
     # with open(to_json_path, 'w') as f:
     #     json.dump(deduped, f, indent=2)
 

@@ -46,6 +46,7 @@ exclude_also = [
 [dependency-groups]
 dev = [
     "anyio>=4.11.0",
+    "ipykernel>=7.1.0",
     "playwright>=1.55.0",
     "pydoll-python>=2.11.0",
     "pytest>=8.4.2",

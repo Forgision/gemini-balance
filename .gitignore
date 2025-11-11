@@ -268,3 +268,4 @@ data/:memory:
 test.py
 gemini_rate_limits.json
 gemini_rate_limits.csv
+test.ipynb
