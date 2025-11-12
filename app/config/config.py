@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     MYSQL_PASSWORD: str = ""
     MYSQL_DATABASE: str = ""
     MYSQL_SOCKET: str = ""
-    KEY_MATRIX_DB_URL: str = "sqlite:///data/key_matrix.db"
+    KEY_MATRIX_DB_URL: str = "sqlite+aiosqlite:///data/key_matrix.db"
 
     # Validate MySQL Configuration
     @field_validator(

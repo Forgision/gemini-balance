@@ -43,42 +43,51 @@ class TestServer(uvicorn.Server):
         self.thread.join()
 
 
-@pytest.fixture(scope="session")
-def live_server_url(test_app, db_engine):
+@pytest.fixture(scope="function")
+def live_server_url(test_app):
     """
-    Session-scoped fixture to start and stop a live FastAPI server.
-    Depends on db_engine to ensure the database is set up.
+    Function-scoped fixture to start and stop a live FastAPI server.
+    Only created when explicitly requested by tests.
+    Note: This fixture does NOT set up a database.
+    For tests that need a database, use route_test_app from tests/routes/conftest.py
     """
-
+    import random
+    # Use a random port to avoid conflicts
+    port = random.randint(8100, 8999)
+    
     config = uvicorn.Config(
-        test_app, host=TEST_SERVER_HOST, port=TEST_SERVER_PORT, log_level="info"
+        test_app, host=TEST_SERVER_HOST, port=port, log_level="error"
     )
     server = TestServer(config=config)
     server.run_in_thread()
 
-    base_url = f"http://{TEST_SERVER_HOST}:{TEST_SERVER_PORT}"
+    base_url = f"http://{TEST_SERVER_HOST}:{port}"
     yield base_url
 
     server.stop()
 
 
 @pytest.fixture(scope="session")
-def base_url(live_server_url):
+def base_url():
     """
-    Provides the live server's base URL to the pytest-base-url plugin,
-    so it can be used automatically by page objects.
+    Provides a default base URL for the pytest-base-url plugin.
+    Tests that need a live server should use live_server_url directly.
     """
-    return live_server_url
+    return "http://localhost:8000"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_app(
     mock_key_manager,
     mock_error_log_service,
-    db_engine,
     mock_chat_service,
     mock_embedding_service,
 ):
+    """
+    Function-scoped fixture to create a test app for non-route tests.
+    Note: Route tests should use route_test_app from tests/routes/conftest.py
+    This fixture does NOT set up a database - use route_test_app if you need DB.
+    """
     app = create_app()
 
     async def override_get_key_manager():
@@ -132,8 +141,11 @@ def test_app(
 
     yield app
 
+    # Clean up dependency overrides after each test
+    app.dependency_overrides.clear()
 
-@pytest.fixture(scope="session")
+
+@pytest.fixture(scope="function")
 def client(test_app):
     """Fixture to create a TestClient with dependencies overridden."""
     with TestClient(test_app) as test_client:

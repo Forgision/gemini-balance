@@ -60,8 +60,11 @@ async def connect_to_db():
     Connect to the database
     """
     try:
-        await database.connect()
-        logger.info(f"Connected to {settings.DATABASE_TYPE}")
+        if not database.is_connected:
+            await database.connect()
+            logger.info(f"Connected to {settings.DATABASE_TYPE}")
+        else:
+            logger.debug(f"Already connected to {settings.DATABASE_TYPE}")
     except Exception as e:
         logger.error(f"Failed to connect to database: {str(e)}")
         raise

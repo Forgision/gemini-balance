@@ -45,13 +45,16 @@ exclude_also = [
 
 [dependency-groups]
 dev = [
+    "aiosql>=13.4",
     "anyio>=4.11.0",
     "ipykernel>=7.1.0",
+    "pandas-stubs>=2.3.2.250926",
     "playwright>=1.55.0",
     "pydoll-python>=2.11.0",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pytest-mock>=3.15.1",
+    "pytest-timeout>=2.4.0",
     "pytest-tornasync>=0.6.0.post2",
     "pytest-trio>=0.8.0",
 ]

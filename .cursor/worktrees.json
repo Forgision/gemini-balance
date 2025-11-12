@@ -1,0 +1,7 @@
+{
+  "setup-worktree": [
+    "cp $ROOT_WORKTREE_PATH/pyproject.toml pyproject.toml",
+    "/config/.local/bin/uv sync",
+    "source .venv/bin/activate"
+  ]
+}

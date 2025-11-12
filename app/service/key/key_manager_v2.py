@@ -1,3 +1,4 @@
+import logging
 import asyncio
 import itertools
 from typing import AsyncGenerator, Optional
@@ -8,22 +9,26 @@ from sqlalchemy import select, MetaData, Column, Integer, String, DateTime, Bool
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
-from app.config.config import settings
 from app.log.logger import get_key_manager_logger
 from app.service.key.rate_limits import scrape_gemini_rate_limits
 
 
-DATABASE_URL = settings.KEY_MATRIX_DB_URL
+DATABASE_URL = "sqlite+aiosqlite:///data/key_matrix.db"
 GEMINI_RATE_LIMIT_URL = (
     "https://ai.google.dev/gemini-api/docs/rate-limits#current-rate-limits"
 )
 
 # Configure logging
 logger = get_key_manager_logger()
+logger.setLevel(logging.DEBUG)
 
+# Pool parameters only for non-SQLite databases
+_pool_kwargs = {}
+if "sqlite" not in DATABASE_URL.lower():
+    _pool_kwargs = {"pool_size": 50, "max_overflow": 100, "pool_timeout": 10}
 
 engine = create_async_engine(
-    DATABASE_URL, echo=False, pool_size=50, max_overflow=100, pool_timeout=10
+    DATABASE_URL, echo=False, **_pool_kwargs
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -53,10 +58,16 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_database():
-    logger.debug("Initializing UsageMatixdb")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.debug("Initializing UsageMatixdb done")
+    """Initialize the database by creating all tables."""
+    logger.debug("Initializing UsageMatrix db")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.debug("Initializing UsageMatrix db done")
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+        # Don't raise - allow the caller to handle the error
+        raise
 
 
 class UsageMatrix(Base):
@@ -165,7 +176,6 @@ class KeyManager:
         # --- Timestamps for Resets ---
         self.last_minute_reset_ts: datetime = self.now_minute()
         self.last_day_reset_ts: datetime = self.now_day()
-        self.last_db_commit_ts: datetime = self.now()
 
     def _model_normalization(self, model_name: str) -> tuple[bool, str]:
         """Normalizes a model name by matching it against configured rate limit models.
@@ -258,10 +268,11 @@ class KeyManager:
         """
         logger.debug("Loading default matrix")
 
-        # Checking rate limit data
-        if not self.rate_limit_data:
+        # Checking rate limit data availability
+        if self.rate_limit_data is None or not isinstance(self.rate_limit_data, dict) or len(self.rate_limit_data) < 1:
             raise ValueError("Rate limits data not found")
 
+        # Checking api keys availability
         if len(self.api_keys) < 1 and len(self.vertex_api_keys) < 1:
             raise ValueError("No api keys found")
 
@@ -317,7 +328,7 @@ class KeyManager:
                     )
 
         # Checking that all api keys have incorate in data
-        if len(defaults) < len(self.api_keys) + len(self.vertex_api_keys):
+        if len(defaults) != len(self.api_keys) + len(self.vertex_api_keys):
             raise ValueError("Defaults is not created for each keys")
 
         # Updating dataframe
@@ -403,16 +414,20 @@ class KeyManager:
             )
 
     async def _set_available_usage(self):
-        if not self.is_ready:
-            await self._check_ready()
-
-        missing_columns = [
-            column
-            for column in ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
-            if column not in self.df.columns
-        ]
-        if missing_columns:
-            raise TypeError(f"Required columns {missing_columns} not found")
+        # Skip _check_ready during initialization to avoid circular dependency
+        # _check_ready requires the "_left" columns that this method creates
+        if self.is_ready:
+            missing_columns = [
+                column
+                for column in ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
+                if column not in self.df.columns
+            ]
+            if missing_columns:
+                raise TypeError(f"Required columns {missing_columns} not found")
+        else:
+            # During init, just verify we have the essential columns
+            if self.df is None or self.df.empty:
+                raise TypeError("DataFrame not initialized")
 
         self.df["rpm_left"] = self.df["max_rpm"] - self.df["rpm"]
         self.df["tpm_left"] = self.df["max_tpm"] - self.df["tpm"]
@@ -463,15 +478,17 @@ class KeyManager:
 
     async def init(
         self,
-        async_session_maker: async_sessionmaker,
-        rate_limit_data: dict,
-        minute_reset_interval: int,
+        async_session_maker: Optional[async_sessionmaker] = None,
+        rate_limit_data: Optional[dict] = None,
+        minute_reset_interval: Optional[int] = None,
     ) -> bool:
         """
         Async factory for creating and initializing the KeyManager.
         This runs the initial data load and starts background tasks.
         """
         try:
+            logger.info("Initializing KeyManager...")
+            
             # create database
             await init_database()
 
@@ -480,8 +497,6 @@ class KeyManager:
             self.minute_reset_interval_sec = (
                 minute_reset_interval or self.minute_reset_interval_sec
             )
-
-            logger.info("Initializing KeyManager...")
 
             # get rate limit data
             rate_limit_data = scrape_gemini_rate_limits(GEMINI_RATE_LIMIT_URL)
@@ -501,9 +516,14 @@ class KeyManager:
             await self._load_from_db()
 
             await self._ensure_numeric_columns()
+            
+            # Ensure available usage columns are created
+            # await self._set_available_usage()
+            # await self._set_exhausted_flags()
 
             # 2. Run initial reset to set timestamps
-            await self.reset_usage()
+            # await self.reset_usage()
+            await self._on_update_usage()
 
             # 3. Start background resetter
             self._background_task = asyncio.create_task(self.reset_usage_bg())
@@ -520,18 +540,38 @@ class KeyManager:
     async def shutdown(self):
         """
         Gracefully shuts down the KeyManager.
+        This method is idempotent and can be called multiple times safely.
         """
+        # Check if already shutting down or shut down
+        if self._stop_event.is_set() and (not self._background_task or self._background_task.done()):
+            logger.debug("KeyManager already shut down or shutting down.")
+            return
+            
         logger.info("Shutting down KeyManager...")
         # 1. Signal background task to stop
         self._stop_event.set()
 
-        # 2. Wait for task to finish
-        if self._background_task:
-            await self._background_task
+        # 2. Wait for task to finish (with timeout to prevent hanging)
+        if self._background_task and not self._background_task.done():
+            try:
+                await asyncio.wait_for(self._background_task, timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("Background task did not stop in time, cancelling...")
+                self._background_task.cancel()
+                try:
+                    await self._background_task
+                except asyncio.CancelledError:
+                    pass
 
-        # 3. Perform one final commit to the DB
-        logger.info("Performing final database commit...")
-        await self._commit_to_db()
+        # 3. Perform one final commit to the DB (only if initialized)
+        if self.is_ready:
+            logger.info("Performing final database commit...")
+            try:
+                await self._commit_to_db()
+            except Exception as e:
+                logger.error(f"Error during final commit: {e}")
+                
+        self.is_ready = False
         logger.info("KeyManager shutdown complete.")
 
     async def get_key(self, model_name: str, is_vertex_key: bool = False) -> str:
@@ -640,7 +680,7 @@ class KeyManager:
                 logger.error(f"Error in update_usage: {e}")
                 return False
 
-    async def reset_usage(self):
+    async def reset_usage(self) -> bool:
         """
         The core LOGIC for resetting metrics in the DataFrame.
         This method is called by the background task.
@@ -677,7 +717,8 @@ class KeyManager:
         """
         Saves the current state (rpd, is_active) to the database.
         """
-        if self.df is None:
+        if self.df is None or self.df.empty:
+            logger.debug("Skipping commit: DataFrame is None or empty.")
             return
 
         # 1. Get a thread-safe copy of the data to save
@@ -722,8 +763,6 @@ class KeyManager:
                         )
                         session.add(instance)
                 await session.commit()
-
-            self.last_db_commit_ts = self.now()
             logger.debug("Database commit successful.")
         except Exception as e:
             logger.error(f"Database commit failed: {e}")
@@ -751,6 +790,9 @@ class KeyManager:
                 except asyncio.TimeoutError:
                     pass  # This is the normal loop
 
+            except asyncio.CancelledError:
+                logger.info("Background task cancelled.")
+                break
             except Exception as e:
                 logger.exception(f"Error in background task: {e}")
                 # Don't crash the loop, just wait and retry
