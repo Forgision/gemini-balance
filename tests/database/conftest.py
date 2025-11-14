@@ -3,8 +3,7 @@ from pytest import MonkeyPatch
 import importlib
 
 from app.config.config import settings
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker, Session
 
 
 @pytest.fixture(scope="session")
@@ -43,17 +42,17 @@ def db_engine(monkeypatch_session):
 
 
 @pytest.fixture(scope="function")
-async def db_session(db_engine):
+def db_session(db_engine):
     """
     Function-scoped fixture to provide a transactional session for each test.
     Rolls back the transaction after the test is complete.
     Used specifically for database tests.
     """
-    async_session = sessionmaker(
-        db_engine, class_=AsyncSession, expire_on_commit=False
+    SessionLocal = sessionmaker(
+        db_engine, class_=Session, expire_on_commit=False
     )
 
-    async with async_session() as session:
+    with SessionLocal() as session:
         yield session
-        await session.rollback()
+        session.rollback()
 

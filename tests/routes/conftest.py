@@ -51,13 +51,113 @@ def route_db_engine(monkeypatch_session):
     Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(scope="session")
+def route_mock_key_manager():
+    """
+    Session-scoped mock KeyManager for route tests.
+    Provides better performance by sharing the mock across route tests.
+    """
+    from unittest.mock import MagicMock, AsyncMock
+    
+    mock = MagicMock()
+    mock.get_random_valid_key = AsyncMock(return_value="test_api_key")
+    mock.get_next_working_key = AsyncMock(return_value="test_api_key_for_model")
+    mock.get_paid_key = AsyncMock(return_value="test_paid_api_key")
+    mock.get_all_keys_with_fail_count = AsyncMock(return_value={"valid_keys": {}, "invalid_keys": {}})
+    mock.handle_api_failure = AsyncMock(return_value=None)
+    return mock
+
+
+@pytest.fixture(scope="session")
+def route_mock_error_log_service():
+    """
+    Session-scoped mock error_log_service for route tests.
+    Provides better performance by sharing the mock across route tests.
+    """
+    from unittest.mock import AsyncMock
+    
+    mock = AsyncMock()
+    mock.process_get_error_logs.return_value = {"logs": [], "total": 0}
+    mock.process_get_error_log_details.return_value = {}
+    mock.process_find_error_log_by_info.return_value = {}
+    mock.process_delete_error_logs_by_ids.return_value = 1
+    mock.process_delete_all_error_logs.return_value = None
+    mock.process_delete_error_log_by_id.return_value = True
+    return mock
+
+
+@pytest.fixture(scope="session")
+def route_mock_chat_service():
+    """
+    Session-scoped mock chat service for route tests.
+    Provides better performance by sharing the mock across route tests.
+    """
+    from unittest.mock import MagicMock, AsyncMock
+    
+    mock = MagicMock()
+    mock.generate_content = AsyncMock(return_value={"candidates": [{"content": {"parts": [{"text": "Hello, world!"}]}}]})
+    mock.count_tokens = AsyncMock(return_value={"totalTokens": 123})
+    return mock
+
+
+@pytest.fixture(scope="session")
+def route_mock_embedding_service():
+    """
+    Session-scoped mock embedding service for route tests.
+    Provides better performance by sharing the mock across route tests.
+    """
+    from unittest.mock import MagicMock, AsyncMock
+    
+    mock = MagicMock()
+    mock.embed_content = AsyncMock(return_value={"embedding": {"values": [0.1, 0.2, 0.3]}})
+    return mock
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_route_mocks(
+    route_mock_key_manager,
+    route_mock_error_log_service,
+    route_mock_chat_service,
+    route_mock_embedding_service,
+):
+    """
+    Function-scoped fixture to reset route mocks between tests.
+    Ensures clean state while maintaining session-scoped mocks for performance.
+    """
+    # Reset key_manager mock
+    route_mock_key_manager.reset_mock()
+    route_mock_key_manager.get_random_valid_key.return_value = "test_api_key"
+    route_mock_key_manager.get_next_working_key.return_value = "test_api_key_for_model"
+    route_mock_key_manager.get_paid_key.return_value = "test_paid_api_key"
+    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {"valid_keys": {}, "invalid_keys": {}}
+    route_mock_key_manager.handle_api_failure.return_value = None
+    
+    # Reset error_log_service mock
+    route_mock_error_log_service.reset_mock()
+    route_mock_error_log_service.process_get_error_logs.return_value = {"logs": [], "total": 0}
+    route_mock_error_log_service.process_get_error_log_details.return_value = {}
+    route_mock_error_log_service.process_find_error_log_by_info.return_value = {}
+    route_mock_error_log_service.process_delete_error_logs_by_ids.return_value = 1
+    route_mock_error_log_service.process_delete_all_error_logs.return_value = None
+    route_mock_error_log_service.process_delete_error_log_by_id.return_value = True
+    
+    # Reset chat_service mock
+    route_mock_chat_service.reset_mock()
+    route_mock_chat_service.generate_content.return_value = {"candidates": [{"content": {"parts": [{"text": "Hello, world!"}]}}]}
+    route_mock_chat_service.count_tokens.return_value = {"totalTokens": 123}
+    
+    # Reset embedding_service mock
+    route_mock_embedding_service.reset_mock()
+    route_mock_embedding_service.embed_content.return_value = {"embedding": {"values": [0.1, 0.2, 0.3]}}
+
+
 @pytest.fixture(scope="function")
 def route_test_app(
-    mock_key_manager,
-    mock_error_log_service,
+    route_mock_key_manager,
+    route_mock_error_log_service,
     route_db_engine,  # Use route-specific db_engine
-    mock_chat_service,
-    mock_embedding_service,
+    route_mock_chat_service,
+    route_mock_embedding_service,
 ):
     """
     Function-scoped fixture to create a test app for route tests.
@@ -66,8 +166,11 @@ def route_test_app(
     # route_db_engine fixture already sets up the test database
     app = create_app()
 
+    # Store original overrides to restore them
+    original_overrides = app.dependency_overrides.copy()
+
     async def override_get_key_manager():
-        return mock_key_manager
+        return route_mock_key_manager
 
     app.dependency_overrides[gemini_routes.get_key_manager] = override_get_key_manager
     app.dependency_overrides[openai_routes.get_key_manager] = override_get_key_manager
@@ -80,19 +183,19 @@ def route_test_app(
     app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
 
     async def override_get_error_log_service_dep():
-        return mock_error_log_service
+        return route_mock_error_log_service
 
     app.dependency_overrides[
         get_error_log_service
     ] = override_get_error_log_service_dep
 
     async def override_get_chat_service():
-        return mock_chat_service
+        return route_mock_chat_service
 
     app.dependency_overrides[gemini_routes.get_chat_service] = override_get_chat_service
 
     async def override_get_embedding_service():
-        return mock_embedding_service
+        return route_mock_embedding_service
 
     app.dependency_overrides[
         gemini_routes.get_embedding_service
@@ -110,15 +213,61 @@ def route_test_app(
     ] = mock_security_dependency
 
     async def override_claude_proxy_service():
-        return mock_chat_service
+        return route_mock_chat_service
 
     app.dependency_overrides[claude_routes.ClaudeProxyService] = override_claude_proxy_service
     app.dependency_overrides[claude_routes.verify_auth_token] = mock_security_dependency
 
     yield app
 
-    # Clean up dependency overrides after each test
+    # Clean up dependency overrides after each test - restore to original state
     app.dependency_overrides.clear()
+    app.dependency_overrides.update(original_overrides)
+
+
+@pytest.fixture(scope="function")
+def test_app(route_test_app):
+    """
+    Alias for route_test_app for backwards compatibility.
+    Some tests use test_app instead of route_test_app.
+    """
+    return route_test_app
+
+
+@pytest.fixture(scope="function")
+def mock_key_manager(route_mock_key_manager):
+    """
+    Alias for route_mock_key_manager for backwards compatibility.
+    Allows tests to use the same fixture name across different modules.
+    """
+    return route_mock_key_manager
+
+
+@pytest.fixture(scope="function")
+def mock_error_log_service(route_mock_error_log_service):
+    """
+    Alias for route_mock_error_log_service for backwards compatibility.
+    Allows tests to use the same fixture name across different modules.
+    """
+    return route_mock_error_log_service
+
+
+@pytest.fixture(scope="function")
+def mock_chat_service(route_mock_chat_service):
+    """
+    Alias for route_mock_chat_service for backwards compatibility.
+    Allows tests to use the same fixture name across different modules.
+    """
+    return route_mock_chat_service
+
+
+@pytest.fixture(scope="function")
+def mock_embedding_service(route_mock_embedding_service):
+    """
+    Alias for route_mock_embedding_service for backwards compatibility.
+    Allows tests to use the same fixture name across different modules.
+    """
+    return route_mock_embedding_service
 
 
 @pytest.fixture(scope="function")

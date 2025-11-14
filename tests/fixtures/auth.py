@@ -1,8 +1,13 @@
 import pytest
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_verify_auth_token(request, mocker):
+    """
+    Fixture to mock auth token verification across all routes.
+    Tests that need auth mocking should explicitly request this fixture.
+    Tests checking unauthorized access should NOT use this fixture.
+    """
     if "no_mock_auth" in request.keywords:
         return
 

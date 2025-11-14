@@ -7,9 +7,7 @@ from app.service.proxy.proxy_check_service import ProxyCheckResult
 from fastapi import HTTPException
 
 
-@patch("app.middleware.middleware.verify_auth_token", return_value=True)
-@patch("app.router.config_routes.verify_auth_token", return_value=True)
-def test_get_config_success(mock_verify_route, mock_verify_middleware, client):
+def test_get_config_success(mock_verify_auth_token, client):
     """Test successful retrieval of configuration."""
     response = client.get(
         "/api/config",
@@ -36,7 +34,7 @@ def test_get_config_unauthorized(mock_router_auth, mock_middleware_auth, client)
 
 
 @patch("app.service.config.config_service.ConfigService.update_config")
-def test_update_config_success(mock_update_config, client):
+def test_update_config_success(mock_update_config, mock_verify_auth_token, client):
     """Test successful update of configuration."""
     mock_update_config.return_value = {"status": "updated"}
 
@@ -68,7 +66,7 @@ def test_update_config_unauthorized(mock_router_auth, mock_middleware_auth, clie
 
 
 @patch("app.service.config.config_service.ConfigService.update_config")
-def test_update_config_error(mock_update_config, client):
+def test_update_config_error(mock_update_config, mock_verify_auth_token, client):
     """Test error handling when config update fails."""
     mock_update_config.side_effect = Exception("Update failed")
 
@@ -83,7 +81,7 @@ def test_update_config_error(mock_update_config, client):
 
 
 @patch("app.service.config.config_service.ConfigService.reset_config")
-def test_reset_config_success(mock_reset_config, client):
+def test_reset_config_success(mock_reset_config, mock_verify_auth_token, client):
     """Test successful reset of configuration."""
     mock_reset_config.return_value = {"status": "reset"}
 
@@ -111,7 +109,7 @@ def test_reset_config_unauthorized(mock_router_auth, mock_middleware_auth, clien
 
 
 @patch("app.service.config.config_service.ConfigService.reset_config")
-def test_reset_config_error(mock_reset_config, client):
+def test_reset_config_error(mock_reset_config, mock_verify_auth_token, client):
     """Test error handling during config reset."""
     mock_reset_config.side_effect = Exception("Reset failed")
 
@@ -126,7 +124,7 @@ def test_reset_config_error(mock_reset_config, client):
 
 # Tests for key deletion
 @patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_success(mock_delete_key, client):
+def test_delete_single_key_success(mock_delete_key, mock_verify_auth_token, client):
     """Test successful deletion of a single key."""
     mock_delete_key.return_value = {"success": True}
 
@@ -154,7 +152,7 @@ def test_delete_single_key_unauthorized(mock_router_auth, mock_middleware_auth, 
 
 
 @patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_not_found(mock_delete_key, client):
+def test_delete_single_key_not_found(mock_delete_key, mock_verify_auth_token, client):
     """Test deleting a key that is not found."""
     mock_delete_key.return_value = {"success": False, "message": "Key not found"}
 
@@ -168,7 +166,7 @@ def test_delete_single_key_not_found(mock_delete_key, client):
 
 
 @patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_success(mock_delete_selected_keys, client):
+def test_delete_selected_keys_success(mock_delete_selected_keys, mock_verify_auth_token, client):
     """Test successful deletion of selected keys."""
     mock_delete_selected_keys.return_value = {"success": True, "deleted_count": 2}
 
@@ -198,7 +196,7 @@ def test_delete_selected_keys_unauthorized(mock_router_auth, mock_middleware_aut
 
 
 @patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_no_keys_provided(mock_delete_selected_keys, client):
+def test_delete_selected_keys_no_keys_provided(mock_delete_selected_keys, mock_verify_auth_token, client):
     """Test request to delete selected keys with an empty list."""
     response = client.post(
         "/api/config/keys/delete-selected",
@@ -212,7 +210,7 @@ def test_delete_selected_keys_no_keys_provided(mock_delete_selected_keys, client
 
 # Tests for proxy endpoints
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.check_single_proxy")
-def test_check_single_proxy_success(mock_check_single_proxy, client):
+def test_check_single_proxy_success(mock_check_single_proxy, mock_verify_auth_token, client):
     """Test successful check of a single proxy."""
     mock_check_single_proxy.return_value = {
         "proxy": "proxy1",
@@ -248,7 +246,7 @@ def test_check_single_proxy_unauthorized(mock_router_auth, mock_middleware_auth,
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.check_multiple_proxies")
-def test_check_all_proxies_success(mock_check_multiple_proxies, client):
+def test_check_all_proxies_success(mock_check_multiple_proxies, mock_verify_auth_token, client):
     """Test successful check of multiple proxies."""
     mock_check_multiple_proxies.return_value = [
         {
@@ -289,7 +287,7 @@ def test_check_all_proxies_unauthorized(mock_router_auth, mock_middleware_auth, 
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.get_cache_stats")
-def test_get_proxy_cache_stats_success(mock_get_cache_stats, client):
+def test_get_proxy_cache_stats_success(mock_get_cache_stats, mock_verify_auth_token, client):
     """Test successful retrieval of proxy cache stats."""
     mock_get_cache_stats.return_value = {"hits": 10, "misses": 5}
 
@@ -317,7 +315,7 @@ def test_get_proxy_cache_stats_unauthorized(mock_router_auth, mock_middleware_au
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.clear_cache", new_callable=MagicMock)
-def test_clear_proxy_cache_success(mock_clear_cache, client):
+def test_clear_proxy_cache_success(mock_clear_cache, mock_verify_auth_token, client):
     """Test successful clearing of proxy cache."""
     mock_clear_cache.return_value = None
 
@@ -346,7 +344,7 @@ def test_clear_proxy_cache_unauthorized(mock_router_auth, mock_middleware_auth, 
 
 # Tests for UI models endpoint
 @patch("app.service.config.config_service.ConfigService.fetch_ui_models")
-def test_get_ui_models_success(mock_fetch_ui_models, client):
+def test_get_ui_models_success(mock_fetch_ui_models, mock_verify_auth_token, client):
     """Test successful retrieval of UI models."""
     mock_fetch_ui_models.return_value = {"models": ["model1", "model2"]}
 
@@ -374,7 +372,7 @@ def test_get_ui_models_unauthorized(mock_router_auth, mock_middleware_auth, clie
 
 
 @patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_error(mock_delete_key, client):
+def test_delete_single_key_error(mock_delete_key, mock_verify_auth_token, client):
     """Test error handling when deleting a single key fails."""
     mock_delete_key.side_effect = Exception("Deletion failed")
 
@@ -388,7 +386,7 @@ def test_delete_single_key_error(mock_delete_key, client):
 
 
 @patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_generic_error(mock_delete_key, client):
+def test_delete_single_key_generic_error(mock_delete_key, mock_verify_auth_token, client):
     """Test error handling when deleting a single key fails with a generic error (not 404)."""
     mock_delete_key.return_value = {"success": False, "message": "Generic deletion error"}
 
@@ -403,7 +401,7 @@ def test_delete_single_key_generic_error(mock_delete_key, client):
 
 
 @patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_error(mock_delete_selected_keys, client):
+def test_delete_selected_keys_error(mock_delete_selected_keys, mock_verify_auth_token, client):
     """Test error handling when bulk deleting keys fails."""
     mock_delete_selected_keys.side_effect = Exception("Bulk deletion failed")
 
@@ -418,7 +416,7 @@ def test_delete_selected_keys_error(mock_delete_selected_keys, client):
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.check_single_proxy")
-def test_check_single_proxy_error(mock_check_single_proxy, client):
+def test_check_single_proxy_error(mock_check_single_proxy, mock_verify_auth_token, client):
     """Test error handling when checking a single proxy fails."""
     mock_check_single_proxy.side_effect = Exception("Proxy check error")
 
@@ -433,7 +431,7 @@ def test_check_single_proxy_error(mock_check_single_proxy, client):
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.check_multiple_proxies")
-def test_check_all_proxies_error(mock_check_multiple_proxies, client):
+def test_check_all_proxies_error(mock_check_multiple_proxies, mock_verify_auth_token, client):
     """Test error handling when checking multiple proxies fails."""
     mock_check_multiple_proxies.side_effect = Exception("Batch proxy check error")
 
@@ -448,7 +446,7 @@ def test_check_all_proxies_error(mock_check_multiple_proxies, client):
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.get_cache_stats")
-def test_get_proxy_cache_stats_error(mock_get_cache_stats, client):
+def test_get_proxy_cache_stats_error(mock_get_cache_stats, mock_verify_auth_token, client):
     """Test error handling when retrieving proxy cache stats fails."""
     mock_get_cache_stats.side_effect = Exception("Cache stats error")
 
@@ -462,7 +460,7 @@ def test_get_proxy_cache_stats_error(mock_get_cache_stats, client):
 
 
 @patch("app.service.proxy.proxy_check_service.ProxyCheckService.clear_cache")
-def test_clear_proxy_cache_error(mock_clear_cache, client):
+def test_clear_proxy_cache_error(mock_clear_cache, mock_verify_auth_token, client):
     """Test error handling when clearing proxy cache fails."""
     mock_clear_cache.side_effect = Exception("Clear cache error")
 
@@ -476,7 +474,7 @@ def test_clear_proxy_cache_error(mock_clear_cache, client):
 
 
 @patch("app.service.config.config_service.ConfigService.fetch_ui_models")
-def test_get_ui_models_error(mock_fetch_ui_models, client):
+def test_get_ui_models_error(mock_fetch_ui_models, mock_verify_auth_token, client):
     """Test error handling when retrieving UI models fails."""
     mock_fetch_ui_models.side_effect = Exception("Fetch UI models error")
 
@@ -490,7 +488,7 @@ def test_get_ui_models_error(mock_fetch_ui_models, client):
 
 
 @patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_partial_failure(mock_delete_selected_keys, client):
+def test_delete_selected_keys_partial_failure(mock_delete_selected_keys, mock_verify_auth_token, client):
     """Test partial failure in deleting selected keys."""
     mock_delete_selected_keys.return_value = {"success": False, "deleted_count": 0, "message": "Some keys not found."}
 

@@ -12,7 +12,7 @@ from app.service.chat.gemini_chat_service import (
     _filter_empty_parts,
     _build_payload,
 )
-from app.domain.gemini_models import GeminiRequest, GeminiContent
+from app.domain.gemini_models import GeminiRequest, GeminiContent, GenerationConfig, SystemInstruction
 from app.config.config import settings
 from dotenv import load_dotenv
 load_dotenv()
@@ -197,7 +197,7 @@ def test_build_payload_non_tts():
     """Test _build_payload for a non-TTS model."""
     request = GeminiRequest(
         contents=[GeminiContent(role="user", parts=[{"text": "Hello"}])],
-        generationConfig={"temperature": 0.9}
+        generation_config=GenerationConfig(temperature=0.9)
     )
     payload = _build_payload("gemini-pro", request)
     assert "contents" in payload
@@ -209,7 +209,7 @@ def test_build_payload_tts():
     """Test _build_payload for a TTS model."""
     request = GeminiRequest(
         contents=[GeminiContent(role="user", parts=[{"text": "Hello"}])],
-        systemInstruction={"parts": [{"text": "You are a helpful assistant."}]}
+        system_instruction=SystemInstruction(parts=[{"text": "You are a helpful assistant."}])
     )
     payload = _build_payload("gemini-tts", request)
     assert "contents" in payload
@@ -221,7 +221,7 @@ def test_build_payload_image_model():
     """Test _build_payload for an image generation model."""
     request = GeminiRequest(
         contents=[GeminiContent(role="user", parts=[{"text": "A cat"}])],
-        systemInstruction={"parts": [{"text": "This should be removed."}]}
+        system_instruction=SystemInstruction(parts=[{"text": "This should be removed."}])
     )
     payload = _build_payload("gemini-pro-image", request)
     assert "systemInstruction" not in payload
@@ -244,7 +244,7 @@ def test_build_payload_thinking_config(monkeypatch):
     # Test client-provided thinking config
     request_with_config = GeminiRequest(
         contents=[GeminiContent(role="user", parts=[{"text": "Think about it"}])],
-        generationConfig={"thinkingConfig": {"thinkingBudget": 500}}
+        generation_config=GenerationConfig(thinkingConfig={"thinkingBudget": 500})
     )
     payload_client = _build_payload("gemini-pro", request_with_config)
     assert payload_client["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 500}

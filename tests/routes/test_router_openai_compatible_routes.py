@@ -3,7 +3,7 @@ import pytest
 from fastapi import HTTPException
 
 # Test for the /openai/v1/models endpoint
-def test_list_models_success(client, mock_key_manager, mocker):
+def test_list_models_success(mock_verify_auth_token, client, mock_key_manager, mocker):
     """Test successful retrieval of models."""
     mock_models_response = {
         "object": "list",
@@ -46,7 +46,7 @@ def test_list_models_unauthorized(client, test_app):
 
 
 # Tests for chat completion
-def test_chat_completion_success(client, mock_key_manager, mocker):
+def test_chat_completion_success(mock_verify_auth_token, client, mock_key_manager, mocker):
     """Test successful chat completion."""
     mock_chat_response = {
         "id": "chatcmpl-123", "object": "chat.completion", "created": 1677652288, "model": "gemini-pro",
@@ -69,7 +69,7 @@ def test_chat_completion_success(client, mock_key_manager, mocker):
     mock_key_manager.get_next_working_key.assert_awaited_once_with(model_name="gemini-pro")
     mock_create_chat.assert_awaited_once()
 
-def test_chat_completion_image_chat_success(client, mock_key_manager, mocker):
+def test_chat_completion_image_chat_success(mock_verify_auth_token, client, mock_key_manager, mocker):
     """Test successful image chat completion."""
     mock_image_chat_response = {
         "id": "chatcmpl-456", "object": "chat.completion", "created": 1677652288, "model": "imagen-3.0-generate-002-chat",
@@ -95,7 +95,7 @@ def test_chat_completion_image_chat_success(client, mock_key_manager, mocker):
     mock_key_manager.get_paid_key.assert_awaited_once()
     mock_create_image_chat.assert_awaited_once()
 
-def test_chat_completion_stream_success(client, mock_key_manager, mocker):
+def test_chat_completion_stream_success(mock_verify_auth_token, client, mock_key_manager, mocker):
     """Test successful streaming chat completion."""
     async def mock_stream_generator():
         yield "data: chunk 1"
@@ -123,7 +123,7 @@ def test_chat_completion_stream_success(client, mock_key_manager, mocker):
     mock_create_chat.assert_awaited_once()
 
 # Tests for image generation
-def test_generate_image_success(client, mock_key_manager, mocker):
+def test_generate_image_success(mock_verify_auth_token, client, mock_key_manager, mocker):
     """Test successful image generation."""
     mock_image_response = {"created": 1677652288, "data": [{"url": "http://example.com/image.png"}]}
     mock_generate_images = mocker.patch(
@@ -141,7 +141,7 @@ def test_generate_image_success(client, mock_key_manager, mocker):
     mock_generate_images.assert_awaited_once()
 
 # Tests for embedding
-def test_embedding_success(client, mock_key_manager, mocker):
+def test_embedding_success(mock_verify_auth_token, client, mock_key_manager, mocker):
     """Test successful text embedding."""
     mock_embedding_response = {
         "object": "list",

@@ -210,7 +210,7 @@ class KeyManager:
             raise ValueError("Rate Limits models are not found")
 
         for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
-            if model_name in prefix:
+            if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return (True, prefix)
 
@@ -327,9 +327,10 @@ class KeyManager:
                         }
                     )
 
-        # Checking that all api keys have incorate in data
-        if len(defaults) != len(self.api_keys) + len(self.vertex_api_keys):
-            raise ValueError("Defaults is not created for each keys")
+        # Checking that all api keys have entries for all models in data
+        expected_entries = (len(self.api_keys) + len(self.vertex_api_keys)) * len(self.rate_limit_data) 
+        if len(defaults) != expected_entries: # (len(self.api_keys) + len(self.vertex_api_keys)) * len(self.rate_limit_data):
+            raise ValueError(f"Defaults is not created for each keys. Expected {expected_entries} entries but got {len(defaults)}")
 
         # Updating dataframe
         async with self.lock:
@@ -392,14 +393,17 @@ class KeyManager:
                         self.df = df
 
                     # setting reset times
-                    max_minute_reset_dt = self.df["minute_reset_time"].max()
-                    if pd.isna(max_minute_reset_dt):
+                    max_minute_reset_dt = pd.to_datetime(self.df["minute_reset_time"]).max()
+                    if pd.isna(max_minute_reset_dt) or isinstance(max_minute_reset_dt, pd.Series):
                         self.last_minute_reset_ts = datetime.now(self.tz)
                     else:
-                        self.last_minute_reset_ts = max_minute_reset_dt
+                        self.last_minute_reset_ts = max_minute_reset_dt.to_pydatetime() if hasattr(max_minute_reset_dt, "to_pydatetime") else max_minute_reset_dt
 
-                    max_day_reset_dt = self.df["day_reset_time"].max()
-                    if not pd.isna(max_day_reset_dt):
+                    max_day_reset_dt = pd.to_datetime(self.df["day_reset_time"]).max()
+                    if pd.isna(max_day_reset_dt) or isinstance(max_day_reset_dt, pd.Series):
+                        self.last_day_reset_ts = datetime.now(self.tz)
+                    else:
+                        self.last_day_reset_ts = max_day_reset_dt.to_pydatetime() if hasattr(max_day_reset_dt, "to_pydatetime") else max_day_reset_dt
                         self.last_day_reset_ts = max_day_reset_dt
 
             else:
@@ -442,6 +446,8 @@ class KeyManager:
         if not self.is_ready:
             await self._check_ready()
 
+        # This method should be called within a lock context
+        # It modifies self.df, so it needs to be protected
         missing_columns = [
             column
             for column in ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
@@ -459,21 +465,25 @@ class KeyManager:
         )
 
     async def _ensure_numeric_columns(self):
-        """Ensures that the columns used for comparison are numeric."""
+        """Ensures that the columns used for comparison are numeric.
+        This method should be called within a lock context.
+        """
+        # This method modifies self.df, so it should be called within a lock
         numeric_cols = ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
         for col in numeric_cols:
             if col in self.df.columns:
-                self.df[col] = (
-                    pd.to_numeric(self.df[col], errors="coerce").fillna(0).astype(int)
-                )
+                self.df[col] = pd.Series(
+                    pd.to_numeric(self.df[col], errors="coerce"), index=self.df.index
+                ).fillna(0).astype(int)
 
     async def _on_update_usage(self):
         """
         Callback for when usage is updated.
         Currently not used.
         """
-        await self._set_available_usage()
-        await self._set_exhausted_flags()
+        async with self.lock:
+            await self._set_available_usage()
+            await self._set_exhausted_flags()
         await self._commit_to_db()
 
     async def init(
@@ -569,7 +579,7 @@ class KeyManager:
             try:
                 await self._commit_to_db()
             except Exception as e:
-                logger.error(f"Error during final commit: {e}")
+                logger.exception("Error during final commit")
                 
         self.is_ready = False
         logger.info("KeyManager shutdown complete.")
@@ -587,17 +597,19 @@ class KeyManager:
         # Normalize model name and extract the normalized string
         matched, model_name = self._model_normalization(model_name)
 
-        # Validate DataFrame and that 'model_name' exists at index level 0
-        if model_name not in self.df.index.get_level_values("model_name"):
-            if is_vertex_key:
-                return next(self.vertex_api_keys_cycle)
-            else:
-                return next(self.api_keys_cycle)
-
+        # Acquire lock early to safely check and access self.df
         async with self.lock:
-            # Filter for the specific model
+            # Validate DataFrame and that 'model_name' exists at index level 0
+            if self.df is None or model_name not in self.df.index.get_level_values("model_name"):
+                if is_vertex_key:
+                    return next(self.vertex_api_keys_cycle)
+                else:
+                    return next(self.api_keys_cycle)
+            # Filter for the specific model and vertex key type
             try:
                 candidates = self.df.xs(model_name, level="model_name").copy()
+                # Filter by vertex key type
+                candidates = candidates.xs(is_vertex_key, level="is_vertex_key").copy()
             except KeyError:
                 raise Exception(f"No keys configured for model: {model_name}")
 
@@ -616,8 +628,22 @@ class KeyManager:
             # Sort by tpm_left descending
             candidates.sort_values(by=["tpm_left"], ascending=False, inplace=True)
 
-            # Get the API key (which is the 3rd level of the index after filtering by model)
-            best_key_string = candidates.index[0][2]
+            # Check index level and get the best key string
+            first_index = candidates.index[0]
+            
+            if isinstance(first_index, tuple) or isinstance(first_index, list):
+                if len(first_index) == 3:
+                    best_key_string = str(first_index[2])
+                elif len(first_index) == 2:
+                    best_key_string = str(first_index[1])
+                elif len(first_index) == 1:
+                    best_key_string = str(first_index[0])
+                else:
+                    raise Exception(f"Invalid index length: {len(first_index)}")
+            elif isinstance(first_index, str):
+                best_key_string = first_index
+            else:
+                raise Exception(f"Invalid index type: {type(first_index)}")
 
             return best_key_string
 
@@ -634,13 +660,15 @@ class KeyManager:
         Updates the in-memory DataFrame with new usage data.
         This is a fast, async, in-memory-only operation.
         """
-        async with self.lock:
-            if not self.is_ready:
-                await self._check_ready()
+        if not self.is_ready:
+            await self._check_ready()
 
-            match, model_name = self._model_normalization(model_name)
+        match, model_name = self._model_normalization(model_name)
+        
+        updated = False
 
-            try:
+        try:
+            async with self.lock:
                 # TODO: add model_name which is not present in self.df. Add unlimit limit for such models, but handle 429 error by setting exhausted status
                 if model_name in self.df.index.get_level_values("model_name"):
                     idx = (model_name, is_vertex_key, key_value)
@@ -653,7 +681,7 @@ class KeyManager:
                                 "is_active",
                             ] = False
                         elif error_type == "429":
-                            # Exhaust this specific model
+                            # Then set exhausted flag for this specific model (after _set_exhausted_flags)
                             self.df.loc[idx, "is_exhausted"] = True
                         return
 
@@ -662,23 +690,39 @@ class KeyManager:
                     rpm_val = pd.to_numeric(self.df.loc[idx, "rpm"], errors="coerce")
                     tpm_val = pd.to_numeric(self.df.loc[idx, "tpm"], errors="coerce")
 
-                    self.df.loc[idx, "rpd"] = int(rpd_val) + 1
-                    self.df.loc[idx, "rpm"] = int(rpm_val) + 1
-                    self.df.loc[idx, "tpm"] = int(tpm_val) + tokens_used
+                    # Extract scalar values and handle NaN
+                    def to_int_safe(val) -> int:
+                        if isinstance(val, (int, float)):
+                            return int(val) if not pd.isna(val) else 0
+                        try:
+                            scalar = val.item() if hasattr(val, 'item') else float(val)
+                            return int(scalar) if not pd.isna(scalar) else 0
+                        except (ValueError, AttributeError, TypeError):
+                            return 0
+
+                    rpd_int = to_int_safe(rpd_val)
+                    rpm_int = to_int_safe(rpm_val)
+                    tpm_int = to_int_safe(tpm_val)
+
+                    self.df.loc[idx, "rpd"] = rpd_int + 1
+                    self.df.loc[idx, "rpm"] = rpm_int + 1
+                    self.df.loc[idx, "tpm"] = tpm_int + tokens_used
                     self.df.loc[idx, "last_used"] = self.now()
 
-                    # Calculate updated available usage
-                    await self._on_update_usage()
-
-                return True
-            except KeyError:
-                logger.warning(
-                    f"Attempted to update non-existent key/model: {key_value}/{model_name}"
-                )
-                return False
-            except Exception as e:
-                logger.error(f"Error in update_usage: {e}")
-                return False
+                    # Set updated flag
+                    updated = True
+        except KeyError:
+            logger.warning(
+                f"Attempted to update non-existent key/model: {key_value}/{model_name}"
+            )
+            return False
+        except Exception as e:
+            logger.error(f"Error in update_usage: {e}")
+            return False
+        
+        if updated:
+            await self._on_update_usage()
+        return True
 
     async def reset_usage(self) -> bool:
         """
@@ -686,29 +730,35 @@ class KeyManager:
         This method is called by the background task.
         """
         try:
-            async with self.lock:
-                if not self.is_ready:
-                    await self._check_ready()
+            if not self.is_ready:
+                await self._check_ready()
 
-                now_minute = self.now_minute()
-                now_day = self.now_day()
+            now_minute = self.now_minute()
+            now_day = self.now_day()
+            
+            reseted = False
 
-                if self.last_minute_reset_ts + timedelta(seconds=59) < now_minute:
-                    logger.debug(
-                        "Resetting minute-level metrics (rpm, tpm, exhausted)..."
-                    )
+            if self.last_minute_reset_ts + timedelta(seconds=59) < now_minute:
+                logger.debug(
+                    "Resetting minute-level metrics (rpm, tpm, exhausted)..."
+                )
+                async with self.lock:
                     self.df["rpm"] = 0
                     self.df["tpm"] = 0
                     self.df["is_exhausted"] = False
                     self.last_minute_reset_ts = now_minute
-
-                if self.last_day_reset_ts + timedelta(days=1) < now_day:
-                    logger.debug("Resetting day-level metrics (rpd)...")
+                    reseted = True
+        
+            if self.last_day_reset_ts + timedelta(days=1) < now_day:
+                logger.debug("Resetting day-level metrics (rpd)...")
+                async with self.lock:
                     self.df["rpd"] = 0
                     self.last_day_reset_ts = now_day
+                    reseted = True
 
+            if reseted:
                 await self._on_update_usage()
-                return True
+            return True
         except Exception as e:
             logger.exception(f"Error in reset_usage: {e}")
             return False
@@ -734,6 +784,7 @@ class KeyManager:
                     stmt = select(UsageMatrix).where(
                         UsageMatrix.api_key == api_key,
                         UsageMatrix.model_name == model_name,
+                        UsageMatrix.vertex_key == is_vertex_key,
                     )
                     result = await session.execute(stmt)
                     instance = result.scalars().first()

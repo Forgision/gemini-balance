@@ -6,8 +6,7 @@ from datetime import datetime, timedelta
 
 
 # Test for the /api/logs/errors endpoint (GET)
-# @patch("app.router.error_log_routes.verify_auth_token", return_value=True)
-async def test_get_error_logs_api_success(client, mock_error_log_service):
+async def test_get_error_logs_api_success(mock_verify_auth_token, client, mock_error_log_service):
     """Test successful retrieval of error logs."""
     mock_error_log_service.process_get_error_logs.return_value = {"logs": [], "total": 0}
     response = client.get("/api/logs/errors", cookies={"auth_token": "test_token"})
@@ -27,8 +26,7 @@ async def test_get_error_logs_api_unauthorized(mock_verify_auth, client):
 
 
 # Test for the /api/logs/errors/{log_id}/details endpoint (GET)
-@patch("app.router.error_log_routes.verify_auth_token", return_value=True)
-async def test_get_error_log_detail_api_success(mock_verify_auth, client, mock_error_log_service):
+async def test_get_error_log_detail_api_success(mock_verify_auth_token, client, mock_error_log_service):
     """Test successful retrieval of an error log's details."""
     log_detail = {
         "id": 1,
@@ -55,8 +53,7 @@ async def test_get_error_log_detail_api_unauthorized(mock_verify_auth, client):
 
 
 # Test for the /api/logs/errors/lookup endpoint (GET)
-@patch("app.router.error_log_routes.verify_auth_token", return_value=True)
-async def test_lookup_error_log_by_info_success(mock_verify_auth, client, mock_error_log_service):
+async def test_lookup_error_log_by_info_success(mock_verify_auth_token, client, mock_error_log_service):
     """Test successful lookup of an error log."""
     log_detail = {
         "id": 1,
@@ -91,8 +88,7 @@ async def test_lookup_error_log_by_info_unauthorized(mock_verify_auth, client):
 
 
 # Test for the /api/logs/errors endpoint (DELETE)
-@patch("app.router.error_log_routes.verify_auth_token", return_value=True)
-async def test_delete_error_logs_bulk_api_success(mock_verify_auth, client, mock_error_log_service):
+async def test_delete_error_logs_bulk_api_success(mock_verify_auth_token, client, mock_error_log_service):
     """Test successful bulk deletion of error logs."""
     mock_error_log_service.process_delete_error_logs_by_ids.return_value = 1
     response = client.request("DELETE", "/api/logs/errors", content=json.dumps({"ids": [1, 2]}), cookies={"auth_token": "test_token"})
@@ -113,8 +109,7 @@ async def test_delete_error_logs_bulk_api_unauthorized(mock_verify_auth, client)
 
 
 # Test for the /api/logs/errors/all endpoint (DELETE)
-@patch("app.router.error_log_routes.verify_auth_token", return_value=True)
-async def test_delete_all_error_logs_api_success(mock_verify_auth, client, mock_error_log_service):
+async def test_delete_all_error_logs_api_success(mock_verify_auth_token, client, mock_error_log_service):
     """Test successful deletion of all error logs."""
     response = client.delete("/api/logs/errors/all", cookies={"auth_token": "test_token"})
     assert response.status_code == 204
@@ -129,8 +124,7 @@ async def test_delete_all_error_logs_api_unauthorized(mock_verify_auth, client):
 
 
 # Test for the /api/logs/errors/{log_id} endpoint (DELETE)
-@patch("app.router.error_log_routes.verify_auth_token", return_value=True)
-async def test_delete_error_log_api_success(mock_verify_auth, client, mock_error_log_service):
+async def test_delete_error_log_api_success(mock_verify_auth_token, client, mock_error_log_service):
     """Test successful deletion of a single error log."""
     mock_error_log_service.process_delete_error_log_by_id.return_value = True
     response = client.delete("/api/logs/errors/1", cookies={"auth_token": "test_token"})

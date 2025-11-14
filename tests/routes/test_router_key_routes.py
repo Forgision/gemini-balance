@@ -1,13 +1,15 @@
-from unittest.mock import AsyncMock
-from app.service.key.key_manager import KeyManager
 import pytest
 
-def test_get_keys_paginated_success(client, mock_key_manager: KeyManager):
+def test_get_keys_paginated_success(mock_verify_auth_token, client, mock_key_manager):
     """Test successful retrieval of paginated keys with default parameters."""
-    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
-        "valid_keys": {"test_key_1": 0, "test_key_2": 1},
-        "invalid_keys": {"test_key_3": 10},
-    })
+    setattr(
+        mock_key_manager.get_all_keys_with_fail_count,
+        "return_value",
+        {
+            "valid_keys": {"test_key_1": 0, "test_key_2": 1},
+            "invalid_keys": {"test_key_3": 10},
+        },
+    )
 
     response = client.get(
         "/api/keys",
@@ -23,18 +25,18 @@ def test_get_keys_paginated_success(client, mock_key_manager: KeyManager):
 
 
 @pytest.mark.no_mock_auth
-def test_get_keys_paginated_unauthorized(client, mock_key_manager: KeyManager):
+def test_get_keys_paginated_unauthorized(client, mock_key_manager):
     """Test unauthorized access to paginated keys."""
     response = client.get("/api/keys")
     assert response.status_code == 401
 
 
-def test_get_keys_paginated_filter_by_status(client, mock_key_manager: KeyManager):
+def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, client, mock_key_manager):
     """Test filtering keys by status (valid/invalid)."""
-    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
+    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"valid_key": 0},
         "invalid_keys": {"invalid_key": 5},
-    })
+    }
 
     # Test 'valid' status
     response_valid = client.get(
@@ -59,12 +61,12 @@ def test_get_keys_paginated_filter_by_status(client, mock_key_manager: KeyManage
     assert "valid_key" not in data_invalid["keys"]
 
 
-def test_get_keys_paginated_search(client, mock_key_manager: KeyManager):
+def test_get_keys_paginated_search(mock_verify_auth_token, client, mock_key_manager):
     """Test searching for a specific key."""
-    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
+    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"search_target_key": 0, "another_key": 1},
         "invalid_keys": {},
-    })
+    }
 
     response = client.get(
         "/api/keys?search=target",
@@ -78,12 +80,12 @@ def test_get_keys_paginated_search(client, mock_key_manager: KeyManager):
     assert "another_key" not in data["keys"]
 
 
-def test_get_keys_paginated_fail_count_threshold(client, mock_key_manager: KeyManager):
+def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, client, mock_key_manager):
     """Test filtering by fail count threshold."""
-    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
+    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"key_low_fail": 1},
         "invalid_keys": {"key_high_fail": 15},
-    })
+    }
 
     response = client.get(
         "/api/keys?fail_count_threshold=10",
@@ -97,13 +99,13 @@ def test_get_keys_paginated_fail_count_threshold(client, mock_key_manager: KeyMa
     assert "key_low_fail" not in data["keys"]
 
 
-def test_get_keys_paginated_pagination(client, mock_key_manager: KeyManager):
+def test_get_keys_paginated_pagination(mock_verify_auth_token, client, mock_key_manager):
     """Test the pagination logic."""
     keys = {f"key_{i}": i for i in range(20)}
-    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
+    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": keys,
         "invalid_keys": {},
-    })
+    }
 
     # Get page 2 with a limit of 5
     response = client.get(
@@ -125,12 +127,12 @@ def test_get_keys_paginated_pagination(client, mock_key_manager: KeyManager):
 
 
 # Tests for get_all_keys
-def test_get_all_keys_success(client, mock_key_manager: KeyManager):
+def test_get_all_keys_success(mock_verify_auth_token, client, mock_key_manager):
     """Test successful retrieval of all keys for bulk operations."""
-    mock_key_manager.get_all_keys_with_fail_count = AsyncMock(return_value={
+    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"valid_1": 0, "valid_2": 1},
         "invalid_keys": {"invalid_1": 10},
-    })
+    }
 
     response = client.get(
         "/api/keys/all",
@@ -147,7 +149,7 @@ def test_get_all_keys_success(client, mock_key_manager: KeyManager):
 
 
 @pytest.mark.no_mock_auth
-def test_get_all_keys_unauthorized(client, mock_key_manager: KeyManager):
+def test_get_all_keys_unauthorized(client, mock_key_manager):
     """Test unauthorized access to the get_all_keys endpoint."""
     response = client.get("/api/keys/all")
     assert response.status_code == 401

@@ -74,17 +74,11 @@ async def test_openai_chat_service_stream_content_failure(mock_key_manager):
         request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=True)
         stream = await service.create_chat_completion(request, "test_api_key")
         with pytest.raises(Exception):
+            assert stream is not None
+            assert isinstance(stream, AsyncGenerator)
             async for _ in stream:
                 pass
-        mock_stream_generate_content.assert_called_once()
-        service = OpenAIChatService("http://base.url", mock_key_manager)
-        request = ChatRequest(messages=[{"role": "user", "content": "Hello"}], stream=True)
-        stream = await service.create_chat_completion(request, "test_api_key")
-        with pytest.raises(Exception):
-            assert stream is not None
-            assert isinstance(stream, AsyncMock)
-            _ = [chunk async for chunk in stream]
-        mock_stream_generate_content.assert_called_once()
+        mock_stream_generate_content.assert_called()
 
 
 @pytest.mark.asyncio

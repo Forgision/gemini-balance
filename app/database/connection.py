@@ -15,13 +15,17 @@ logger = get_database_logger()
 
 # Database URL
 if settings.DATABASE_TYPE == "sqlite":
-    # Ensure the data directory exists
-    data_dir = Path("data")
-    data_dir.mkdir(exist_ok=True)
-    db_path = data_dir / settings.SQLITE_DATABASE
-    # Following is to avoid windows separator in windows
-    db_path = PureWindowsPath(db_path).as_posix()
-    DATABASE_URL = f"sqlite:///{db_path}"
+    # Handle in-memory database specially
+    if settings.SQLITE_DATABASE == ":memory:":
+        DATABASE_URL = "sqlite:///:memory:"
+    else:
+        # Ensure the data directory exists
+        data_dir = Path("data")
+        data_dir.mkdir(exist_ok=True)
+        db_path = data_dir / settings.SQLITE_DATABASE
+        # Following is to avoid windows separator in windows
+        db_path = PureWindowsPath(db_path).as_posix()
+        DATABASE_URL = f"sqlite:///{db_path}"
 elif settings.DATABASE_TYPE == "mysql":
     if settings.MYSQL_SOCKET:
         DATABASE_URL = f"mysql+pymysql://{settings.MYSQL_USER}:{quote_plus(settings.MYSQL_PASSWORD)}@/{settings.MYSQL_DATABASE}?unix_socket={settings.MYSQL_SOCKET}"

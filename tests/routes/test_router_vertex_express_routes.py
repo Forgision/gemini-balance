@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 from app.router.vertex_express_routes import security_service
 
-def test_generate_content_success(client):
+def test_generate_content_success(mock_verify_auth_token, client):
     """Test successful content generation."""
     from app.domain.gemini_models import GeminiRequest, GeminiContent
 
