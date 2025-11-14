@@ -8,6 +8,8 @@ from typing import Optional, Dict, Any, Tuple
 from httpx import AsyncClient
 import asyncio
 
+from fastapi import Request
+
 from app.config.config import settings
 from app.database import services as db_services
 from app.database.models import FileState
@@ -16,7 +18,7 @@ from fastapi import HTTPException
 from app.log.logger import get_files_logger
 from app.utils.helpers import redact_key_for_logging
 from app.service.client.api_client import GeminiApiClient
-from app.service.key.key_manager import get_key_manager_instance
+from app.service.key.key_manager import KeyManager
 
 logger = get_files_logger()
 
@@ -32,13 +34,14 @@ class FilesService:
         self.api_client = GeminiApiClient(base_url=settings.BASE_URL)
         self.key_manager = None
 
-    async def _get_key_manager(self):
-        """Get KeyManager instance"""
-        if not self.key_manager:
-            self.key_manager = await get_key_manager_instance(
-                settings.API_KEYS, settings.VERTEX_API_KEYS
-            )
-        return self.key_manager
+    async def _get_key_manager(self, request: Optional[Request] = None):
+        """Get KeyManager instance from app.state"""
+        if request and hasattr(request.app.state, "key_manager"):
+            return request.app.state.key_manager
+        # Fallback: try to get from self.key_manager if set
+        if self.key_manager:
+            return self.key_manager
+        raise RuntimeError("KeyManager not available. Request object required for app.state access.")
     
 
     async def initialize_upload(
@@ -47,6 +50,7 @@ class FilesService:
         body: Optional[bytes],
         user_token: str,
         request_host: Optional[str] = None,  # Add request host parameter
+        request: Optional[Request] = None,  # Add request for app.state access
     ) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """
         Initialize file upload
@@ -61,7 +65,7 @@ class FilesService:
         """
         try:
             # Get an available API key
-            key_manager = await self._get_key_manager()
+            key_manager = await self._get_key_manager(request)
             api_key = await key_manager.get_next_key()
 
             if not api_key:

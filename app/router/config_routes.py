@@ -45,10 +45,11 @@ async def update_config(
         logger.warning("Unauthorized access attempt to config page")
         return RedirectResponse(url="/", status_code=302)
     try:
-        result = await config_service.update_config(config_data)
+        result = await config_service.update_config(config_data, request.app)
         # After the configuration is updated successfully, immediately update the level of all loggers
-        Logger.update_log_levels(config_data["LOG_LEVEL"])
-        logger.info("Log levels updated after configuration change.")
+        if "LOG_LEVEL" in config_data:
+            Logger.update_log_levels(config_data["LOG_LEVEL"])
+            logger.info("Log levels updated after configuration change.")
         return result
     except Exception as e:
         logger.error(f"Error updating config or log levels: {e}", exc_info=True)
@@ -64,7 +65,7 @@ async def reset_config(
         logger.warning("Unauthorized access attempt to config page")
         return RedirectResponse(url="/", status_code=302)
     try:
-        return await config_service.reset_config()
+        return await config_service.reset_config(request.app)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -89,7 +90,7 @@ async def delete_single_key(
         logger.info(
             f"Attempting to delete key: {redact_key_for_logging(key_to_delete)}"
         )
-        result = await config_service.delete_key(key_to_delete)
+        result = await config_service.delete_key(key_to_delete, request.app)
         if not result.get("success"):
             raise HTTPException(
                 status_code=(
@@ -125,7 +126,7 @@ async def delete_selected_keys_route(
 
     try:
         logger.info(f"Attempting to bulk delete {len(delete_request.keys)} keys.")
-        result = await config_service.delete_selected_keys(delete_request.keys)
+        result = await config_service.delete_selected_keys(delete_request.keys, request.app)
         if not result.get("success") and result.get("deleted_count", 0) == 0:
             raise HTTPException(
                 status_code=400, detail=result.get("message", "Failed to delete keys.")
@@ -150,7 +151,7 @@ async def get_ui_models(
         raise HTTPException(status_code=403, detail="Not authenticated")
 
     try:
-        models = await config_service.fetch_ui_models()
+        models = await config_service.fetch_ui_models(request.app)
         return models
     except HTTPException as e:
         raise e

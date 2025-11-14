@@ -3,8 +3,8 @@ from functools import wraps
 from typing import Any, Callable, TypeVar, cast
 
 from app.config.config import settings
+from app.exception.api_exceptions import ApiClientException
 from app.log.logger import get_retry_logger
-from app.service.key.key_manager import get_key_manager_instance
 from app.utils.helpers import redact_key_for_logging
 
 T = TypeVar("T")
@@ -17,8 +17,12 @@ def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
         async def wrapper(*args, **kwargs) -> Any:
             key_manager = kwargs.get("key_manager")
             if not key_manager:
-                # Fallback to singleton if not injected
-                key_manager = await get_key_manager_instance()
+                # Try to get from request if available
+                request = kwargs.get("request")
+                if request and hasattr(request.app.state, "key_manager"):
+                    key_manager = request.app.state.key_manager
+                else:
+                    raise ValueError("KeyManager instance is not available. Use dependency injection or provide request object.")
 
             if key_manager is None:
                 raise ValueError("KeyManager instance is not available.")
@@ -50,8 +54,17 @@ def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
                         )
                         break
 
+                    # Extract status_code from exception
+                    status_code = None
+                    if isinstance(e, ApiClientException):
+                        status_code = e.status_code
+                    elif hasattr(e, 'args') and len(e.args) > 0:
+                        status_code = e.args[0] if isinstance(e.args[0], int) else None
+                    if status_code is None:
+                        status_code = 500  # Default to 500 if not available
+
                     new_key = await key_manager.handle_api_failure(
-                        old_key, model_name, retries
+                        old_key, model_name, retries, status_code=status_code
                     )
                     if new_key:
                         kwargs[key_arg] = new_key

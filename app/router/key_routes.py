@@ -41,12 +41,16 @@ async def get_keys_paginated(
         }
 
     # Further filtering (search and fail_count_threshold)
+    # Note: v2 doesn't track fail_count, so fail_count_threshold is ignored
     filtered_keys = {}
-    for key, fail_count in keys_to_filter.items():
+    for key, status_info in keys_to_filter.items():
         search_match = True
         if search:
             search_match = search.lower() in key.lower()
 
+        # v2: status_info is a dict with status/exhausted flags
+        # For compatibility, treat as fail_count=0 for valid, 1 for invalid
+        fail_count = 0 if status_info.get("status") == "active" else 1
         fail_count_match = True
         if fail_count_threshold is not None:
             fail_count_match = fail_count >= fail_count_threshold

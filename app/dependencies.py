@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
 from app.config.config import settings
 from app.service.chat.gemini_chat_service import GeminiChatService
@@ -11,14 +11,17 @@ from app.service.chat.vertex_express_chat_service import (
 from app.service.config.config_service import ConfigService
 from app.service.error_log import error_log_service
 from app.service.files.files_service import FilesService
-from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.key.key_manager import KeyManager
 from app.service.openai_compatiable.openai_compatiable_service import (
     OpenAICompatiableService,
 )
 
 
-async def get_key_manager():
-    return await get_key_manager_instance(settings.API_KEYS, settings.VERTEX_API_KEYS)
+async def get_key_manager(request: Request) -> KeyManager:
+    """Get KeyManager instance from app.state."""
+    if not hasattr(request.app.state, "key_manager"):
+        raise RuntimeError("KeyManager not initialized. Check application startup.")
+    return request.app.state.key_manager
 
 
 def get_openai_chat_service(

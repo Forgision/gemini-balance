@@ -23,7 +23,8 @@ from app.handler.retry_handler import RetryHandler
 from app.log.logger import get_gemini_logger
 from app.service.chat.gemini_chat_service import GeminiChatService
 from app.service.embedding.gemini_embedding_service import GeminiEmbeddingService
-from app.service.key.key_manager import KeyManager, get_key_manager_instance
+from app.service.key.key_manager import KeyManager
+from app.dependencies import get_key_manager
 from app.service.model.model_service import ModelService
 from app.service.tts.native.tts_routes import get_tts_chat_service
 from app.utils.helpers import redact_key_for_logging
@@ -36,16 +37,14 @@ security_service = SecurityService()
 model_service = ModelService()
 
 
-async def get_key_manager():
-    """Get the key manager instance."""
-    return await get_key_manager_instance()
+# Use get_key_manager from dependencies.py instead of defining local function
 
 
 async def get_next_working_key(
     model_name: str, key_manager: KeyManager = Depends(get_key_manager)
 ):
     """Get the next available API key."""
-    return await key_manager.get_next_working_key(model_name)
+    return await key_manager.get_key(model_name, is_vertex_key=False)
 
 
 async def get_embedding_service(key_manager: KeyManager = Depends(get_key_manager)):
@@ -362,12 +361,16 @@ async def reset_all_key_fail_counts(
             keys_to_reset = list(invalid_keys.keys())
             logger.info(f"Resetting only invalid keys, count: {len(keys_to_reset)}")
         else:
-            # Reset all keys
-            await key_manager.reset_failure_counts()
+            # Reset all keys - v2: reactivate all invalid keys
+            keys_by_status = await key_manager.get_keys_by_status()
+            invalid_keys = list(keys_by_status.get("invalid_keys", {}).keys())
+            for key in invalid_keys:
+                await key_manager.reset_key_failure_count(key)
             return JSONResponse(
                 {
                     "success": True,
                     "message": "Failure count for all keys has been reset.",
+                    "reset_count": len(invalid_keys),
                 }
             )
 
@@ -518,15 +521,11 @@ async def verify_key(
             return JSONResponse({"status": "valid"})
     except Exception as e:
         logger.error(f"Key verification failed: {str(e)}")
-
-        async with key_manager.failure_count_lock:
-            if api_key in key_manager.key_failure_counts:
-                key_manager.key_failure_counts[api_key] += 1
-                logger.warning(
-                    f"Verification exception for key: {redact_key_for_logging(api_key)}, incrementing failure count"
-                )
-
-        return JSONResponse({"status": "invalid", "error": e.args[1]})
+        # v2 doesn't track failure counts, so just return invalid status
+        error_msg = str(e)
+        if hasattr(e, 'args') and len(e.args) > 1:
+            error_msg = e.args[1]
+        return JSONResponse({"status": "invalid", "error": error_msg})
 
 
 @router.post("/verify-selected-keys")
@@ -575,18 +574,17 @@ async def verify_selected_keys(
             logger.warning(
                 f"Key verification failed for {redact_key_for_logging(api_key)}: {error_message}"
             )
-            async with key_manager.failure_count_lock:
-                if api_key in key_manager.key_failure_counts:
-                    key_manager.key_failure_counts[api_key] += 1
-                    logger.warning(
-                        f"Bulk verification exception for key: {redact_key_for_logging(api_key)}, incrementing failure count"
-                    )
-                else:
-                    key_manager.key_failure_counts[api_key] = 1
-                    logger.warning(
-                        f"Bulk verification exception for key: {redact_key_for_logging(api_key)}, initializing failure count to 1"
-                    )
-            failed_keys[api_key] = {"error_message": e.args[1], "error_code": e.args[0]}
+            # v2 doesn't track failure counts, so just log the error
+            error_msg = str(e)
+            error_code = 500
+            if hasattr(e, 'args') and len(e.args) > 0:
+                error_code = e.args[0] if isinstance(e.args[0], int) else 500
+                if len(e.args) > 1:
+                    error_msg = e.args[1]
+            logger.warning(
+                f"Bulk verification exception for key: {redact_key_for_logging(api_key)}, error: {error_msg}"
+            )
+            failed_keys[api_key] = {"error_message": error_msg, "error_code": error_code}
             return api_key, "invalid", error_message
 
     tasks = [_verify_single_key(key) for key in keys_to_verify]

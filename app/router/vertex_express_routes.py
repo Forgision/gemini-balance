@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config.config import settings
@@ -24,9 +24,14 @@ security_service = SecurityService()
 model_service = ModelService()
 
 
-async def dep_get_next_working_vertex_key(key_manager: KeyManager = Depends(get_key_manager)):
-    """Get the next available API key."""
-    return await key_manager.get_next_working_vertex_key()
+async def dep_get_next_working_vertex_key(
+    request: Request,
+    key_manager: KeyManager = Depends(get_key_manager)
+):
+    """Get the next available Vertex API key."""
+    # Try to extract model from request if available, otherwise use default
+    model_name = getattr(request.state, "model_name", None) or "gemini-pro"
+    return await key_manager.get_key(model_name, is_vertex_key=True)
 
 
 @router.get("/models")

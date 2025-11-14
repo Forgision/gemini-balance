@@ -8,6 +8,7 @@ import httpx
 
 from app.config.config import settings
 from app.core.constants import DEFAULT_TIMEOUT
+from app.exception.api_exceptions import ApiClientException
 from app.log.logger import get_api_client_logger
 
 logger = get_api_client_logger()
@@ -106,7 +107,7 @@ class GeminiApiClient(ApiClient):
                 logger.error(
                     f"API call failed - Status: {response.status_code}, Content: {error_content}"
                 )
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             response_data = response.json()
 
             # Check the basic information of the response structure
@@ -138,7 +139,7 @@ class GeminiApiClient(ApiClient):
                 if response.status_code != 200:
                     error_content = await response.aread()
                     error_msg = error_content.decode("utf-8")
-                    raise Exception(response.status_code, error_msg)
+                    raise ApiClientException(response.status_code, error_msg)
                 async for line in response.aiter_lines():
                     yield line
 
@@ -162,7 +163,7 @@ class GeminiApiClient(ApiClient):
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
                 error_content = response.text
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             return response.json()
 
     async def embed_content(
@@ -189,7 +190,7 @@ class GeminiApiClient(ApiClient):
                 logger.error(
                     f"Embedding API call failed - Status: {response.status_code}, Content: {error_content}"
                 )
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             return response.json()
 
     async def batch_embed_contents(
@@ -216,7 +217,7 @@ class GeminiApiClient(ApiClient):
                 logger.error(
                     f"Batch embedding API call failed - Status: {response.status_code}, Content: {error_content}"
                 )
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             return response.json()
 
 
@@ -251,7 +252,7 @@ class OpenaiApiClient(ApiClient):
             response = await client.get(url, headers=headers)
             if response.status_code != 200:
                 error_content = response.text
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             return response.json()
 
     async def generate_content(
@@ -275,7 +276,7 @@ class OpenaiApiClient(ApiClient):
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
                 error_content = response.text
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             return response.json()
 
     async def stream_generate_content(
@@ -299,7 +300,7 @@ class OpenaiApiClient(ApiClient):
                 if response.status_code != 200:
                     error_content = await response.aread()
                     error_msg = error_content.decode("utf-8")
-                    raise Exception(response.status_code, error_msg)
+                    raise ApiClientException(response.status_code, error_msg)
                 async for line in response.aiter_lines():
                     yield line
 
@@ -326,7 +327,7 @@ class OpenaiApiClient(ApiClient):
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
                 error_content = response.text
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             return response.json()
 
     async def generate_images(
@@ -348,5 +349,5 @@ class OpenaiApiClient(ApiClient):
             response = await client.post(url, json=payload, headers=headers)
             if response.status_code != 200:
                 error_content = response.text
-                raise Exception(response.status_code, error_content)
+                raise ApiClientException(response.status_code, error_content)
             return response.json()

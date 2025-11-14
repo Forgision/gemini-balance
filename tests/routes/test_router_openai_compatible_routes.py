@@ -66,7 +66,7 @@ def test_chat_completion_success(mock_verify_auth_token, client, mock_key_manage
 
     assert response.status_code == 200
     assert response.json() == mock_chat_response
-    mock_key_manager.get_next_working_key.assert_awaited_once_with(model_name="gemini-pro")
+    mock_key_manager.get_key.assert_awaited_once_with("gemini-pro", is_vertex_key=False)
     mock_create_chat.assert_awaited_once()
 
 def test_chat_completion_image_chat_success(mock_verify_auth_token, client, mock_key_manager, mocker):
@@ -119,7 +119,7 @@ def test_chat_completion_stream_success(mock_verify_auth_token, client, mock_key
     streamed_content = response.text
     expected_content = "data: chunk 1data: chunk 2"
     assert streamed_content == expected_content
-    mock_key_manager.get_next_working_key.assert_awaited_once_with(model_name="gemini-pro")
+    mock_key_manager.get_key.assert_awaited_once_with("gemini-pro", is_vertex_key=False)
     mock_create_chat.assert_awaited_once()
 
 # Tests for image generation
@@ -163,5 +163,5 @@ def test_embedding_success(mock_verify_auth_token, client, mock_key_manager, moc
 
     assert response.status_code == 200
     assert response.json() == mock_embedding_response
-    mock_key_manager.get_next_working_key.assert_awaited_once_with(model_name="text-embedding-ada-002")
+    mock_key_manager.get_key.assert_awaited_once_with(model_name="text-embedding-ada-002", is_vertex_key=False)
     mock_create_embeddings.assert_awaited_once()

@@ -11,8 +11,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 
 from app.config.config import settings
+from app.exception.api_exceptions import ApiClientException
 from app.log.logger import get_gemini_logger
-from app.service.key.key_manager import get_key_manager_instance
+from fastapi import Request
 
 logger = get_gemini_logger()
 
@@ -311,9 +312,11 @@ class ClaudeProxyService:
 
         yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
 
-    async def create_message(self, request: MessagesRequest):
-        key_manager = await get_key_manager_instance()
-        api_key_info = await key_manager.get_next_working_key(model_name=request.model)
+    async def create_message(self, request: MessagesRequest, fastapi_request: Optional[Request] = None):
+        if not fastapi_request or not hasattr(fastapi_request.app.state, "key_manager"):
+            raise RuntimeError("KeyManager not initialized. Request object required.")
+        key_manager = fastapi_request.app.state.key_manager
+        api_key_info = await key_manager.get_key(model_name=request.model, is_vertex_key=False)
 
         if not api_key_info:
             raise HTTPException(status_code=429, detail="All API keys are currently exhausted.")
@@ -333,5 +336,13 @@ class ClaudeProxyService:
                 return self._convert_litellm_to_anthropic(litellm_response, request)
         except Exception as e:
             logger.error(f"Error calling litellm: {e}", exc_info=True)
-            await key_manager.handle_api_failure(api_key=api_key_info, model_name=request.model, retries=0) # type: ignore
+            # Extract status_code from exception (default to 500)
+            status_code = 500
+            if isinstance(e, ApiClientException):
+                status_code = e.status_code
+            elif hasattr(e, 'args') and len(e.args) > 0 and isinstance(e.args[0], int):
+                status_code = e.args[0]
+            await key_manager.handle_api_failure(
+                api_key=api_key_info, model_name=request.model, retries=0, status_code=status_code
+            ) # type: ignore
             raise HTTPException(status_code=500, detail=str(e))

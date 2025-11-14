@@ -16,6 +16,7 @@ from app.database.services import (
     update_usage_stats,
 )
 from app.domain.gemini_models import GeminiRequest
+from app.exception.api_exceptions import ApiClientException
 from app.handler.response_handler import GeminiResponseHandler
 from app.handler.stream_optimizer import gemini_optimizer
 from app.log.logger import get_gemini_logger
@@ -530,10 +531,18 @@ class GeminiChatService:
             except Exception as e:
                 retries += 1
                 is_success = False
-                status_code = e.args[0] if e.args else 500
+                # Extract status_code from exception
+                if isinstance(e, ApiClientException):
+                    status_code = e.status_code
+                    error_log_msg = e.message
+                elif hasattr(e, 'args'):
+                    status_code = e.args[0] if len(e.args) > 0 and isinstance(e.args[0], int) else 500
+                    error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
+                else:
+                    status_code = 500
+                    error_log_msg = str(e)
                 if status_code == 429:
                     await set_key_exhausted_status(current_attempt_key, model, True)
-                error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
                 logger.warning(
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
                 )
@@ -551,7 +560,7 @@ class GeminiChatService:
                 )
 
                 api_key = await self.key_manager.handle_api_failure(
-                    current_attempt_key, model, retries
+                    current_attempt_key, model, retries, status_code=status_code
                 )
                 if api_key:
                     logger.info(

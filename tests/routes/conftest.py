@@ -52,6 +52,43 @@ def route_db_engine(monkeypatch_session):
 
 
 @pytest.fixture(scope="session")
+def route_async_db_engine(monkeypatch_session):
+    """
+    Session-scoped fixture to set up and tear down an in-memory async SQLite database.
+    Used for the UsageMatrix table in KeyManager.
+    """
+    import asyncio
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import StaticPool
+    
+    # Patch the async database URL to use in-memory database
+    monkeypatch_session.setattr(settings, "KEY_MATRIX_DB_URL", "sqlite+aiosqlite:///:memory:")
+    
+    # Reload the key_manager module to apply the new settings
+    from app.service.key import key_manager
+    importlib.reload(key_manager)
+    
+    # Import the engine and Base after reload
+    from app.service.key.key_manager import engine, Base
+    
+    # Create tables in the async database
+    async def create_tables():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    
+    # Run the async table creation
+    asyncio.run(create_tables())
+    
+    yield engine
+    
+    # Cleanup: dispose of the engine
+    async def dispose_engine():
+        await engine.dispose(close=True)
+    
+    asyncio.run(dispose_engine())
+
+
+@pytest.fixture(scope="session")
 def route_mock_key_manager():
     """
     Session-scoped mock KeyManager for route tests.
@@ -63,6 +100,7 @@ def route_mock_key_manager():
     mock.get_random_valid_key = AsyncMock(return_value="test_api_key")
     mock.get_next_working_key = AsyncMock(return_value="test_api_key_for_model")
     mock.get_paid_key = AsyncMock(return_value="test_paid_api_key")
+    mock.get_key = AsyncMock(return_value="test_api_key_for_model")
     mock.get_all_keys_with_fail_count = AsyncMock(return_value={"valid_keys": {}, "invalid_keys": {}})
     mock.handle_api_failure = AsyncMock(return_value=None)
     return mock
@@ -113,12 +151,55 @@ def route_mock_embedding_service():
     return mock
 
 
+@pytest.fixture(scope="session")
+def route_mock_config_service():
+    """
+    Session-scoped mock ConfigService for route tests.
+    Provides better performance by sharing the mock across route tests.
+    """
+    from unittest.mock import MagicMock, AsyncMock
+    
+    mock = MagicMock()
+    mock.get_config = AsyncMock(return_value={"LOG_LEVEL": "INFO", "API_KEYS": []})
+    mock.update_config = AsyncMock(return_value={"status": "updated"})
+    mock.reset_config = AsyncMock(return_value={"status": "reset"})
+    mock.delete_key = AsyncMock(return_value={"success": True})
+    mock.delete_selected_keys = AsyncMock(return_value={"success": True, "deleted_count": 0})
+    mock.fetch_ui_models = AsyncMock(return_value={"models": []})
+    return mock
+
+
+@pytest.fixture(scope="session")
+def route_mock_proxy_check_service():
+    """
+    Session-scoped mock ProxyCheckService for route tests.
+    Provides better performance by sharing the mock across route tests.
+    """
+    from unittest.mock import MagicMock, AsyncMock
+    import time
+    
+    mock = MagicMock()
+    mock.check_single_proxy = AsyncMock(return_value={
+        "proxy": "proxy1",
+        "is_available": True,
+        "response_time": 0.5,
+        "error_message": None,
+        "checked_at": time.time(),
+    })
+    mock.check_multiple_proxies = AsyncMock(return_value=[])
+    mock.get_cache_stats = MagicMock(return_value={"hits": 0, "misses": 0})
+    mock.clear_cache = MagicMock(return_value=None)
+    return mock
+
+
 @pytest.fixture(scope="function", autouse=True)
 def reset_route_mocks(
     route_mock_key_manager,
     route_mock_error_log_service,
     route_mock_chat_service,
     route_mock_embedding_service,
+    route_mock_config_service,
+    route_mock_proxy_check_service,
 ):
     """
     Function-scoped fixture to reset route mocks between tests.
@@ -129,6 +210,7 @@ def reset_route_mocks(
     route_mock_key_manager.get_random_valid_key.return_value = "test_api_key"
     route_mock_key_manager.get_next_working_key.return_value = "test_api_key_for_model"
     route_mock_key_manager.get_paid_key.return_value = "test_paid_api_key"
+    route_mock_key_manager.get_key.return_value = "test_api_key_for_model"
     route_mock_key_manager.get_all_keys_with_fail_count.return_value = {"valid_keys": {}, "invalid_keys": {}}
     route_mock_key_manager.handle_api_failure.return_value = None
     
@@ -149,6 +231,29 @@ def reset_route_mocks(
     # Reset embedding_service mock
     route_mock_embedding_service.reset_mock()
     route_mock_embedding_service.embed_content.return_value = {"embedding": {"values": [0.1, 0.2, 0.3]}}
+    
+    # Reset config_service mock
+    route_mock_config_service.reset_mock()
+    route_mock_config_service.get_config.return_value = {"LOG_LEVEL": "INFO", "API_KEYS": []}
+    route_mock_config_service.update_config.return_value = {"status": "updated"}
+    route_mock_config_service.reset_config.return_value = {"status": "reset"}
+    route_mock_config_service.delete_key.return_value = {"success": True}
+    route_mock_config_service.delete_selected_keys.return_value = {"success": True, "deleted_count": 0}
+    route_mock_config_service.fetch_ui_models.return_value = {"models": []}
+    
+    # Reset proxy_check_service mock
+    route_mock_proxy_check_service.reset_mock()
+    import time
+    route_mock_proxy_check_service.check_single_proxy.return_value = {
+        "proxy": "proxy1",
+        "is_available": True,
+        "response_time": 0.5,
+        "error_message": None,
+        "checked_at": time.time(),
+    }
+    route_mock_proxy_check_service.check_multiple_proxies.return_value = []
+    route_mock_proxy_check_service.get_cache_stats.return_value = {"hits": 0, "misses": 0}
+    route_mock_proxy_check_service.clear_cache.return_value = None
 
 
 @pytest.fixture(scope="function")
@@ -156,14 +261,17 @@ def route_test_app(
     route_mock_key_manager,
     route_mock_error_log_service,
     route_db_engine,  # Use route-specific db_engine
+    route_async_db_engine,  # Use route-specific async db_engine for KeyManager
     route_mock_chat_service,
     route_mock_embedding_service,
+    route_mock_config_service,
+    route_mock_proxy_check_service,
 ):
     """
     Function-scoped fixture to create a test app for route tests.
     Each test gets a fresh app instance to avoid state leakage.
     """
-    # route_db_engine fixture already sets up the test database
+    # route_db_engine and route_async_db_engine fixtures already set up the test databases
     app = create_app()
 
     # Store original overrides to restore them
@@ -200,6 +308,23 @@ def route_test_app(
     app.dependency_overrides[
         gemini_routes.get_embedding_service
     ] = override_get_embedding_service
+
+    # Add ConfigService dependency override
+    from app.dependencies import get_config_service
+    from app.router import config_routes
+    
+    def override_get_config_service():
+        return route_mock_config_service
+
+    app.dependency_overrides[get_config_service] = override_get_config_service
+
+    # Add ProxyCheckService dependency override
+    from app.service.proxy.proxy_check_service import get_proxy_check_service
+    
+    def override_get_proxy_check_service():
+        return route_mock_proxy_check_service
+
+    app.dependency_overrides[get_proxy_check_service] = override_get_proxy_check_service
 
     async def mock_security_dependency():
         pass

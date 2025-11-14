@@ -6,8 +6,11 @@ def test_get_keys_paginated_success(mock_verify_auth_token, client, mock_key_man
         mock_key_manager.get_all_keys_with_fail_count,
         "return_value",
         {
-            "valid_keys": {"test_key_1": 0, "test_key_2": 1},
-            "invalid_keys": {"test_key_3": 10},
+            "valid_keys": {
+                "test_key_1": {"status": "active", "exhausted": False},
+                "test_key_2": {"status": "active", "exhausted": False},
+            },
+            "invalid_keys": {"test_key_3": {"status": "inactive", "exhausted": False}},
         },
     )
 
@@ -34,8 +37,8 @@ def test_get_keys_paginated_unauthorized(client, mock_key_manager):
 def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, client, mock_key_manager):
     """Test filtering keys by status (valid/invalid)."""
     mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
-        "valid_keys": {"valid_key": 0},
-        "invalid_keys": {"invalid_key": 5},
+        "valid_keys": {"valid_key": {"status": "active", "exhausted": False}},
+        "invalid_keys": {"invalid_key": {"status": "inactive", "exhausted": False}},
     }
 
     # Test 'valid' status
@@ -64,7 +67,10 @@ def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, client, moc
 def test_get_keys_paginated_search(mock_verify_auth_token, client, mock_key_manager):
     """Test searching for a specific key."""
     mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
-        "valid_keys": {"search_target_key": 0, "another_key": 1},
+        "valid_keys": {
+            "search_target_key": {"status": "active", "exhausted": False},
+            "another_key": {"status": "active", "exhausted": False},
+        },
         "invalid_keys": {},
     }
 
@@ -83,12 +89,14 @@ def test_get_keys_paginated_search(mock_verify_auth_token, client, mock_key_mana
 def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, client, mock_key_manager):
     """Test filtering by fail count threshold."""
     mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
-        "valid_keys": {"key_low_fail": 1},
-        "invalid_keys": {"key_high_fail": 15},
+        "valid_keys": {"key_low_fail": {"status": "active", "exhausted": False}},
+        "invalid_keys": {"key_high_fail": {"status": "inactive", "exhausted": False}},
     }
 
+    # In v2, status "active" maps to fail_count=0, "inactive" maps to fail_count=1
+    # So threshold=1 should only return inactive keys
     response = client.get(
-        "/api/keys?fail_count_threshold=10",
+        "/api/keys?fail_count_threshold=1",
         cookies={"auth_token": "test_auth_token"},
     )
 
@@ -101,7 +109,7 @@ def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, client,
 
 def test_get_keys_paginated_pagination(mock_verify_auth_token, client, mock_key_manager):
     """Test the pagination logic."""
-    keys = {f"key_{i}": i for i in range(20)}
+    keys = {f"key_{i}": {"status": "active", "exhausted": False} for i in range(20)}
     mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": keys,
         "invalid_keys": {},
@@ -130,8 +138,11 @@ def test_get_keys_paginated_pagination(mock_verify_auth_token, client, mock_key_
 def test_get_all_keys_success(mock_verify_auth_token, client, mock_key_manager):
     """Test successful retrieval of all keys for bulk operations."""
     mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
-        "valid_keys": {"valid_1": 0, "valid_2": 1},
-        "invalid_keys": {"invalid_1": 10},
+        "valid_keys": {
+            "valid_1": {"status": "active", "exhausted": False},
+            "valid_2": {"status": "active", "exhausted": False},
+        },
+        "invalid_keys": {"invalid_1": {"status": "inactive", "exhausted": False}},
     }
 
     response = client.get(

@@ -6,7 +6,13 @@ from app.log.logger import Logger
 from app.service.chat.gemini_chat_service import GeminiChatService
 from app.service.error_log.error_log_service import delete_old_error_logs
 from app.service.files.files_service import get_files_service
-from app.service.key.key_manager import get_key_manager_instance
+# App reference will be set when scheduler starts
+_app_reference = None
+
+def set_app_reference(app):
+    """Set app reference for scheduled tasks."""
+    global _app_reference
+    _app_reference = app
 from app.service.request_log.request_log_service import delete_old_request_logs_task
 from app.utils.helpers import redact_key_for_logging
 
@@ -20,9 +26,13 @@ async def check_failed_keys():
     """
     logger.info("Starting scheduled check for failed API keys...")
     try:
-        key_manager = await get_key_manager_instance()
+        global _app_reference
+        if not _app_reference or not hasattr(_app_reference.state, "key_manager"):
+            logger.warning("App reference not available. Skipping check.")
+            return
+        key_manager = _app_reference.state.key_manager
         # Ensure KeyManager is initialized
-        if not key_manager or not hasattr(key_manager, "key_failure_counts"):
+        if not key_manager or not hasattr(key_manager, "reset_key_failure_count"):
             logger.warning(
                 "KeyManager instance not available or not initialized. Skipping check."
             )
@@ -32,26 +42,19 @@ async def check_failed_keys():
         # Note: An instance is created directly here, not through dependency injection, as this is a background task
         chat_service = GeminiChatService(settings.BASE_URL, key_manager)
 
-        # Get the list of keys to check (failure count > 0)
-        keys_to_check = []
-        async with (
-            key_manager.failure_count_lock
-        ):  # Accessing shared data requires a lock
-            # Make a copy to avoid modifying the dictionary while iterating
-            failure_counts_copy = key_manager.key_failure_counts.copy()
-            keys_to_check = [
-                key for key, count in failure_counts_copy.items() if count > 0
-            ]  # Check all keys with a failure count greater than 0
-
-        if not keys_to_check:
-            logger.info("No keys with failure count > 0 found. Skipping verification.")
+        # Get all keys and verify them (v2 uses reset_key_failure_count for manual reactivation)
+        # Note: v2 doesn't track failure counts, so we'll verify all keys and reactivate failed ones
+        # For v2 compatibility, we'll just verify keys using get_keys_by_status
+        keys_status = await key_manager.get_keys_by_status()
+        invalid_keys = list(keys_status.get("invalid_keys", {}).keys())
+        
+        if not invalid_keys:
+            logger.info("No invalid keys found. Skipping verification.")
             return
 
-        logger.info(
-            f"Found {len(keys_to_check)} keys with failure count > 0 to verify."
-        )
+        logger.info(f"Found {len(invalid_keys)} invalid keys to verify.")
 
-        for key in keys_to_check:
+        for key in invalid_keys:
             # Redact part of the key for logging
             log_key = redact_key_for_logging(key)
             logger.info(f"Verifying key: {log_key}...")
@@ -69,29 +72,13 @@ async def check_failed_keys():
                     settings.TEST_MODEL, gemini_request, key
                 )
                 logger.info(
-                    f"Key {log_key} verification successful. Resetting failure count."
+                    f"Key {log_key} verification successful. Reactivating key."
                 )
                 await key_manager.reset_key_failure_count(key)
             except Exception as e:
                 logger.warning(
-                    f"Key {log_key} verification failed: {str(e)}. Incrementing failure count."
+                    f"Key {log_key} verification failed: {str(e)}."
                 )
-                # Operate the counter directly, requiring a lock
-                async with key_manager.failure_count_lock:
-                    # Re-check if the key exists and the failure count has not reached the upper limit
-                    if (
-                        key in key_manager.key_failure_counts
-                        and key_manager.key_failure_counts[key]
-                        < key_manager.MAX_FAILURES
-                    ):
-                        key_manager.key_failure_counts[key] += 1
-                        logger.info(
-                            f"Failure count for key {log_key} incremented to {key_manager.key_failure_counts[key]}."
-                        )
-                    elif key in key_manager.key_failure_counts:
-                        logger.warning(
-                            f"Key {log_key} reached MAX_FAILURES ({key_manager.MAX_FAILURES}). Not incrementing further."
-                        )
 
     except Exception as e:
         logger.error(

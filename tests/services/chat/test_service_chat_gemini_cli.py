@@ -43,7 +43,7 @@ def mock_auth_data():
         "access_token": "test_access_token",
         "refresh_token": "test_refresh_token",
         "token_type": "Bearer",
-        "expiry_date": (datetime.now() - timedelta(hours=1)).isoformat(),
+        "expiry_date": (datetime.now() + timedelta(hours=1)).isoformat(),
     }
     
     
@@ -89,16 +89,18 @@ def test_load_credentials_invalid_json(service):
             service.load_credentials("dummy_path.json")
 
 
-def test_load_authorization_success(service, mock_auth_data, mock_credentials_data):
+@patch("google.oauth2.credentials.Credentials.refresh", return_value=None)
+def test_load_authorization_success(mock_refresh, service, mock_auth_data, mock_credentials_data):
     """Test successful loading of authorization."""
     service.OAUTH_CLIENT_ID = mock_credentials_data["web"]["client_id"]
     service.OAUTH_CLIENT_SECRET = mock_credentials_data["web"]["client_secret"]
     m = mock_open(read_data=json.dumps(mock_auth_data))
     with patch("builtins.open", m), patch("os.path.exists", return_value=True):
-        auth = service.load_authorization("dummy_auth.json")
-        assert isinstance(auth, GeminiCLIAuthorization)
-        assert service.authorization is not None
-        assert service.authorization.token == "test_access_token"
+        with patch.object(service, "_save_authorization") as mock_save:
+            auth = service.load_authorization("dummy_auth.json")
+            assert isinstance(auth, GeminiCLIAuthorization)
+            assert service.authorization is not None
+            assert service.authorization.token == "test_access_token"
 
 
 def test_load_authorization_file_not_found(service):

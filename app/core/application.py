@@ -12,8 +12,8 @@ from app.exception.exceptions import setup_exception_handlers
 from app.log.logger import get_application_logger, setup_access_logging
 from app.middleware.middleware import setup_middlewares
 from app.router.routes import setup_routers
-from app.scheduler.scheduled_tasks import start_scheduler, stop_scheduler
-from app.service.key.key_manager import get_key_manager_instance
+from app.scheduler.scheduled_tasks import start_scheduler, stop_scheduler, set_app_reference
+from app.service.key.key_manager import KeyManager, AsyncSessionLocal
 from app.service.update.update_service import check_for_updates
 from app.utils.helpers import get_current_version
 
@@ -37,24 +37,39 @@ def update_template_globals(app: FastAPI, update_info: dict):
 
 
 # --- Helper functions for lifespan ---
-async def _setup_database_and_config(app_settings):
+async def _setup_database_and_config(app: FastAPI, app_settings):
     """Initializes database, syncs settings, and initializes KeyManager."""
     initialize_database()
     logger.info("Database initialized successfully")
     await connect_to_db()
     await sync_initial_settings()
-    await get_key_manager_instance(app_settings.API_KEYS, app_settings.VERTEX_API_KEYS)
+    
+    # Create KeyManager instance
+    key_manager = KeyManager(
+        api_keys=app_settings.API_KEYS,
+        vertex_api_keys=app_settings.VERTEX_API_KEYS,
+        async_session_maker=AsyncSessionLocal,
+    )
+    
+    # Initialize
+    await key_manager.init()
+    
+    # Store in app.state
+    app.state.key_manager = key_manager
     logger.info("Database, config sync, and KeyManager initialized successfully")
 
 
-async def _shutdown_database():
-    """Disconnects from the database."""
+async def _shutdown_database(app: FastAPI):
+    """Disconnects from the database and shuts down KeyManager."""
+    if hasattr(app.state, "key_manager") and app.state.key_manager:
+        await app.state.key_manager.shutdown()
     await disconnect_from_db()
 
 
-def _start_scheduler():
+def _start_scheduler(app: FastAPI):
     """Starts the background scheduler."""
     try:
+        set_app_reference(app)
         start_scheduler()
         logger.info("Scheduler started successfully.")
     except Exception as e:
@@ -94,9 +109,9 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Application starting up...")
     try:
-        await _setup_database_and_config(settings)
+        await _setup_database_and_config(app, settings)
         await _perform_update_check(app)
-        _start_scheduler()
+        _start_scheduler(app)
 
     except Exception as e:
         logger.critical(
@@ -107,7 +122,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("Application shutting down...")
     _stop_scheduler()
-    await _shutdown_database()
+    await _shutdown_database(app)
 
 
 def create_app() -> FastAPI:

@@ -164,7 +164,7 @@ def test_reset_all_key_fail_counts_success(mock_verify_auth_token, client):
     try:
         mock_key_manager = MagicMock()
         mock_key_manager.get_keys_by_status = AsyncMock(return_value={"valid_keys": {}, "invalid_keys": {}})
-        mock_key_manager.reset_failure_counts = AsyncMock(return_value=None)
+        mock_key_manager.reset_key_failure_count = AsyncMock(return_value=True)
 
         async def override_get_key_manager():
             return mock_key_manager
@@ -173,7 +173,11 @@ def test_reset_all_key_fail_counts_success(mock_verify_auth_token, client):
 
         response = client.post("/gemini/v1beta/reset-all-fail-counts")
         assert response.status_code == 200
-        assert response.json() == {"success": True, "message": "Failure count for all keys has been reset."}
+        assert response.json() == {
+            "success": True,
+            "message": "Failure count for all keys has been reset.",
+            "reset_count": 0
+        }
     finally:
         # clean up
         client.app.dependency_overrides = original_overrides

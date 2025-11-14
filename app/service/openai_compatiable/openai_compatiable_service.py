@@ -8,6 +8,7 @@ from app.database.services import (
     add_request_log,
 )
 from app.domain.openai_models import ChatRequest, ImageGenerationRequest
+from app.exception.api_exceptions import ApiClientException
 from app.log.logger import get_openai_compatible_logger
 from app.service.client.api_client import OpenaiApiClient
 from app.service.key.key_manager import KeyManager
@@ -141,8 +142,16 @@ class OpenAICompatiableService:
             except Exception as e:
                 retries += 1
                 is_success = False
-                status_code = e.args[0]
-                error_log_msg = e.args[1]
+                # Extract status_code from exception
+                if isinstance(e, ApiClientException):
+                    status_code = e.status_code
+                    error_log_msg = e.message
+                elif hasattr(e, 'args'):
+                    status_code = e.args[0] if len(e.args) > 0 and isinstance(e.args[0], int) else 500
+                    error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
+                else:
+                    status_code = 500
+                    error_log_msg = str(e)
                 logger.warning(
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
                 )
@@ -161,7 +170,7 @@ class OpenAICompatiableService:
 
                 if self.key_manager:
                     api_key = await self.key_manager.handle_api_failure(
-                        current_attempt_key, model, retries
+                        current_attempt_key, model, retries, status_code=status_code
                     )
                     if api_key:
                         logger.info(

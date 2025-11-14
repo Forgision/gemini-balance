@@ -82,6 +82,7 @@ async def upload_file_init(
             body=body,
             user_token=user_token,
             request_host=request_host,  # Pass the request host
+            request=request,  # Pass request for app.state access
         )
 
         logger.info(f"Upload initialization response: {response_data}")

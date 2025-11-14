@@ -16,10 +16,8 @@ from app.database.connection import database
 from app.database.models import Settings
 from app.database.services import get_all_settings
 from app.log.logger import get_config_routes_logger
-from app.service.key.key_manager import (
-    get_key_manager_instance,
-    reset_key_manager_instance,
-)
+from app.service.key.key_manager import KeyManager, AsyncSessionLocal
+from fastapi import FastAPI
 from app.service.model.model_service import ModelService
 
 logger = get_config_routes_logger()
@@ -33,7 +31,7 @@ class ConfigService:
         return settings.model_dump()
 
     @staticmethod
-    async def update_config(config_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_config(config_data: Dict[str, Any], app: FastAPI) -> Dict[str, Any]:
         for key, value in config_data.items():
             if hasattr(settings, key):
                 setattr(settings, key, value)
@@ -114,16 +112,26 @@ class ConfigService:
 
         # Reset and reinitialize KeyManager
         try:
-            await reset_key_manager_instance()
-            await get_key_manager_instance(settings.API_KEYS, settings.VERTEX_API_KEYS)
+            if hasattr(app.state, "key_manager") and app.state.key_manager:
+                await app.state.key_manager.shutdown()
+            
+            # Create new instance
+            key_manager = KeyManager(
+                api_keys=settings.API_KEYS,
+                vertex_api_keys=settings.VERTEX_API_KEYS,
+                async_session_maker=AsyncSessionLocal,
+            )
+            await key_manager.init()
+            app.state.key_manager = key_manager
             logger.info("KeyManager instance re-initialized with updated settings.")
         except Exception as e:
             logger.error(f"Failed to re-initialize KeyManager: {str(e)}")
+            raise
 
         return await ConfigService.get_config()
 
     @staticmethod
-    async def delete_key(key_to_delete: str) -> Dict[str, Any]:
+    async def delete_key(key_to_delete: str, app: FastAPI) -> Dict[str, Any]:
         """Delete a single API key"""
         # Ensure settings.API_KEYS is a list
         if not isinstance(settings.API_KEYS, list):
@@ -137,7 +145,7 @@ class ConfigService:
             # The key was found and removed from the list
             settings.API_KEYS = updated_api_keys  # First, update the settings in memory
             # Use update_config to persist the changes, it handles both the database and KeyManager
-            await ConfigService.update_config({"API_KEYS": settings.API_KEYS})
+            await ConfigService.update_config({"API_KEYS": settings.API_KEYS}, app)
             logger.info(f"Key '{key_to_delete}' has been successfully deleted.")
             return {
                 "success": True,
@@ -151,7 +159,7 @@ class ConfigService:
             return {"success": False, "message": f"Key '{key_to_delete}' not found."}
 
     @staticmethod
-    async def delete_selected_keys(keys_to_delete: List[str]) -> Dict[str, Any]:
+    async def delete_selected_keys(keys_to_delete: List[str], app: FastAPI) -> Dict[str, Any]:
         """Bulk delete selected API keys"""
         if not isinstance(settings.API_KEYS, list):
             settings.API_KEYS = []
@@ -172,7 +180,7 @@ class ConfigService:
 
         if deleted_count > 0:
             settings.API_KEYS = current_api_keys
-            await ConfigService.update_config({"API_KEYS": settings.API_KEYS})
+            await ConfigService.update_config({"API_KEYS": settings.API_KEYS}, app)
             logger.info(
                 f"Successfully deleted {deleted_count} keys. Keys: {keys_actually_removed}"
             )
@@ -200,7 +208,7 @@ class ConfigService:
             }
 
     @staticmethod
-    async def reset_config() -> Dict[str, Any]:
+    async def reset_config(app: FastAPI) -> Dict[str, Any]:
         """
         Reset the configuration: load from system environment variables first, then from the .env file,
         update the in-memory settings object, and refresh the KeyManager.
@@ -216,25 +224,32 @@ class ConfigService:
 
         # 2. Reset and reinitialize KeyManager
         try:
-            await reset_key_manager_instance()
-            # Ensure to use the API_KEYS from the updated settings
-            await get_key_manager_instance(settings.API_KEYS)
+            if hasattr(app.state, "key_manager") and app.state.key_manager:
+                await app.state.key_manager.shutdown()
+            
+            # Create new instance
+            key_manager = KeyManager(
+                api_keys=settings.API_KEYS,
+                vertex_api_keys=settings.VERTEX_API_KEYS,
+                async_session_maker=AsyncSessionLocal,
+            )
+            await key_manager.init()
+            app.state.key_manager = key_manager
             logger.info("KeyManager instance re-initialized with reloaded settings.")
         except Exception as e:
             logger.error(f"Failed to re-initialize KeyManager during reset: {str(e)}")
-            # Decide whether to raise an exception or continue based on requirements
-            # Here, we choose to log the error and continue
+            raise
 
         # 3. Return the updated configuration
         return await ConfigService.get_config()
 
     @staticmethod
-    async def fetch_ui_models() -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+    async def fetch_ui_models(app: FastAPI) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """Get the list of models for UI display"""
         try:
-            key_manager = await get_key_manager_instance(
-                settings.API_KEYS, settings.VERTEX_API_KEYS
-            )
+            if not hasattr(app.state, "key_manager"):
+                raise RuntimeError("KeyManager not initialized.")
+            key_manager = app.state.key_manager
             model_service = ModelService()
 
             api_key = await key_manager.get_random_valid_key()

@@ -565,6 +565,15 @@ class KeyManager:
                 self.is_ready = True
             logger.info("KeyManager is ready.")
             return True
+        except ValueError as e:
+            # Handle specific case: no API keys found - return False instead of raising
+            if "No api keys found" in str(e):
+                logger.warning("KeyManager initialization failed: No API keys found")
+                self.is_ready = False
+                return False
+            # For other ValueError cases, log and raise
+            logger.exception("KeyManager initialization is failed")
+            raise RuntimeError(f"KeyManager initialization failed: {e}") from e
         except Exception as e:
             logger.exception("KeyManager initialization is failed")
             # Raise exception instead of returning False
@@ -646,8 +655,7 @@ class KeyManager:
 
             # Check data is not empty
             if candidates.empty:
-                logger.warning(f"No available keys for model {model_name}, falling back to cycle.")
-                return await self.get_next_key(is_vertex_key=is_vertex_key)
+                raise Exception(f"No available keys for model {model_name}")
 
             # Sort by tpm_left descending
             candidates.sort_values(by=["tpm_left"], ascending=False, inplace=True)
@@ -752,9 +760,6 @@ class KeyManager:
                             self.df.index.get_level_values("api_key") == key_value,
                             "is_active",
                         ] = False
-                    elif error_type == "429":
-                        # Then set exhausted flag for this specific model (after _set_exhausted_flags)
-                        self.df.loc[idx, "is_exhausted"] = True
                     updated = True
                     
         except KeyError:
@@ -768,6 +773,10 @@ class KeyManager:
         
         if updated:
             await self._on_update_usage()
+            # Set exhausted flag for 429 errors AFTER _on_update_usage() to preserve it
+            if error and error_type == "429":
+                async with self.lock:
+                    self.df.loc[idx, "is_exhausted"] = True
         return True
 
     async def reset_usage(self) -> bool:

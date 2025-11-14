@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock, ANY
 import pytest
 import time
 from app.core.application import create_app
@@ -33,10 +33,9 @@ def test_get_config_unauthorized(mock_router_auth, mock_middleware_auth, client)
     assert response.status_code == 401
 
 
-@patch("app.service.config.config_service.ConfigService.update_config")
-def test_update_config_success(mock_update_config, mock_verify_auth_token, client):
+def test_update_config_success(mock_verify_auth_token, client, route_mock_config_service):
     """Test successful update of configuration."""
-    mock_update_config.return_value = {"status": "updated"}
+    route_mock_config_service.update_config.return_value = {"status": "updated"}
 
     with patch("app.log.logger.Logger.update_log_levels") as mock_update_logs:
         response = client.put(
@@ -47,7 +46,7 @@ def test_update_config_success(mock_update_config, mock_verify_auth_token, clien
 
     assert response.status_code == 200
     assert response.json() == {"status": "updated"}
-    mock_update_config.assert_called_once_with({"LOG_LEVEL": "DEBUG"})
+    route_mock_config_service.update_config.assert_called_once_with({"LOG_LEVEL": "DEBUG"}, ANY)
     mock_update_logs.assert_called_once_with("DEBUG")
 
 
@@ -65,10 +64,9 @@ def test_update_config_unauthorized(mock_router_auth, mock_middleware_auth, clie
     assert response.status_code == 401
 
 
-@patch("app.service.config.config_service.ConfigService.update_config")
-def test_update_config_error(mock_update_config, mock_verify_auth_token, client):
+def test_update_config_error(mock_verify_auth_token, client, route_mock_config_service):
     """Test error handling when config update fails."""
-    mock_update_config.side_effect = Exception("Update failed")
+    route_mock_config_service.update_config.side_effect = Exception("Update failed")
 
     response = client.put(
         "/api/config",
@@ -80,10 +78,9 @@ def test_update_config_error(mock_update_config, mock_verify_auth_token, client)
     assert "Update failed" in response.text
 
 
-@patch("app.service.config.config_service.ConfigService.reset_config")
-def test_reset_config_success(mock_reset_config, mock_verify_auth_token, client):
+def test_reset_config_success(mock_verify_auth_token, client, route_mock_config_service):
     """Test successful reset of configuration."""
-    mock_reset_config.return_value = {"status": "reset"}
+    route_mock_config_service.reset_config.return_value = {"status": "reset"}
 
     response = client.post(
         "/api/config/reset",
@@ -92,7 +89,7 @@ def test_reset_config_success(mock_reset_config, mock_verify_auth_token, client)
 
     assert response.status_code == 200
     assert response.json() == {"status": "reset"}
-    mock_reset_config.assert_called_once()
+    route_mock_config_service.reset_config.assert_called_once()
 
 
 @pytest.mark.no_mock_auth
@@ -108,10 +105,9 @@ def test_reset_config_unauthorized(mock_router_auth, mock_middleware_auth, clien
     assert response.status_code == 401
 
 
-@patch("app.service.config.config_service.ConfigService.reset_config")
-def test_reset_config_error(mock_reset_config, mock_verify_auth_token, client):
+def test_reset_config_error(mock_verify_auth_token, client, route_mock_config_service):
     """Test error handling during config reset."""
-    mock_reset_config.side_effect = Exception("Reset failed")
+    route_mock_config_service.reset_config.side_effect = Exception("Reset failed")
 
     response = client.post(
         "/api/config/reset",
@@ -123,10 +119,9 @@ def test_reset_config_error(mock_reset_config, mock_verify_auth_token, client):
 
 
 # Tests for key deletion
-@patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_success(mock_delete_key, mock_verify_auth_token, client):
+def test_delete_single_key_success(mock_verify_auth_token, client, route_mock_config_service):
     """Test successful deletion of a single key."""
-    mock_delete_key.return_value = {"success": True}
+    route_mock_config_service.delete_key.return_value = {"success": True}
 
     response = client.delete(
         "/api/config/keys/test_key",
@@ -135,7 +130,7 @@ def test_delete_single_key_success(mock_delete_key, mock_verify_auth_token, clie
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
-    mock_delete_key.assert_called_once_with("test_key")
+    route_mock_config_service.delete_key.assert_called_once_with("test_key", ANY)
 
 
 @pytest.mark.no_mock_auth
@@ -151,10 +146,9 @@ def test_delete_single_key_unauthorized(mock_router_auth, mock_middleware_auth, 
     assert response.status_code == 401
 
 
-@patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_not_found(mock_delete_key, mock_verify_auth_token, client):
+def test_delete_single_key_not_found(mock_verify_auth_token, client, route_mock_config_service):
     """Test deleting a key that is not found."""
-    mock_delete_key.return_value = {"success": False, "message": "Key not found"}
+    route_mock_config_service.delete_key.return_value = {"success": False, "message": "Key not found"}
 
     response = client.delete(
         "/api/config/keys/non_existent_key",
@@ -165,10 +159,9 @@ def test_delete_single_key_not_found(mock_delete_key, mock_verify_auth_token, cl
     assert "Key not found" in response.text
 
 
-@patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_success(mock_delete_selected_keys, mock_verify_auth_token, client):
+def test_delete_selected_keys_success(mock_verify_auth_token, client, route_mock_config_service):
     """Test successful deletion of selected keys."""
-    mock_delete_selected_keys.return_value = {"success": True, "deleted_count": 2}
+    route_mock_config_service.delete_selected_keys.return_value = {"success": True, "deleted_count": 2}
 
     response = client.post(
         "/api/config/keys/delete-selected",
@@ -178,7 +171,7 @@ def test_delete_selected_keys_success(mock_delete_selected_keys, mock_verify_aut
 
     assert response.status_code == 200
     assert response.json() == {"success": True, "deleted_count": 2}
-    mock_delete_selected_keys.assert_called_once_with(["key1", "key2"])
+    route_mock_config_service.delete_selected_keys.assert_called_once_with(["key1", "key2"], ANY)
 
 
 @pytest.mark.no_mock_auth
@@ -195,8 +188,7 @@ def test_delete_selected_keys_unauthorized(mock_router_auth, mock_middleware_aut
     assert response.status_code == 401
 
 
-@patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_no_keys_provided(mock_delete_selected_keys, mock_verify_auth_token, client):
+def test_delete_selected_keys_no_keys_provided(mock_verify_auth_token, client, route_mock_config_service):
     """Test request to delete selected keys with an empty list."""
     response = client.post(
         "/api/config/keys/delete-selected",
@@ -205,7 +197,7 @@ def test_delete_selected_keys_no_keys_provided(mock_delete_selected_keys, mock_v
     )
     assert response.status_code == 400
     assert "No keys provided" in response.text
-    mock_delete_selected_keys.assert_not_called()
+    route_mock_config_service.delete_selected_keys.assert_not_called()
 
 
 # Tests for proxy endpoints
@@ -343,10 +335,9 @@ def test_clear_proxy_cache_unauthorized(mock_router_auth, mock_middleware_auth, 
 
 
 # Tests for UI models endpoint
-@patch("app.service.config.config_service.ConfigService.fetch_ui_models")
-def test_get_ui_models_success(mock_fetch_ui_models, mock_verify_auth_token, client):
+def test_get_ui_models_success(mock_verify_auth_token, client, route_mock_config_service):
     """Test successful retrieval of UI models."""
-    mock_fetch_ui_models.return_value = {"models": ["model1", "model2"]}
+    route_mock_config_service.fetch_ui_models.return_value = {"models": ["model1", "model2"]}
 
     response = client.get(
         "/api/config/ui/models",
@@ -355,7 +346,7 @@ def test_get_ui_models_success(mock_fetch_ui_models, mock_verify_auth_token, cli
 
     assert response.status_code == 200
     assert response.json() == {"models": ["model1", "model2"]}
-    mock_fetch_ui_models.assert_called_once()
+    route_mock_config_service.fetch_ui_models.assert_called_once()
 
 
 @pytest.mark.no_mock_auth
@@ -371,10 +362,9 @@ def test_get_ui_models_unauthorized(mock_router_auth, mock_middleware_auth, clie
     assert response.status_code == 401
 
 
-@patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_error(mock_delete_key, mock_verify_auth_token, client):
+def test_delete_single_key_error(mock_verify_auth_token, client, route_mock_config_service):
     """Test error handling when deleting a single key fails."""
-    mock_delete_key.side_effect = Exception("Deletion failed")
+    route_mock_config_service.delete_key.side_effect = Exception("Deletion failed")
 
     response = client.delete(
         "/api/config/keys/test_key",
@@ -385,10 +375,10 @@ def test_delete_single_key_error(mock_delete_key, mock_verify_auth_token, client
     assert "Error deleting key: Deletion failed" in response.text
 
 
-@patch("app.service.config.config_service.ConfigService.delete_key")
-def test_delete_single_key_generic_error(mock_delete_key, mock_verify_auth_token, client):
+def test_delete_single_key_generic_error(mock_verify_auth_token, client, route_mock_config_service):
     """Test error handling when deleting a single key fails with a generic error (not 404)."""
-    mock_delete_key.return_value = {"success": False, "message": "Generic deletion error"}
+    route_mock_config_service.delete_key.side_effect = None
+    route_mock_config_service.delete_key.return_value = {"success": False, "message": "Generic deletion error"}
 
     response = client.delete(
         "/api/config/keys/test_key",
@@ -397,13 +387,12 @@ def test_delete_single_key_generic_error(mock_delete_key, mock_verify_auth_token
 
     assert response.status_code == 400
     assert "Generic deletion error" in response.text
-    mock_delete_key.assert_called_once_with("test_key")
+    route_mock_config_service.delete_key.assert_called_once_with("test_key", ANY)
 
 
-@patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_error(mock_delete_selected_keys, mock_verify_auth_token, client):
+def test_delete_selected_keys_error(mock_verify_auth_token, client, route_mock_config_service):
     """Test error handling when bulk deleting keys fails."""
-    mock_delete_selected_keys.side_effect = Exception("Bulk deletion failed")
+    route_mock_config_service.delete_selected_keys.side_effect = Exception("Bulk deletion failed")
 
     response = client.post(
         "/api/config/keys/delete-selected",
@@ -473,10 +462,9 @@ def test_clear_proxy_cache_error(mock_clear_cache, mock_verify_auth_token, clien
     assert "Clear cache failed: Clear cache error" in response.text
 
 
-@patch("app.service.config.config_service.ConfigService.fetch_ui_models")
-def test_get_ui_models_error(mock_fetch_ui_models, mock_verify_auth_token, client):
+def test_get_ui_models_error(mock_verify_auth_token, client, route_mock_config_service):
     """Test error handling when retrieving UI models fails."""
-    mock_fetch_ui_models.side_effect = Exception("Fetch UI models error")
+    route_mock_config_service.fetch_ui_models.side_effect = Exception("Fetch UI models error")
 
     response = client.get(
         "/api/config/ui/models",
@@ -487,10 +475,10 @@ def test_get_ui_models_error(mock_fetch_ui_models, mock_verify_auth_token, clien
     assert "An unexpected error occurred while fetching UI models: Fetch UI models error" in response.text
 
 
-@patch("app.service.config.config_service.ConfigService.delete_selected_keys")
-def test_delete_selected_keys_partial_failure(mock_delete_selected_keys, mock_verify_auth_token, client):
+def test_delete_selected_keys_partial_failure(mock_verify_auth_token, client, route_mock_config_service):
     """Test partial failure in deleting selected keys."""
-    mock_delete_selected_keys.return_value = {"success": False, "deleted_count": 0, "message": "Some keys not found."}
+    route_mock_config_service.delete_selected_keys.side_effect = None
+    route_mock_config_service.delete_selected_keys.return_value = {"success": False, "deleted_count": 0, "message": "Some keys not found."}
 
     response = client.post(
         "/api/config/keys/delete-selected",

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config.config import settings
@@ -32,9 +32,15 @@ tts_service = TTSService()
 
 
 async def get_next_working_key_wrapper(
+    request: Request,
     key_manager: KeyManager = Depends(get_key_manager),
 ):
-    return await key_manager.get_next_working_key(model_name="gemini-pro")
+    """Get the next available API key, extracting model from request if possible."""
+    # Try to get model from request body/query params
+    # For now, use default - model will be extracted in the route handler
+    model_name = "gemini-pro"  # Default
+    # Could parse request body if needed, but model is usually in request.model
+    return await key_manager.get_key(model_name, is_vertex_key=False)
 
 
 async def get_tts_service():
@@ -167,7 +173,7 @@ async def embedding(
     operation_name = "embedding"
     async with handle_route_errors(logger, operation_name):
         logger.info(f"Handling embedding request for model: {request.model}")
-        api_key = await key_manager.get_next_working_key(model_name=request.model)
+        api_key = await key_manager.get_key(model_name=request.model, is_vertex_key=False)
         logger.info(f"Using allowed token: {allowed_token}")
         logger.info(f"Using API key: {redact_key_for_logging(api_key)}")
         response = await embedding_service.create_embedding(

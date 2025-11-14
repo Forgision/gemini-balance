@@ -24,7 +24,7 @@ from app.router import (
     version_routes,
     vertex_express_routes,
 )
-from app.service.key.key_manager import get_key_manager_instance
+# No longer using get_key_manager_instance - use app.state
 from app.service.stats.stats_service import StatsService
 from app.utils.static_version import get_static_url
 
@@ -111,7 +111,9 @@ def setup_page_routes(app: FastAPI) -> None:
                 logger.warning("Unauthorized access attempt to keys page")
                 return RedirectResponse(url="/", status_code=302)
 
-            key_manager = await get_key_manager_instance()
+            if not hasattr(request.app.state, "key_manager"):
+                raise RuntimeError("KeyManager not initialized.")
+            key_manager = request.app.state.key_manager
             keys_status = await key_manager.get_keys_by_status()
             total_keys = len(keys_status["valid_keys"]) + len(
                 keys_status["invalid_keys"]
@@ -253,10 +255,12 @@ def setup_api_stats_routes(app: FastAPI) -> None:
             # if not isinstance(status_code, int) or status_code < 100 or status_code > 599:
             #     return {"error": f"Unsupported status_code: {status_code}"}, 400
 
-            key_manager = await get_key_manager_instance()
+            if not hasattr(request.app.state, "key_manager"):
+                raise RuntimeError("KeyManager not initialized.")
+            key_manager = request.app.state.key_manager
             keys_status = await key_manager.get_keys_by_status()
-            in_memory_keys = set(keys_status.get("valid_keys", [])) | set(
-                keys_status.get("invalid_keys", [])
+            in_memory_keys = set(keys_status.get("valid_keys", {}).keys()) | set(
+                keys_status.get("invalid_keys", {}).keys()
             )
             stats_service = StatsService()
             data = await stats_service.get_attention_keys_last_24h(
