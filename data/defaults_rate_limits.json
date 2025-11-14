@@ -1,0 +1,220 @@
+{
+  "Free Tier": {
+    "gemini-2.5-pro": {
+      "name": "Gemini 2.5 Pro",
+      "RPM": 2,
+      "TPM": 125000,
+      "RPD": 50
+    },
+    "gemini-2.5-flash": {
+      "name": "Gemini 2.5 Flash",
+      "RPM": 10,
+      "TPM": 250000,
+      "RPD": 250
+    },
+    "gemini-2.5-flash-preview": {
+      "name": "Gemini 2.5 Flash Preview",
+      "RPM": 10,
+      "TPM": 250000,
+      "RPD": 250
+    },
+    "gemini-2.5-flash-lite": {
+      "name": "Gemini 2.5 Flash-Lite",
+      "RPM": 15,
+      "TPM": 250000,
+      "RPD": 1000
+    },
+    "gemini-2.5-flash-lite-preview": {
+      "name": "Gemini 2.5 Flash-Lite Preview",
+      "RPM": 15,
+      "TPM": 250000,
+      "RPD": 1000
+    },
+    "gemini-2.0-flash": {
+      "name": "Gemini 2.0 Flash",
+      "RPM": 15,
+      "TPM": 1000000,
+      "RPD": 200
+    },
+    "gemini-2.0-flash-lite": {
+      "name": "Gemini 2.0 Flash-Lite",
+      "RPM": 30,
+      "TPM": 1000000,
+      "RPD": 200
+    },
+    "gemini-2.5-flash-preview-tts": {
+      "name": "Gemini 2.5 Flash Preview TTS",
+      "RPM": 3,
+      "TPM": 10000,
+      "RPD": 15
+    },
+    "gemini-2.0-flash-preview-image-generation": {
+      "name": "Gemini 2.0 Flash Preview Image Generation",
+      "RPM": 10,
+      "TPM": 200000,
+      "RPD": 100
+    },
+    "gemma-3-&-3n": {
+      "name": "Gemma 3 & 3n",
+      "RPM": 30,
+      "TPM": 15000,
+      "RPD": 14400
+    },
+    "gemini-embedding": {
+      "name": "Gemini Embedding",
+      "RPM": 100,
+      "TPM": 30000,
+      "RPD": 1000
+    },
+    "gemini-robotics-er-1.5-preview": {
+      "name": "Gemini Robotics-ER 1.5 Preview",
+      "RPM": 10,
+      "TPM": 250000,
+      "RPD": 250
+    },
+    "gemini-1.5-flash-(deprecated)": {
+      "name": "Gemini 1.5 Flash (Deprecated)",
+      "RPM": 15,
+      "TPM": 250000,
+      "RPD": 50
+    },
+    "gemini-1.5-flash-8b-(deprecated)": {
+      "name": "Gemini 1.5 Flash-8B (Deprecated)",
+      "RPM": 15,
+      "TPM": 250000,
+      "RPD": 50
+    }
+  },
+  "Tier 1": {
+    "gemini-2.5-pro": {
+      "name": "Gemini 2.5 Pro",
+      "RPM": 150,
+      "TPM": 2000000,
+      "RPD": 10000
+    },
+    "gemini-2.5-flash": {
+      "name": "Gemini 2.5 Flash",
+      "RPM": 1000,
+      "TPM": 1000000,
+      "RPD": 10000
+    },
+    "gemini-2.5-flash-preview": {
+      "name": "Gemini 2.5 Flash Preview",
+      "RPM": 1000,
+      "TPM": 1000000,
+      "RPD": 10000
+    },
+    "gemini-2.5-flash-preview-tts": {
+      "name": "Gemini 2.5 Flash Preview TTS",
+      "RPM": 10,
+      "TPM": 10000,
+      "RPD": 100
+    },
+    "gemini-2.5-pro-preview-tts": {
+      "name": "Gemini 2.5 Pro Preview TTS",
+      "RPM": 10,
+      "TPM": 10000,
+      "RPD": 50
+    },
+    "gemini-2.5-flash-image": {
+      "name": "Gemini 2.5 Flash Image",
+      "RPM": 500,
+      "TPM": 500000,
+      "RPD": 2000
+    },
+    "gemini-2.0-flash-preview-image-generation": {
+      "name": "Gemini 2.0 Flash Preview Image Generation",
+      "RPM": 1000,
+      "TPM": 1000000,
+      "RPD": 10000
+    },
+    "gemma-3-&-3n": {
+      "name": "Gemma 3 & 3n",
+      "RPM": 30,
+      "TPM": 15000,
+      "RPD": 14400
+    },
+    "gemini-robotics-er-1.5-preview": {
+      "name": "Gemini Robotics-ER 1.5 Preview",
+      "RPM": 300,
+      "TPM": 1000000,
+      "RPD": 10000
+    },
+    "gemini-2.5-computer-use-preview": {
+      "name": "Gemini 2.5 Computer Use Preview",
+      "RPM": 150,
+      "TPM": 2000000,
+      "RPD": 10000
+    }
+  },
+  "Tier 2": {
+    "gemini-2.5-pro": {
+      "name": "Gemini 2.5 Pro",
+      "RPM": 1000,
+      "TPM": 5000000,
+      "RPD": 50000
+    },
+    "gemini-2.5-flash": {
+      "name": "Gemini 2.5 Flash",
+      "RPM": 2000,
+      "TPM": 3000000,
+      "RPD": 100000
+    },
+    "gemini-2.5-flash-preview": {
+      "name": "Gemini 2.5 Flash Preview",
+      "RPM": 2000,
+      "TPM": 3000000,
+      "RPD": 100000
+    },
+    "gemini-2.5-flash-preview-tts": {
+      "name": "Gemini 2.5 Flash Preview TTS",
+      "RPM": 1000,
+      "TPM": 100000,
+      "RPD": 10000
+    },
+    "gemini-2.5-pro-preview-tts": {
+      "name": "Gemini 2.5 Pro Preview TTS",
+      "RPM": 100,
+      "TPM": 25000,
+      "RPD": 1000
+    },
+    "gemini-2.5-flash-image": {
+      "name": "Gemini 2.5 Flash Image",
+      "RPM": 2000,
+      "TPM": 1500000,
+      "RPD": 50000
+    },
+    "gemini-2.0-flash-preview-image-generation": {
+      "name": "Gemini 2.0 Flash Preview Image Generation",
+      "RPM": 2000,
+      "TPM": 3000000,
+      "RPD": 100000
+    },
+    "gemma-3-&-3n": {
+      "name": "Gemma 3 & 3n",
+      "RPM": 30,
+      "TPM": 15000,
+      "RPD": 14400
+    },
+    "gemini-robotics-er-1.5-preview": {
+      "name": "Gemini Robotics-ER 1.5 Preview",
+      "RPM": 400,
+      "TPM": 3000000,
+      "RPD": 100000
+    },
+    "gemini-2.5-computer-use-preview": {
+      "name": "Gemini 2.5 Computer Use Preview",
+      "RPM": 1000,
+      "TPM": 5000000,
+      "RPD": 50000
+    }
+  },
+  "Tier 3": {
+    "gemma-3-&-3n": {
+      "name": "Gemma 3 & 3n",
+      "RPM": 30,
+      "TPM": 15000,
+      "RPD": 14400
+    }
+  }
+}
