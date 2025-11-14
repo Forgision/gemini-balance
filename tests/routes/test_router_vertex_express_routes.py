@@ -3,11 +3,11 @@ from unittest.mock import AsyncMock, patch
 
 from app.router.vertex_express_routes import security_service
 
-def test_generate_content_success(mock_verify_auth_token, client):
+def test_generate_content_success(mock_verify_auth_token, route_client):
     """Test successful content generation."""
     from app.domain.gemini_models import GeminiRequest, GeminiContent
 
-    app = client.app
+    app = route_client.app
     app.dependency_overrides[
         security_service.verify_key_or_goog_api_key
     ] = lambda: "test_token"
@@ -26,13 +26,13 @@ def test_generate_content_success(mock_verify_auth_token, client):
     from app.dependencies import get_vertex_express_chat_service
     from app.router.vertex_express_routes import dep_get_next_working_vertex_key
 
-    app = client.app
+    app = route_client.app
     app.dependency_overrides[
         get_vertex_express_chat_service
     ] = lambda: mock_chat_service
     app.dependency_overrides[dep_get_next_working_vertex_key] = lambda: "test_api_key"
 
-    response = client.post(
+    response = route_client.post(
         "/vertex-express/v1beta/models/gemini-pro:generateContent",
         json=request_body,
         headers={"x-goog-api-key": "test_token"},

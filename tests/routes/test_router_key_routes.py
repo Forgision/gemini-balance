@@ -1,9 +1,9 @@
 import pytest
 
-def test_get_keys_paginated_success(mock_verify_auth_token, client, mock_key_manager):
+def test_get_keys_paginated_success(mock_verify_auth_token, route_client, route_mock_key_manager):
     """Test successful retrieval of paginated keys with default parameters."""
     setattr(
-        mock_key_manager.get_all_keys_with_fail_count,
+        route_mock_key_manager.get_all_keys_with_fail_count,
         "return_value",
         {
             "valid_keys": {
@@ -14,7 +14,7 @@ def test_get_keys_paginated_success(mock_verify_auth_token, client, mock_key_man
         },
     )
 
-    response = client.get(
+    response = route_client.get(
         "/api/keys",
         cookies={"auth_token": "test_auth_token"},
     )
@@ -28,21 +28,21 @@ def test_get_keys_paginated_success(mock_verify_auth_token, client, mock_key_man
 
 
 @pytest.mark.no_mock_auth
-def test_get_keys_paginated_unauthorized(client, mock_key_manager):
+def test_get_keys_paginated_unauthorized(route_client, route_mock_key_manager):
     """Test unauthorized access to paginated keys."""
-    response = client.get("/api/keys")
+    response = route_client.get("/api/keys")
     assert response.status_code == 401
 
 
-def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, client, mock_key_manager):
+def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, route_client, route_mock_key_manager):
     """Test filtering keys by status (valid/invalid)."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
+    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"valid_key": {"status": "active", "exhausted": False}},
         "invalid_keys": {"invalid_key": {"status": "inactive", "exhausted": False}},
     }
 
     # Test 'valid' status
-    response_valid = client.get(
+    response_valid = route_client.get(
         "/api/keys?status=valid",
         cookies={"auth_token": "test_auth_token"},
     )
@@ -53,7 +53,7 @@ def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, client, moc
     assert "invalid_key" not in data_valid["keys"]
 
     # Test 'invalid' status
-    response_invalid = client.get(
+    response_invalid = route_client.get(
         "/api/keys?status=invalid",
         cookies={"auth_token": "test_auth_token"},
     )
@@ -64,9 +64,9 @@ def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, client, moc
     assert "valid_key" not in data_invalid["keys"]
 
 
-def test_get_keys_paginated_search(mock_verify_auth_token, client, mock_key_manager):
+def test_get_keys_paginated_search(mock_verify_auth_token, route_client, route_mock_key_manager):
     """Test searching for a specific key."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
+    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {
             "search_target_key": {"status": "active", "exhausted": False},
             "another_key": {"status": "active", "exhausted": False},
@@ -74,7 +74,7 @@ def test_get_keys_paginated_search(mock_verify_auth_token, client, mock_key_mana
         "invalid_keys": {},
     }
 
-    response = client.get(
+    response = route_client.get(
         "/api/keys?search=target",
         cookies={"auth_token": "test_auth_token"},
     )
@@ -86,16 +86,16 @@ def test_get_keys_paginated_search(mock_verify_auth_token, client, mock_key_mana
     assert "another_key" not in data["keys"]
 
 
-def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, client, mock_key_manager):
+def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, route_client, route_mock_key_manager):
     """Test filtering by fail count threshold."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
+    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"key_low_fail": {"status": "active", "exhausted": False}},
         "invalid_keys": {"key_high_fail": {"status": "inactive", "exhausted": False}},
     }
 
     # In v2, status "active" maps to fail_count=0, "inactive" maps to fail_count=1
     # So threshold=1 should only return inactive keys
-    response = client.get(
+    response = route_client.get(
         "/api/keys?fail_count_threshold=1",
         cookies={"auth_token": "test_auth_token"},
     )
@@ -107,16 +107,16 @@ def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, client,
     assert "key_low_fail" not in data["keys"]
 
 
-def test_get_keys_paginated_pagination(mock_verify_auth_token, client, mock_key_manager):
+def test_get_keys_paginated_pagination(mock_verify_auth_token, route_client, route_mock_key_manager):
     """Test the pagination logic."""
     keys = {f"key_{i}": {"status": "active", "exhausted": False} for i in range(20)}
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
+    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": keys,
         "invalid_keys": {},
     }
 
     # Get page 2 with a limit of 5
-    response = client.get(
+    response = route_client.get(
         "/api/keys?page=2&limit=5",
         cookies={"auth_token": "test_auth_token"},
     )
@@ -135,9 +135,9 @@ def test_get_keys_paginated_pagination(mock_verify_auth_token, client, mock_key_
 
 
 # Tests for get_all_keys
-def test_get_all_keys_success(mock_verify_auth_token, client, mock_key_manager):
+def test_get_all_keys_success(mock_verify_auth_token, route_client, route_mock_key_manager):
     """Test successful retrieval of all keys for bulk operations."""
-    mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
+    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {
             "valid_1": {"status": "active", "exhausted": False},
             "valid_2": {"status": "active", "exhausted": False},
@@ -145,7 +145,7 @@ def test_get_all_keys_success(mock_verify_auth_token, client, mock_key_manager):
         "invalid_keys": {"invalid_1": {"status": "inactive", "exhausted": False}},
     }
 
-    response = client.get(
+    response = route_client.get(
         "/api/keys/all",
         cookies={"auth_token": "test_auth_token"},
     )
@@ -160,7 +160,7 @@ def test_get_all_keys_success(mock_verify_auth_token, client, mock_key_manager):
 
 
 @pytest.mark.no_mock_auth
-def test_get_all_keys_unauthorized(client, mock_key_manager):
+def test_get_all_keys_unauthorized(route_client, route_mock_key_manager):
     """Test unauthorized access to the get_all_keys endpoint."""
-    response = client.get("/api/keys/all")
+    response = route_client.get("/api/keys/all")
     assert response.status_code == 401

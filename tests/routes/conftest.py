@@ -1,6 +1,9 @@
 import pytest
 from pytest import MonkeyPatch
-import importlib
+import asyncio
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.config.config import settings
 from fastapi.testclient import TestClient
@@ -17,73 +20,77 @@ from app.router import (
 )
 
 
-@pytest.fixture(scope="session")
-def monkeypatch_session():
-    """Session-scoped monkeypatch fixture for route tests."""
+@pytest.fixture(scope="module")
+def route_monkeypatch():
+    """
+    Module-scoped monkeypatch fixture for route tests.
+    Changed from session to module scope to prevent global state leakage.
+    """
     mp = MonkeyPatch()
     yield mp
     mp.undo()
 
 
-@pytest.fixture(scope="session")
-def route_db_engine(monkeypatch_session):
+@pytest.fixture(scope="module")
+def route_db_engine(route_monkeypatch):
     """
-    Session-scoped fixture to set up and tear down an in-memory SQLite database.
+    Module-scoped fixture to set up and tear down an in-memory SQLite database.
     Used specifically for route tests that need a database.
+    Creates a separate engine instance without reloading modules.
     """
-    monkeypatch_session.setattr(settings, "SQLITE_DATABASE", ":memory:")
-    monkeypatch_session.setattr(settings, "DATABASE_TYPE", "sqlite")
+    # Patch settings before importing connection module
+    route_monkeypatch.setattr(settings, "SQLITE_DATABASE", ":memory:")
+    route_monkeypatch.setattr(settings, "DATABASE_TYPE", "sqlite")
 
-    # Reload the connection module to apply the new settings
-    from app.database import connection
-
-    importlib.reload(connection)
-
-    # Now we can import the engine and Base
-    from app.database.connection import Base, engine
+    # Create a separate engine for tests without reloading the module
+    from app.database.connection import Base
+    
+    # Create a new engine instance for testing
+    test_engine = create_engine("sqlite:///:memory:", poolclass=StaticPool, connect_args={"check_same_thread": False})
 
     # Create tables
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=test_engine)
 
-    yield engine
+    yield test_engine
 
-    # Drop tables
-    Base.metadata.drop_all(bind=engine)
+    # Drop tables and dispose engine
+    Base.metadata.drop_all(bind=test_engine)
+    test_engine.dispose(close=True)
 
 
-@pytest.fixture(scope="session")
-def route_async_db_engine(monkeypatch_session):
+@pytest.fixture(scope="module")
+def route_async_db_engine(route_monkeypatch):
     """
-    Session-scoped fixture to set up and tear down an in-memory async SQLite database.
+    Module-scoped fixture to set up and tear down an in-memory async SQLite database.
     Used for the UsageMatrix table in KeyManager.
+    Creates a separate engine instance without reloading modules.
     """
-    import asyncio
-    from sqlalchemy.ext.asyncio import create_async_engine
-    from sqlalchemy.pool import StaticPool
-    
     # Patch the async database URL to use in-memory database
-    monkeypatch_session.setattr(settings, "KEY_MATRIX_DB_URL", "sqlite+aiosqlite:///:memory:")
+    route_monkeypatch.setattr(settings, "KEY_MATRIX_DB_URL", "sqlite+aiosqlite:///:memory:")
     
-    # Reload the key_manager module to apply the new settings
-    from app.service.key import key_manager
-    importlib.reload(key_manager)
+    # Create a separate async engine for tests without reloading the module
+    from app.service.key.key_manager import Base
     
-    # Import the engine and Base after reload
-    from app.service.key.key_manager import engine, Base
+    # Create a new async engine instance for testing
+    test_async_engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False}
+    )
     
     # Create tables in the async database
     async def create_tables():
-        async with engine.begin() as conn:
+        async with test_async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     
     # Run the async table creation
     asyncio.run(create_tables())
     
-    yield engine
+    yield test_async_engine
     
     # Cleanup: dispose of the engine
     async def dispose_engine():
-        await engine.dispose(close=True)
+        await test_async_engine.dispose(close=True)
     
     asyncio.run(dispose_engine())
 
@@ -270,137 +277,97 @@ def route_test_app(
     """
     Function-scoped fixture to create a test app for route tests.
     Each test gets a fresh app instance to avoid state leakage.
+    Properly cleans up dependency overrides using try/finally.
     """
     # route_db_engine and route_async_db_engine fixtures already set up the test databases
     app = create_app()
 
     # Store original overrides to restore them
-    original_overrides = app.dependency_overrides.copy()
+    original_overrides = dict(app.dependency_overrides)
 
-    async def override_get_key_manager():
-        return route_mock_key_manager
+    try:
+        async def override_get_key_manager():
+            return route_mock_key_manager
 
-    app.dependency_overrides[gemini_routes.get_key_manager] = override_get_key_manager
-    app.dependency_overrides[openai_routes.get_key_manager] = override_get_key_manager
-    app.dependency_overrides[
-        vertex_express_routes.get_key_manager
-    ] = override_get_key_manager
-    app.dependency_overrides[
-        openai_compatible_routes.get_key_manager
-    ] = override_get_key_manager
-    app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
+        app.dependency_overrides[gemini_routes.get_key_manager] = override_get_key_manager
+        app.dependency_overrides[openai_routes.get_key_manager] = override_get_key_manager
+        app.dependency_overrides[
+            vertex_express_routes.get_key_manager
+        ] = override_get_key_manager
+        app.dependency_overrides[
+            openai_compatible_routes.get_key_manager
+        ] = override_get_key_manager
+        app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
 
-    async def override_get_error_log_service_dep():
-        return route_mock_error_log_service
+        async def override_get_error_log_service_dep():
+            return route_mock_error_log_service
 
-    app.dependency_overrides[
-        get_error_log_service
-    ] = override_get_error_log_service_dep
+        app.dependency_overrides[
+            get_error_log_service
+        ] = override_get_error_log_service_dep
 
-    async def override_get_chat_service():
-        return route_mock_chat_service
+        async def override_get_chat_service():
+            return route_mock_chat_service
 
-    app.dependency_overrides[gemini_routes.get_chat_service] = override_get_chat_service
+        app.dependency_overrides[gemini_routes.get_chat_service] = override_get_chat_service
 
-    async def override_get_embedding_service():
-        return route_mock_embedding_service
+        async def override_get_embedding_service():
+            return route_mock_embedding_service
 
-    app.dependency_overrides[
-        gemini_routes.get_embedding_service
-    ] = override_get_embedding_service
+        app.dependency_overrides[
+            gemini_routes.get_embedding_service
+        ] = override_get_embedding_service
 
-    # Add ConfigService dependency override
-    from app.dependencies import get_config_service
-    from app.router import config_routes
-    
-    def override_get_config_service():
-        return route_mock_config_service
+        # Add ConfigService dependency override
+        from app.dependencies import get_config_service
+        from app.router import config_routes
+        
+        def override_get_config_service():
+            return route_mock_config_service
 
-    app.dependency_overrides[get_config_service] = override_get_config_service
+        app.dependency_overrides[get_config_service] = override_get_config_service
 
-    # Add ProxyCheckService dependency override
-    from app.service.proxy.proxy_check_service import get_proxy_check_service
-    
-    def override_get_proxy_check_service():
-        return route_mock_proxy_check_service
+        # Add ProxyCheckService dependency override
+        from app.service.proxy.proxy_check_service import get_proxy_check_service
+        
+        def override_get_proxy_check_service():
+            return route_mock_proxy_check_service
 
-    app.dependency_overrides[get_proxy_check_service] = override_get_proxy_check_service
+        app.dependency_overrides[get_proxy_check_service] = override_get_proxy_check_service
 
-    async def mock_security_dependency():
-        pass
+        async def mock_security_dependency():
+            pass
 
-    app.dependency_overrides[
-        gemini_routes.security_service.verify_key_or_goog_api_key
-    ] = mock_security_dependency
+        app.dependency_overrides[
+            gemini_routes.security_service.verify_key_or_goog_api_key
+        ] = mock_security_dependency
 
-    app.dependency_overrides[
-        openai_compatible_routes.security_service.verify_authorization
-    ] = mock_security_dependency
+        app.dependency_overrides[
+            openai_compatible_routes.security_service.verify_authorization
+        ] = mock_security_dependency
 
-    async def override_claude_proxy_service():
-        return route_mock_chat_service
+        async def override_claude_proxy_service():
+            return route_mock_chat_service
 
-    app.dependency_overrides[claude_routes.ClaudeProxyService] = override_claude_proxy_service
-    app.dependency_overrides[claude_routes.verify_auth_token] = mock_security_dependency
+        app.dependency_overrides[claude_routes.ClaudeProxyService] = override_claude_proxy_service
+        app.dependency_overrides[claude_routes.verify_auth_token] = mock_security_dependency
 
-    yield app
+        yield app
 
-    # Clean up dependency overrides after each test - restore to original state
-    app.dependency_overrides.clear()
-    app.dependency_overrides.update(original_overrides)
-
-
-@pytest.fixture(scope="function")
-def test_app(route_test_app):
-    """
-    Alias for route_test_app for backwards compatibility.
-    Some tests use test_app instead of route_test_app.
-    """
-    return route_test_app
+    finally:
+        # Clean up dependency overrides after each test - restore to original state
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(original_overrides)
 
 
 @pytest.fixture(scope="function")
-def mock_key_manager(route_mock_key_manager):
-    """
-    Alias for route_mock_key_manager for backwards compatibility.
-    Allows tests to use the same fixture name across different modules.
-    """
-    return route_mock_key_manager
-
-
-@pytest.fixture(scope="function")
-def mock_error_log_service(route_mock_error_log_service):
-    """
-    Alias for route_mock_error_log_service for backwards compatibility.
-    Allows tests to use the same fixture name across different modules.
-    """
-    return route_mock_error_log_service
-
-
-@pytest.fixture(scope="function")
-def mock_chat_service(route_mock_chat_service):
-    """
-    Alias for route_mock_chat_service for backwards compatibility.
-    Allows tests to use the same fixture name across different modules.
-    """
-    return route_mock_chat_service
-
-
-@pytest.fixture(scope="function")
-def mock_embedding_service(route_mock_embedding_service):
-    """
-    Alias for route_mock_embedding_service for backwards compatibility.
-    Allows tests to use the same fixture name across different modules.
-    """
-    return route_mock_embedding_service
-
-
-@pytest.fixture(scope="function")
-def client(route_test_app):
+def route_client(route_test_app):
     """
     Function-scoped fixture to create a TestClient for route tests.
     Each test gets a fresh client instance.
+    Renamed from 'client' to 'route_client' to avoid conflicts with global fixtures.
     """
-    with TestClient(route_test_app) as test_client:
+    # Disable lifespan events to prevent database connection conflicts
+    with TestClient(route_test_app, raise_server_exceptions=False) as test_client:
         yield test_client
 
