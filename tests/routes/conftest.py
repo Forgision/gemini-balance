@@ -349,8 +349,23 @@ def route_test_app(
         async def override_claude_proxy_service():
             return route_mock_chat_service
 
-        app.dependency_overrides[claude_routes.ClaudeProxyService] = override_claude_proxy_service
-        app.dependency_overrides[claude_routes.verify_auth_token] = mock_security_dependency
+        from app.service.claude_proxy_service import ClaudeProxyService
+        from app.router import claude_routes
+        from fastapi import Header, HTTPException
+        from typing import Optional
+        
+        app.dependency_overrides[ClaudeProxyService] = override_claude_proxy_service
+        
+        # Conditional auth override: raise 401 if no auth header or invalid token, otherwise pass
+        async def conditional_auth_override(authorization: Optional[str] = Header(None)):
+            if not authorization:
+                raise HTTPException(status_code=401, detail="Missing auth_token header")
+            token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
+            if token != settings.AUTH_TOKEN:
+                raise HTTPException(status_code=401, detail="Invalid auth_token")
+            return token
+        
+        app.dependency_overrides[claude_routes.security_service.verify_auth_token] = conditional_auth_override
 
         yield app
 

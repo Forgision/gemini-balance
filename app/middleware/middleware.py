@@ -35,6 +35,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             and not request.url.path.startswith("/api/version/check")
             and not request.url.path.startswith("/vertex-express")
             and not request.url.path.startswith("/upload")
+            and not request.url.path.startswith("/claude")
         ):
             auth_token = request.cookies.get("auth_token")
             if not auth_token or not verify_auth_token(auth_token):

@@ -18,9 +18,11 @@ def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
             key_manager = kwargs.get("key_manager")
             if not key_manager:
                 # Try to get from request if available
-                request = kwargs.get("request")
-                if request and hasattr(request.app.state, "key_manager"):
-                    key_manager = request.app.state.key_manager
+                # Check for both 'request' and 'fastapi_request' (some routes use different names)
+                fastapi_request = kwargs.get("fastapi_request") or kwargs.get("request")
+                # Only try to access .app if it's a FastAPI Request object (has 'app' attribute)
+                if fastapi_request and hasattr(fastapi_request, "app") and hasattr(fastapi_request.app.state, "key_manager"):
+                    key_manager = fastapi_request.app.state.key_manager
                 else:
                     raise ValueError("KeyManager instance is not available. Use dependency injection or provide request object.")
 

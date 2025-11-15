@@ -41,6 +41,10 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
         if self.is_already_correct_format(path):
             return path, None
 
+        # Skip processing for Claude routes - they should pass through as-is
+        if path.startswith("/claude/"):
+            return path, None
+
         # 1. Highest priority: contains generateContent -> Gemini format
         if "generatecontent" in path.lower() or "v1beta/models" in path.lower():
             return self.fix_gemini_by_operation(path, method, request)
@@ -74,6 +78,7 @@ class SmartRoutingMiddleware(BaseHTTPMiddleware):
             r"^/vertex-express/v1beta/models/[^/:]+:(generate|streamGenerate)Content$",  # Vertex Express Gemini format
             r"^/vertex-express/v1beta/models$",  # Vertex Express model list
             r"^/vertex-express/v1/(chat/completions|models|embeddings|images/generations)$",  # Vertex Express OpenAI format
+            r"^/claude/v1/(messages|messages/count_tokens)$",  # Claude proxy format
         ]
 
         for pattern in correct_patterns:

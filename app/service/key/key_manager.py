@@ -397,6 +397,13 @@ class KeyManager:
                     # self.df is guaranteed to be initialized by _load_default before this method is called.
                     # Ensure self.df is also indexed for proper update.
                     if isinstance(self.df, pd.DataFrame):
+                        # Ensure datetime columns in df match the dtype in self.df to avoid FutureWarning
+                        datetime_columns = ['minute_reset_time', 'day_reset_time', 'last_used']
+                        for col in datetime_columns:
+                            if col in df.columns and col in self.df.columns:
+                                # Convert to match the dtype of self.df column
+                                df[col] = pd.to_datetime(df[col], utc=True)
+                        
                         # Update existing entries in self.df with values from db_df.
                         # This will only update rows where the index (api_key, model_name) matches.
                         # Columns present in self.df but not in db_df (e.g., 'vertex_key') will remain unchanged.
@@ -412,13 +419,21 @@ class KeyManager:
                     if pd.isna(max_minute_reset_dt) or isinstance(max_minute_reset_dt, pd.Series):
                         self.last_minute_reset_ts = datetime.now(self.tz)
                     else:
-                        self.last_minute_reset_ts = max_minute_reset_dt.to_pydatetime() if hasattr(max_minute_reset_dt, "to_pydatetime") else max_minute_reset_dt
+                        dt = max_minute_reset_dt.to_pydatetime() if hasattr(max_minute_reset_dt, "to_pydatetime") else max_minute_reset_dt
+                        # Ensure timezone-aware datetime (assume UTC if naive)
+                        if dt.tzinfo is None:
+                            dt = self.tz.localize(dt)
+                        self.last_minute_reset_ts = dt
 
                     max_day_reset_dt = pd.to_datetime(self.df["day_reset_time"]).max()
                     if pd.isna(max_day_reset_dt) or isinstance(max_day_reset_dt, pd.Series):
                         self.last_day_reset_ts = datetime.now(self.tz)
                     else:
-                        self.last_day_reset_ts = max_day_reset_dt.to_pydatetime() if hasattr(max_day_reset_dt, "to_pydatetime") else max_day_reset_dt
+                        dt = max_day_reset_dt.to_pydatetime() if hasattr(max_day_reset_dt, "to_pydatetime") else max_day_reset_dt
+                        # Ensure timezone-aware datetime (assume UTC if naive)
+                        if dt.tzinfo is None:
+                            dt = self.tz.localize(dt)
+                        self.last_day_reset_ts = dt
 
             else:
                 # No data in DB, self.df remains as initialized by _load_default.
@@ -786,6 +801,10 @@ class KeyManager:
             
             reseted = False
 
+            # Ensure last_minute_reset_ts is timezone-aware (assume UTC if naive)
+            if self.last_minute_reset_ts.tzinfo is None:
+                self.last_minute_reset_ts = self.tz.localize(self.last_minute_reset_ts)
+            
             if self.last_minute_reset_ts + timedelta(seconds=59) < now_minute:
                 logger.debug(
                     "Resetting minute-level metrics (rpm, tpm, exhausted)..."
@@ -797,6 +816,10 @@ class KeyManager:
                     self.last_minute_reset_ts = now_minute
                     reseted = True
         
+            # Ensure last_day_reset_ts is timezone-aware (assume UTC if naive)
+            if self.last_day_reset_ts.tzinfo is None:
+                self.last_day_reset_ts = self.tz.localize(self.last_day_reset_ts)
+            
             if self.last_day_reset_ts + timedelta(days=1) < now_day:
                 logger.debug("Resetting day-level metrics (rpd)...")
                 async with self.lock:

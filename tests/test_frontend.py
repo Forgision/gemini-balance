@@ -148,7 +148,7 @@ def test_app(
         return mock_chat_service
 
     app.dependency_overrides[claude_routes.ClaudeProxyService] = override_claude_proxy_service
-    app.dependency_overrides[claude_routes.verify_auth_token] = mock_security_dependency
+    app.dependency_overrides[claude_routes.security_service.verify_auth_token] = mock_security_dependency
 
     yield app
 
