@@ -19,26 +19,13 @@ from fastapi import (
 from pydantic import BaseModel
 
 from app.core.security import verify_auth_token
+from app.service.error_log.error_log_service import ErrorLogListResponse, ErrorLogListItem
 from app.dependencies import get_error_log_service
 from app.log.logger import get_log_routes_logger
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 
 logger = get_log_routes_logger()
-
-
-class ErrorLogListItem(BaseModel):
-    id: int
-    gemini_key: Optional[str] = None
-    error_type: Optional[str] = None
-    error_code: Optional[int] = None
-    model_name: Optional[str] = None
-    request_time: Optional[datetime] = None
-
-
-class ErrorLogListResponse(BaseModel):
-    logs: List[ErrorLogListItem]
-    total: int
 
 
 @router.get("/errors", response_model=ErrorLogListResponse)
@@ -65,7 +52,7 @@ async def get_error_logs_api(
         "id", description="Field to sort by (e.g., 'id', 'request_time')"
     ),
     sort_order: str = Query("desc", description="Sort order ('asc' or 'desc')"),
-    error_log_service=Depends(get_error_log_service),
+    error_log_service = Depends(get_error_log_service),
 ):
     """
     Get a list of error logs (returns error codes), supports filtering and sorting
@@ -91,7 +78,7 @@ async def get_error_logs_api(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        result = await error_log_service.process_get_error_logs(
+        result: ErrorLogListResponse = await error_log_service.process_get_error_logs(
             limit=limit,
             offset=offset,
             key_search=key_search,
@@ -102,11 +89,7 @@ async def get_error_logs_api(
             sort_by=sort_by,
             sort_order=sort_order,
         )
-        logs_data = result["logs"]
-        total_count = result["total"]
-
-        validated_logs = [ErrorLogListItem(**log) for log in logs_data]
-        return ErrorLogListResponse(logs=validated_logs, total=total_count)
+        return result
     except Exception as e:
         logger.exception(f"Failed to get error logs list: {str(e)}")
         raise HTTPException(

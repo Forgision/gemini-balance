@@ -11,7 +11,15 @@ T = TypeVar("T")
 logger = get_retry_logger()
 
 
-def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
+def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name", model_arg_required: bool = True):
+    """
+    Retry handler decorator for API routes with automatic key switching.
+    
+    Args:
+        key_arg: Name of the API key argument in the function signature
+        model_arg: Name of the model argument in the function signature. Can be a nested path like "request.model"
+        model_arg_required: If False, retry logic will work even without model_name (e.g., for list_models endpoints)
+    """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
@@ -19,7 +27,16 @@ def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
             if not key_manager:
                 # Try to get from request if available
                 # Check for both 'request' and 'fastapi_request' (some routes use different names)
-                fastapi_request = kwargs.get("fastapi_request") or kwargs.get("request")
+                # Only check if these are actually in the function signature to avoid FastAPI validation issues
+                func_sig = inspect.signature(func)
+                param_names = set(func_sig.parameters.keys())
+                
+                fastapi_request = None
+                if "fastapi_request" in param_names and "fastapi_request" in kwargs:
+                    fastapi_request = kwargs.get("fastapi_request")
+                elif "request" in param_names and "request" in kwargs:
+                    fastapi_request = kwargs.get("request")
+                
                 # Only try to access .app if it's a FastAPI Request object (has 'app' attribute)
                 if fastapi_request and hasattr(fastapi_request, "app") and hasattr(fastapi_request.app.state, "key_manager"):
                     key_manager = fastapi_request.app.state.key_manager
@@ -48,13 +65,44 @@ def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
                         logger.error("No API key found in arguments for retry handler.")
                         break
 
-                    # TODO: test that model_name works with routes from openai_routes.py and vertext_express_routes.py
-                    model_name = kwargs.get(model_arg)
-                    if not model_name:
-                        logger.error(
-                            "No model name found in arguments for retry handler."
+                    # Extract model_name - handle nested paths like "request.model"
+                    model_name = None
+                    if "." in model_arg:
+                        # Handle nested paths like "request.model"
+                        parts = model_arg.split(".")
+                        obj = kwargs.get(parts[0])
+                        for part in parts[1:]:
+                            if obj is not None and hasattr(obj, part):
+                                obj = getattr(obj, part)
+                                if isinstance(obj, str):
+                                    model_name = obj
+                                    break
+                            elif obj is not None and isinstance(obj, dict) and part in obj:
+                                obj = obj[part]
+                                if isinstance(obj, str):
+                                    model_name = obj
+                                    break
+                            else:
+                                break
+                    else:
+                        model_name = kwargs.get(model_arg)
+                    
+                    # If model_arg is required but not found, break retry loop
+                    if model_arg_required and not model_name:
+                        logger.warning(
+                            f"No model name found in arguments for retry handler (model_arg='{model_arg}'). "
+                            f"Skipping retry logic for this endpoint."
                         )
                         break
+                    
+                    # If model_name is not available and not required, use a default for key switching
+                    if not model_name:
+                        # For endpoints without model_name (like list_models), use a default model
+                        # This allows key switching but may not be model-specific
+                        model_name = "default"
+                        logger.debug(
+                            f"Model name not found, using default for key switching."
+                        )
 
                     # Extract status_code from exception
                     status_code = None
@@ -65,18 +113,23 @@ def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name"):
                     if status_code is None:
                         status_code = 500  # Default to 500 if not available
 
-                    new_key = await key_manager.handle_api_failure(
-                        old_key, model_name, retries, status_code=status_code
-                    )
-                    if new_key:
-                        kwargs[key_arg] = new_key
-                        logger.info(
-                            f"Switched to new API key: {redact_key_for_logging(new_key)}"
+                    # Only handle API failure if we have a model_name (even if default)
+                    if model_name:
+                        new_key = await key_manager.handle_api_failure(
+                            old_key, model_name, retries, status_code=status_code
                         )
+                        if new_key:
+                            kwargs[key_arg] = new_key
+                            logger.info(
+                                f"Switched to new API key: {redact_key_for_logging(new_key)}"
+                            )
+                        else:
+                            logger.error(
+                                f"No valid API key available after {retries} retries."
+                            )
+                            break
                     else:
-                        logger.error(
-                            f"No valid API key available after {retries} retries."
-                        )
+                        # No model_name available, can't do key switching
                         break
 
             if last_exception is None:

@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel
 from sqlalchemy import delete, func, select
+from fastapi import BackgroundTasks
 
 from app.config.config import settings
 from app.database import services as db_services
@@ -10,6 +12,20 @@ from app.database.models import ErrorLog
 from app.log.logger import get_error_log_logger
 
 logger = get_error_log_logger()
+
+
+class ErrorLogListItem(BaseModel):
+    id: int
+    gemini_key: Optional[str] = None
+    error_type: Optional[str] = None
+    error_code: Optional[int] = None
+    model_name: Optional[str] = None
+    request_time: Optional[datetime] = None
+
+
+class ErrorLogListResponse(BaseModel):
+    logs: List[ErrorLogListItem]
+    total: int
 
 
 async def delete_old_error_logs():
@@ -76,7 +92,8 @@ async def process_get_error_logs(
     end_date: Optional[datetime],
     sort_by: str,
     sort_order: str,
-) -> Dict[str, Any]:
+    background_tasks: Optional[BackgroundTasks] = None,
+) -> ErrorLogListResponse:
     """
     Processes the retrieval of error logs, supporting pagination and filtering.
     """
@@ -99,7 +116,31 @@ async def process_get_error_logs(
             start_date=start_date,
             end_date=end_date,
         )
-        return {"logs": logs_data, "total": total_count}
+        
+        validated_logs: List[ErrorLogListItem] = []
+        
+        # database items to pydantic models
+        for log in logs_data:
+            try:
+                error_log_item = ErrorLogListItem(
+                    id=log["id"],
+                    gemini_key=log["gemini_key"],
+                    error_type=log["error_type"],
+                    error_code=log["error_code"],
+                    model_name=log["model_name"],
+                    request_time=log["request_time"]
+                )
+                validated_logs.append(error_log_item)
+            except Exception as e:
+                logger.exception(f"Failed to validate log: {str(e)}, scheduling deletion")
+                if background_tasks:
+                    background_tasks.add_task(db_services.delete_error_log_by_id, log["id"])
+                else:
+                    # Fallback to synchronous deletion if no background_tasks provided
+                    await db_services.delete_error_log_by_id(log["id"])
+                continue
+            
+        return ErrorLogListResponse(logs=validated_logs, total=total_count)
     except Exception as e:
         logger.error(f"Service error in process_get_error_logs: {e}", exc_info=True)
         raise

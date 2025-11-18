@@ -3,6 +3,7 @@ Database connection pool module
 """
 
 from pathlib import Path, PureWindowsPath
+import platform
 from urllib.parse import quote_plus
 from databases import Database
 from sqlalchemy import create_engine, MetaData
@@ -27,7 +28,8 @@ if settings.DATABASE_TYPE == "sqlite":
         db_path = PureWindowsPath(db_path).as_posix()
         DATABASE_URL = f"sqlite:///{db_path}"
 elif settings.DATABASE_TYPE == "mysql":
-    if settings.MYSQL_SOCKET:
+    is_windows = platform.system() == "Windows"
+    if settings.MYSQL_SOCKET and not is_windows:
         DATABASE_URL = f"mysql+pymysql://{settings.MYSQL_USER}:{quote_plus(settings.MYSQL_PASSWORD)}@/{settings.MYSQL_DATABASE}?unix_socket={settings.MYSQL_SOCKET}"
     else:
         DATABASE_URL = f"mysql+pymysql://{settings.MYSQL_USER}:{quote_plus(settings.MYSQL_PASSWORD)}@{settings.MYSQL_HOST}:{settings.MYSQL_PORT}/{settings.MYSQL_DATABASE}"

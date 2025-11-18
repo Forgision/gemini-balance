@@ -5,13 +5,15 @@ from typing import AsyncGenerator, Optional, Dict, Any
 import pandas as pd
 import pytz
 from datetime import datetime, timedelta
-from sqlalchemy import select, MetaData, Column, Integer, String, DateTime, Boolean
+from sqlalchemy import select, MetaData, Column, Integer, String, DateTime, Boolean, UniqueConstraint, update as sa_update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.log.logger import get_key_manager_logger
 from app.service.key.rate_limits import scrape_gemini_rate_limits
 from app.config.config import settings
+from app.utils.read_write_lock import ReadWriteLock
 
 
 GEMINI_RATE_LIMIT_URL = (
@@ -79,6 +81,9 @@ class UsageMatrix(Base):
     """
 
     __tablename__ = "t_usage_stats"
+    __table_args__ = (
+        UniqueConstraint("api_key", "model_name", "vertex_key", name="uq_usage_stats_key"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     api_key = Column(String(100), nullable=False, index=True)
@@ -133,6 +138,7 @@ class KeyManager:
             "last_used",
         ]
     ]
+    _ALL_COLUMNS = _INDEX_LEVEL + _COLUMNS[0]
 
     def __init__(
         self,
@@ -164,23 +170,23 @@ class KeyManager:
         self.minute_reset_interval_sec = (
             minute_reset_interval or 60
         )  # default 60 seconds
-        # self.scheduler = scheduler = AsyncIOScheduler(self.tz)    #TODO: use this schedule to sechdule reset
 
         # --- Core Data ---
         # This DataFrame is the "brain" and holds all state.
         self.df: pd.DataFrame = pd.DataFrame()
-        self.lock = asyncio.Lock()
+        self.lock = ReadWriteLock()
 
         # --- State Management ---
         self.is_ready = False
         self._background_task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
+        self._required_db_commit = False
 
         # --- Timestamps for Resets ---
         self.last_minute_reset_ts: datetime = self.now_minute()
         self.last_day_reset_ts: datetime = self.now_day()
 
-    def _model_normalization(self, model_name: str) -> tuple[bool, str]:
+    def _model_normalization(self, model_name: str) -> str:
         """Normalizes a model name by matching it against configured rate limit models.
         This method checks if the input model name matches any prefix in the rate limit
         models list. If a match is found, it returns the longest matching prefix along
@@ -189,9 +195,7 @@ class KeyManager:
         Args:
             model_name (str): The model name to normalize. Must be a non-empty string.
         Returns:
-            tuple[bool, str]: A tuple containing:
-                - bool: True if a matching prefix was found, False otherwise
-                - str: The matching prefix if found, otherwise the original model_name
+            str: The matching prefix if found, otherwise the original model_name
         Raises:
             TypeError: If model_name is not a non-empty string.
             ValueError: If rate_limit_models is not properly configured (None, not a list,
@@ -215,10 +219,10 @@ class KeyManager:
         for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
-                return (True, prefix)
+                return prefix
 
         # If the loop finishes without finding any match, return the original string.
-        return (False, model_name)
+        return model_name
 
     def _get_default_rate_limits(self) -> dict:
         """Return default rate limits if scraping fails."""
@@ -261,6 +265,9 @@ class KeyManager:
             ]
             if missing_columns:
                 error_msg += f"\nRequired columns {missing_columns} not found"
+                
+        if self.df.empty:
+            error_msg += "\nDataFrame is empty."
 
         if error_msg:
             raise Exception(error_msg)
@@ -343,14 +350,15 @@ class KeyManager:
                     )
 
         # Checking that all api keys have entries for all models in data
-        expected_entries = (len(self.api_keys) + len(self.vertex_api_keys)) * len(self.rate_limit_data) 
-        if len(defaults) != expected_entries: # (len(self.api_keys) + len(self.vertex_api_keys)) * len(self.rate_limit_data):
+        expected_entries = (len(self.api_keys) + len(self.vertex_api_keys)) * len(self.rate_limit_data)
+        if len(defaults) != expected_entries:
             raise ValueError(f"Defaults is not created for each keys. Expected {expected_entries} entries but got {len(defaults)}")
 
+        df = pd.DataFrame(defaults)
+        df.set_index(self._INDEX_LEVEL, inplace=True, drop=True)
         # Updating dataframe
-        async with self.lock:
-            self.df = pd.DataFrame(defaults)
-            self.df.set_index(self._INDEX_LEVEL, inplace=True, drop=True)
+        async with self.lock.write_lock():
+            self.df = df
             self.last_minute_reset_ts = self.now_minute()
             self.last_day_reset_ts = self.now_day()
 
@@ -392,29 +400,28 @@ class KeyManager:
 
                 df = pd.DataFrame(db_data_dict)
                 df.set_index(self._INDEX_LEVEL, inplace=True, drop=True)
+                
+                # Ensure datetime columns in df match the dtype in self.df to avoid FutureWarning
+                datetime_columns = ['minute_reset_time', 'day_reset_time', 'last_used']
+                for col in datetime_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], utc=True)
 
-                async with self.lock:
+                async with self.lock.write_lock():
                     # self.df is guaranteed to be initialized by _load_default before this method is called.
                     # Ensure self.df is also indexed for proper update.
                     if isinstance(self.df, pd.DataFrame):
-                        # Ensure datetime columns in df match the dtype in self.df to avoid FutureWarning
-                        datetime_columns = ['minute_reset_time', 'day_reset_time', 'last_used']
-                        for col in datetime_columns:
-                            if col in df.columns and col in self.df.columns:
-                                # Convert to match the dtype of self.df column
-                                df[col] = pd.to_datetime(df[col], utc=True)
-                        
-                        # Update existing entries in self.df with values from db_df.
-                        # This will only update rows where the index (api_key, model_name) matches.
-                        # Columns present in self.df but not in db_df (e.g., 'vertex_key') will remain unchanged.
+                        # Update existing entries in self.df with values from df.
                         self.df.update(df)
                         logger.info(
                             f"Successfully merged {len(df)} records from database into self.df."
                         )
                     else:
-                        self.df = df
+                        raise ValueError("self.df is not a DataFrame. run _load_default first.")
 
                     # setting reset times
+                    
+                    # set last minute reset time
                     max_minute_reset_dt = pd.to_datetime(self.df["minute_reset_time"]).max()
                     if pd.isna(max_minute_reset_dt) or isinstance(max_minute_reset_dt, pd.Series):
                         self.last_minute_reset_ts = datetime.now(self.tz)
@@ -425,6 +432,7 @@ class KeyManager:
                             dt = self.tz.localize(dt)
                         self.last_minute_reset_ts = dt
 
+                    # set last day reset time
                     max_day_reset_dt = pd.to_datetime(self.df["day_reset_time"]).max()
                     if pd.isna(max_day_reset_dt) or isinstance(max_day_reset_dt, pd.Series):
                         self.last_day_reset_ts = datetime.now(self.tz)
@@ -442,41 +450,13 @@ class KeyManager:
                 )
 
         except Exception as e:
-            logger.error(
-                f"Failed to load from database: {e}. Keeping defaults from _load_default."
+            logger.exception(
+                f"Exception to load from database: {e}"
             )
 
     async def _set_available_usage(self):
-        # Skip _check_ready during initialization to avoid circular dependency
-        # _check_ready requires the "_left" columns that this method creates
-        if self.is_ready:
-            missing_columns = [
-                column
-                for column in ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
-                if column not in self.df.columns
-            ]
-            if missing_columns:
-                raise TypeError(f"Required columns {missing_columns} not found")
-        else:
-            # During init, just verify we have the essential columns
-            if self.df is None or self.df.empty:
-                raise TypeError("DataFrame not initialized")
-
-        self.df["rpm_left"] = self.df["max_rpm"] - self.df["rpm"]
-        self.df["tpm_left"] = self.df["max_tpm"] - self.df["tpm"]
-        self.df["rpd_left"] = self.df["max_rpd"] - self.df["rpd"]
-
-        # Ensure no negative values for 'left' columns
-        self.df["rpm_left"] = self.df["rpm_left"].clip(lower=0)
-        self.df["tpm_left"] = self.df["tpm_left"].clip(lower=0)
-        self.df["rpd_left"] = self.df["rpd_left"].clip(lower=0)
-
-    async def _set_exhausted_flags(self):
-        if not self.is_ready:
-            await self._check_ready()
-
-        # This method should be called within a lock context
-        # It modifies self.df, so it needs to be protected
+        """Set available usage for keys based on usage. This should be called by _on_update_usage only."""
+        
         missing_columns = [
             column
             for column in ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
@@ -485,13 +465,29 @@ class KeyManager:
         if missing_columns:
             raise TypeError(f"Required columns {missing_columns} not found")
 
-        self.df["is_exhausted"] = False  # Reset all to False first
+        self.df["rpm_left"] = (self.df["max_rpm"] - self.df["rpm"]).clip(lower=0)
+        self.df["tpm_left"] = (self.df["max_tpm"] - self.df["tpm"]).clip(lower=0)
+        self.df["rpd_left"] = (self.df["max_rpd"] - self.df["rpd"]).clip(lower=0)
 
-        self.df["is_exhausted"] = (
+    async def _set_exhausted_flags(self):
+        """Set exhausted flags for keys based on usage. This should be called by _on_update_usage only."""
+        missing_columns = [
+            column
+            for column in ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
+            if column not in self.df.columns
+        ]
+        if missing_columns:
+            raise TypeError(f"Required columns {missing_columns} not found")
+
+        flags = (
             (self.df["rpm"] >= self.df["max_rpm"])
             | (self.df["tpm"] >= self.df["max_tpm"])
             | (self.df["rpd"] >= self.df["max_rpd"])
         )
+        if "is_exhausted" in self.df.columns:
+            self.df["is_exhausted"] = self.df["is_exhausted"] | flags
+        else:
+            self.df["is_exhausted"] = flags
 
     async def _ensure_numeric_columns(self):
         """Ensures that the columns used for comparison are numeric.
@@ -506,14 +502,12 @@ class KeyManager:
                 ).fillna(0).astype(int)
 
     async def _on_update_usage(self):
-        """
-        Callback for when usage is updated.
-        Currently not used.
-        """
-        async with self.lock:
-            await self._set_available_usage()
-            await self._set_exhausted_flags()
-        await self._commit_to_db()
+        """ This method is called upon any updation in self.df, but must be called within a lock context."""
+        await self._set_available_usage()
+        await self._set_exhausted_flags()
+        
+        # set required db commit
+        self._required_db_commit = True
 
     async def init(
         self,
@@ -527,9 +521,6 @@ class KeyManager:
         """
         try:
             logger.info("Initializing KeyManager...")
-            
-            # create database
-            await init_database()
 
             self.db_maker = async_session_maker or self.db_maker
             self.rate_limit_data = rate_limit_data or self.rate_limit_data
@@ -537,26 +528,19 @@ class KeyManager:
                 minute_reset_interval or self.minute_reset_interval_sec
             )
 
-            # get rate limit data
-            try:
-                rate_limit_data = scrape_gemini_rate_limits(GEMINI_RATE_LIMIT_URL)
-                if not rate_limit_data:
-                    raise ValueError("rate_limit_data is empty!")
-            except Exception as e:
-                logger.warning(f"Failed to scrape rate limits: {e}. Using cached/default.")
-                rate_limit_data = self._get_default_rate_limits()
-            
-            # Handle missing "Free Tier" key
-            if "Free Tier" not in rate_limit_data:
-                logger.warning("Free Tier not found, using first available tier.")
-                tier_key = list(rate_limit_data.keys())[0] if rate_limit_data else "Free Tier"
-                self.rate_limit_data = rate_limit_data.get(tier_key, {}).copy()
-            else:
-                self.rate_limit_data = rate_limit_data["Free Tier"].copy()
-            self.rate_limit_models = sorted(
-                list(self.rate_limit_data.keys()), key=len, reverse=True
-            )
-            del rate_limit_data
+            if not self.rate_limit_data:
+                try:
+                    scraped = scrape_gemini_rate_limits(GEMINI_RATE_LIMIT_URL)
+                except Exception as e:
+                    logger.warning(f"Failed to scrape rate limits: {e}. Using cached/default.")
+                    scraped = None
+                if not scraped:
+                    scraped = self._get_default_rate_limits()
+                if isinstance(scraped, dict) and "Free Tier" in scraped:
+                    self.rate_limit_data = scraped["Free Tier"].copy()
+                else:
+                    self.rate_limit_data = scraped.copy() if isinstance(scraped, dict) else {}
+            self.rate_limit_models = sorted(list(self.rate_limit_data.keys()), key=len, reverse=True)
 
             # load defaults
             await self._load_default()
@@ -565,21 +549,18 @@ class KeyManager:
             await self._load_from_db()
 
             await self._ensure_numeric_columns()
-            
-            # Ensure available usage columns are created
-            # await self._set_available_usage()
-            # await self._set_exhausted_flags()
-
-            # 2. Run initial reset to set timestamps
-            # await self.reset_usage()
-            await self._on_update_usage()
 
             # 3. Start background resetter
-            self._background_task = asyncio.create_task(self.reset_usage_bg())
+            self._background_task = asyncio.create_task(self.backgroud_worker())
 
+            # 2. Run initial reset to set timestamps
+            async with self.lock.write_lock():
+                await self._on_update_usage()
+                
             # 4. Set ready state
             if await self._check_ready():
                 self.is_ready = True
+                
             logger.info("KeyManager is ready.")
             return True
         except Exception as e:
@@ -618,16 +599,28 @@ class KeyManager:
             logger.info("Performing final database commit...")
             try:
                 await self._commit_to_db()
-            except Exception as e:
+            except Exception:
                 logger.exception("Error during final commit")
                 
         self.is_ready = False
         logger.info("KeyManager shutdown complete.")
 
     async def get_key(self, model_name: str, is_vertex_key: bool = False) -> str:
-        """
-        Finds and returns the best available API key for a given model.
-        Implements "sticky" key caching within a 1-minute window.
+        """ Get key for a given model name and type (Gemini or Vertex) which has highest tokens left.
+        
+        The method ensures that the KeyManager is ready, normalizes the model name, and then acquires
+        a lock to safely access key usage records. It filters available keys for the specified model
+        and type, checks activity and depletion status, applies current model and global quota limits, and returns the best key with the most tokens left for assignment.
+
+        Args:
+            model_name (str): The name of the model for which to fetch an API key.
+            is_vertex_key (bool, optional): If True, retrieves a Vertex API key. Otherwise, retrieves a Gemini key. Defaults to False.
+
+        Returns:
+            str: The selected API key as a string.
+
+        Raises:
+            Exception: If no keys are configured or available for the requested model or key type, or if the internal DataFrame is not ready.
         """
 
         # Ensure readiness
@@ -635,58 +628,67 @@ class KeyManager:
             await self._check_ready()
 
         # Normalize model name and extract the normalized string
-        matched, model_name = self._model_normalization(model_name)
+        model_name = self._model_normalization(model_name)
 
         # Acquire lock early to safely check and access self.df
-        async with self.lock:
+        async with self.lock.read_lock():
             # Validate DataFrame and that 'model_name' exists at index level 0
-            if self.df is None or model_name not in self.df.index.get_level_values("model_name"):
+            if model_name not in self.df.index.get_level_values("model_name"):
+                logger.warning(f"No keys configured for model: {model_name}, falling back to cycle.")
+                # return next key in cycle, model will be inserted in next update_usage call
                 if is_vertex_key:
                     return next(self.vertex_api_keys_cycle)
                 else:
                     return next(self.api_keys_cycle)
+                
             # Filter for the specific model and vertex key type
             try:
-                candidates = self.df.xs(model_name, level="model_name").copy()
-                # Filter by vertex key type
-                candidates = candidates.xs(is_vertex_key, level="is_vertex_key").copy()
+                model_df = self.df.xs(model_name, level="model_name", drop_level=False)
+                candidates = model_df.xs(is_vertex_key, level="is_vertex_key", drop_level=False).copy()
             except KeyError:
-                raise Exception(f"No keys configured for model: {model_name}")
-
-            # Apply filters
-            candidates = candidates.query(
-                "is_active == True and "
-                "is_exhausted == False and "
-                "rpm_left >= 1 and "
-                "rpd_left >= 1"
-            )
-
-            # Check data is not empty
-            if candidates.empty:
-                logger.warning(f"No available keys for model {model_name}, falling back to cycle.")
+                logger.warning(f"No keys configured for model: {model_name}, falling back to cycle.")
                 return await self.get_next_key(is_vertex_key=is_vertex_key)
 
-            # Sort by tpm_left descending
-            candidates.sort_values(by=["tpm_left"], ascending=False, inplace=True)
+        # Apply filters
+        mask = (
+            (candidates["is_active"]) &
+            (~candidates["is_exhausted"]) &
+            (candidates["rpm_left"] >= 1) &
+            (candidates["tpm_left"] >= 1) &
+            (candidates["rpd_left"] >= 1)
+        )
+        
+        candidates = candidates.loc[mask]
 
-            # Check index level and get the best key string
-            first_index = candidates.index[0]
-            
-            if isinstance(first_index, tuple) or isinstance(first_index, list):
-                if len(first_index) == 3:
-                    best_key_string = str(first_index[2])
-                elif len(first_index) == 2:
-                    best_key_string = str(first_index[1])
-                elif len(first_index) == 1:
-                    best_key_string = str(first_index[0])
-                else:
-                    raise Exception(f"Invalid index length: {len(first_index)}")
-            elif isinstance(first_index, str):
-                best_key_string = first_index
+        # Check data is not empty
+        if len(candidates) == 0:
+            logger.warning(f"No available keys for model {model_name}, falling back to cycle.")
+            #TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
+            return "" # Return empty string to indicate no key available
+
+        # Sort by tpm_left descending
+        candidates.sort_values(by=["tpm_left"], ascending=False, inplace=True)
+
+        # Check index level and get the best key string
+        first_index = candidates.index[0]
+        
+        if isinstance(first_index, tuple) or isinstance(first_index, list):
+            if len(first_index) == 3:
+                best_key_string = str(first_index[2])
+            elif len(first_index) == 2:
+                best_key_string = str(first_index[1])
+            elif len(first_index) == 1:
+                best_key_string = str(first_index[0])
             else:
-                raise Exception(f"Invalid index type: {type(first_index)}")
+                logger.warning(f"Invalid index length: {len(first_index)}, falling back to cycle.")
+                return await self.get_next_key(is_vertex_key=is_vertex_key)
+        elif isinstance(first_index, str):
+            best_key_string = first_index
+        else:
+            logger.warning(f"Invalid index type: {type(first_index)}, falling back to cycle.")
+            return await self.get_next_key(is_vertex_key=is_vertex_key)
 
-            return best_key_string
+        return best_key_string
 
     async def update_usage(
         self,
@@ -701,93 +703,79 @@ class KeyManager:
         Updates the in-memory DataFrame with new usage data.
         This is a fast, async, in-memory-only operation.
         """
+        
+        # convert to int and handle NaN
+        def to_int_safe(val) -> int:
+            if isinstance(val, (int, float)):
+                return int(val) if not pd.isna(val) else 0
+            try:
+                scalar = val.item() if hasattr(val, 'item') else float(val)
+                return int(scalar) if not pd.isna(scalar) else 0
+            except (ValueError, AttributeError, TypeError):
+                return 0
+        
         if not self.is_ready:
             await self._check_ready()
 
-        match, model_name = self._model_normalization(model_name)
+        model_name = self._model_normalization(model_name)
         idx = (model_name, is_vertex_key, key_value)
-        updated = False
-
+        
+        # Pre-compute values outside lock
+        now = self.now()
+        
         try:
-            async with self.lock:
-                # Create entry for unknown model with unlimited limits (within same lock)
-                if model_name not in self.df.index.get_level_values("model_name"):
+            async with self.lock.write_lock():
+                    
+                if idx in self.df.index:
+                    # Fast atomic update - direct write
+                    row = self.df.loc[idx]
+
+                    # Update individual columns (preserves all other columns)
+                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
+                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
+                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
+                    self.df.loc[idx, "last_used"] = now
+
+                    if error:
+                        if error_type == "permanent":
+                            key_mask = self.df.index.get_level_values("api_key") == key_value
+                            self.df.loc[key_mask, "is_active"] = False
+                        elif error_type == "429":
+                            self.df.loc[idx, "is_exhausted"] = True
+                    
+                    # Call _on_update_usage to update usage
+                    await self._on_update_usage()
+                else:
                     new_entry = {
                         "api_key": key_value,
                         "model_name": model_name,
-                        "rpm": 0,
-                        "max_rpm": 999999,  # Unlimited
-                        "tpm": 0,
+                        "rpm": 1,
+                        "max_rpm": 99999,  # Unlimited
+                        "tpm": tokens_used,
                         "max_tpm": 999999999,  # Unlimited
-                        "rpd": 0,
-                        "max_rpd": 999999,  # Unlimited
+                        "rpd": 1,
+                        "max_rpd": 99999,  # Unlimited
                         "minute_reset_time": self.now_minute(),
                         "day_reset_time": self.now_day(),
                         "last_used": self.now() - timedelta(2),
                         "is_vertex_key": is_vertex_key,
-                        "is_active": True,
-                        "is_exhausted": False,
+                        "is_active": True if not error or error_type != "permanent" else False,
+                        "is_exhausted": True if error and error_type == "429" else False,
                     }
                     new_df = pd.DataFrame([new_entry])
                     new_df.set_index(self._INDEX_LEVEL, inplace=True, drop=True)
                     self.df = pd.concat([self.df, new_df])
                     logger.info(f"Created entry for unknown model: {model_name}")
-                else:   # update existing entry
-                    # get current usage values
-                    rpd_val = pd.to_numeric(self.df.loc[idx, "rpd"], errors="coerce")
-                    rpm_val = pd.to_numeric(self.df.loc[idx, "rpm"], errors="coerce")
-                    tpm_val = pd.to_numeric(self.df.loc[idx, "tpm"], errors="coerce")
-
-                    # convert to int and handle NaN
-                    def to_int_safe(val) -> int:
-                        if isinstance(val, (int, float)):
-                            return int(val) if not pd.isna(val) else 0
-                        try:
-                            scalar = val.item() if hasattr(val, 'item') else float(val)
-                            return int(scalar) if not pd.isna(scalar) else 0
-                        except (ValueError, AttributeError, TypeError):
-                            return 0
-                        
-                    # convert to int and handle NaN
-                    rpd_int = to_int_safe(rpd_val)
-                    rpm_int = to_int_safe(rpm_val)
-                    tpm_int = to_int_safe(tpm_val)
                     
-                    # update usage values
-                    self.df.loc[idx, "rpd"] = rpd_int + 1
-                    self.df.loc[idx, "rpm"] = rpm_int + 1
-                    self.df.loc[idx, "tpm"] = tpm_int + tokens_used
-                    self.df.loc[idx, "last_used"] = self.now()
-
-                    # Set updated flag
-                    updated = True
-                    
-                if error:
-                    if error_type == "permanent":
-                        # Deactivate key for ALL models
-                        self.df.loc[
-                            self.df.index.get_level_values("api_key") == key_value,
-                            "is_active",
-                        ] = False
-                    elif error_type == "429":
-                        # Then set exhausted flag for this specific model (after _set_exhausted_flags)
-                        self.df.loc[idx, "is_exhausted"] = True
-                    updated = True
-                    
-        except KeyError:
-            logger.warning(
-                f"Attempted to update non-existent key/model: {key_value}/{model_name}"
-            )
-            return False
+                    # Call _on_update_usage to update usage
+                    await self._on_update_usage()
         except Exception as e:
             logger.error(f"Error in update_usage: {e}")
             return False
         
-        if updated:
-            await self._on_update_usage()
         return True
 
-    async def reset_usage(self) -> bool:
+    async def reset_usage(self):
         """
         The core LOGIC for resetting metrics in the DataFrame.
         This method is called by the background task.
@@ -798,8 +786,6 @@ class KeyManager:
 
             now_minute = self.now_minute()
             now_day = self.now_day()
-            
-            reseted = False
 
             # Ensure last_minute_reset_ts is timezone-aware (assume UTC if naive)
             if self.last_minute_reset_ts.tzinfo is None:
@@ -809,12 +795,12 @@ class KeyManager:
                 logger.debug(
                     "Resetting minute-level metrics (rpm, tpm, exhausted)..."
                 )
-                async with self.lock:
+                async with self.lock.write_lock():
                     self.df["rpm"] = 0
                     self.df["tpm"] = 0
                     self.df["is_exhausted"] = False
                     self.last_minute_reset_ts = now_minute
-                    reseted = True
+                    await self._on_update_usage()
         
             # Ensure last_day_reset_ts is timezone-aware (assume UTC if naive)
             if self.last_day_reset_ts.tzinfo is None:
@@ -822,16 +808,13 @@ class KeyManager:
             
             if self.last_day_reset_ts + timedelta(days=1) < now_day:
                 logger.debug("Resetting day-level metrics (rpd)...")
-                async with self.lock:
+                async with self.lock.write_lock():
                     self.df["rpd"] = 0
                     self.last_day_reset_ts = now_day
-                    reseted = True
-
-            if reseted:
-                await self._on_update_usage()
+                    await self._on_update_usage()
             return True
-        except Exception as e:
-            logger.exception(f"Error in reset_usage: {e}")
+        except Exception:
+            logger.exception("Exception in reset_usage")
             return False
 
     async def _commit_to_db(self):
@@ -843,68 +826,92 @@ class KeyManager:
             return
 
         # 1. Get a thread-safe copy of the data to save
-        async with self.lock:
+        async with self.lock.write_lock():
             df_to_save = self.df.copy()
 
         # 2. Iterate and save
         logger.info(f"Committing {len(df_to_save)} records to database...")
         try:
             async with self.db_maker() as session:
-                for (model_name, is_vertex_key, api_key), row in df_to_save.iterrows():  # type: ignore
-                    # Use a more general "upsert" method
-                    stmt = select(UsageMatrix).where(
-                        UsageMatrix.api_key == api_key,
-                        UsageMatrix.model_name == model_name,
-                        UsageMatrix.vertex_key == is_vertex_key,
-                    )
-                    result = await session.execute(stmt)
-                    instance = result.scalars().first()
-
-                    if instance:  # Update existing record
-                        instance.rpm = int(row["rpm"])  # type: ignore
-                        instance.tpm = int(row["tpm"])  # type: ignore
-                        instance.rpd = int(row["rpd"])  # type: ignore
-                        instance.minute_reset_time = self.last_minute_reset_ts  # type: ignore
-                        instance.day_reset_time = self.last_day_reset_ts  # type: ignore
-                        instance.is_exhausted = bool(row["is_exhausted"])  # type: ignore
-                        instance.last_used = row["last_used"]  # type: ignore
-                        instance.is_active = bool(row["is_active"])  # type: ignore
-                    else:  # Insert new record
-                        instance = UsageMatrix(
-                            api_key=api_key,
-                            model_name=model_name,
-                            rpm=int(row["rpm"]),
-                            tpm=int(row["tpm"]),
-                            rpd=int(row["rpd"]),
-                            minute_reset_time=self.last_minute_reset_ts,
-                            day_reset_time=self.last_day_reset_ts,
-                            vertex_key=is_vertex_key,
-                            is_active=bool(row["is_active"]),
-                            is_exhausted=bool(row["is_exhausted"]),
-                            last_used=row["last_used"],
+                bind = session.get_bind()
+                is_sqlite = hasattr(bind, "dialect") and getattr(bind.dialect, "name", "") == "sqlite"
+                if is_sqlite:
+                    for (model_name, is_vertex_key, api_key), row in df_to_save.iterrows():  # type: ignore
+                        values = {
+                            "api_key": api_key,
+                            "model_name": model_name,
+                            "rpm": int(row["rpm"]),
+                            "tpm": int(row["tpm"]),
+                            "rpd": int(row["rpd"]),
+                            "minute_reset_time": self.last_minute_reset_ts,
+                            "day_reset_time": self.last_day_reset_ts,
+                            "vertex_key": bool(is_vertex_key),
+                            "is_active": bool(row["is_active"]),
+                            "is_exhausted": bool(row["is_exhausted"]),
+                            "last_used": row["last_used"],
+                        }
+                        stmt = sqlite_insert(UsageMatrix).values(**values)
+                        stmt = stmt.on_conflict_do_update(
+                            index_elements=[UsageMatrix.api_key, UsageMatrix.model_name, UsageMatrix.vertex_key],
+                            set_=values,
                         )
-                        session.add(instance)
-                await session.commit()
+                        await session.execute(stmt)
+                    await session.commit()
+                else:
+                    for (model_name, is_vertex_key, api_key), row in df_to_save.iterrows():  # type: ignore
+                        values = {
+                            "rpm": int(row["rpm"]),
+                            "tpm": int(row["tpm"]),
+                            "rpd": int(row["rpd"]),
+                            "minute_reset_time": self.last_minute_reset_ts,
+                            "day_reset_time": self.last_day_reset_ts,
+                            "is_exhausted": bool(row["is_exhausted"]),
+                            "last_used": row["last_used"],
+                            "is_active": bool(row["is_active"]),
+                        }
+                        upd = sa_update(UsageMatrix).where(
+                            (UsageMatrix.api_key == api_key)
+                            & (UsageMatrix.model_name == model_name)
+                            & (UsageMatrix.vertex_key == bool(is_vertex_key))
+                        ).values(**values)
+                        result = await session.execute(upd)
+                        if result.rowcount == 0:
+                            instance = UsageMatrix(
+                                api_key=api_key,
+                                model_name=model_name,
+                                rpm=values["rpm"],
+                                tpm=values["tpm"],
+                                rpd=values["rpd"],
+                                minute_reset_time=values["minute_reset_time"],
+                                day_reset_time=values["day_reset_time"],
+                                vertex_key=bool(is_vertex_key),
+                                is_active=values["is_active"],
+                                is_exhausted=values["is_exhausted"],
+                                last_used=values["last_used"],
+                            )
+                            session.add(instance)
+                    await session.commit()
             logger.debug("Database commit successful.")
-        except Exception as e:
-            logger.error(f"Database commit failed: {e}")
+        except Exception:
+            logger.exception("Database commit failed")
 
-    async def reset_usage_bg(self):
+    async def backgroud_worker(self):
         """
         The main background task that runs the reset and commit loops.
         """
-        logger.info("Background reset/commit task started.")
+        logger.info("KeyManager backgroud worker started.")
         while not self._stop_event.is_set():
             try:
                 if not self.is_ready:
                     await asyncio.sleep(1)
                     await self._check_ready()
 
-                reset: bool = await self.reset_usage()
-
+                await self.reset_usage()
+                    
                 # 3. Check for DB Commit
-                if reset:
-                    await self._on_update_usage()
+                if self._required_db_commit:
+                    await self._commit_to_db()
+                    self._required_db_commit = False
 
                 # Wait for 1 second or until stop_event is set
                 try:
@@ -913,14 +920,14 @@ class KeyManager:
                     pass  # This is the normal loop
 
             except asyncio.CancelledError:
-                logger.info("Background task cancelled.")
+                logger.info("KeyManager backgroud worker cancelled.")
                 break
-            except Exception as e:
-                logger.exception(f"Error in background task: {e}")
+            except Exception:
+                logger.exception("Exception in KeyManager backgroud worker")
                 # Don't crash the loop, just wait and retry
                 await asyncio.sleep(5)
 
-        logger.info("Background reset/commit task stopped.")
+        logger.info("KeyManager backgroud worker stopped.")
 
     # ========== Adapter Methods for v1 Compatibility ==========
 
@@ -956,10 +963,10 @@ class KeyManager:
         if not self.is_ready:
             await self._check_ready()
         
-        match, model_name = self._model_normalization(model_name)
+        model_name = self._model_normalization(model_name)
         is_vertex_key = api_key in self.vertex_api_keys
         
-        async with self.lock:
+        async with self.lock.read_lock():
             try:
                 idx = (model_name, is_vertex_key, api_key)
                 if idx not in self.df.index:
@@ -996,7 +1003,7 @@ class KeyManager:
         valid_keys = {}
         invalid_keys = {}
         
-        async with self.lock:
+        async with self.lock.read_lock():
             # Get all unique keys from DataFrame
             all_keys = set(self.df.index.get_level_values("api_key"))
             
@@ -1042,15 +1049,14 @@ class KeyManager:
         
         from app.utils.helpers import redact_key_for_logging
         
-        async with self.lock:
+        async with self.lock.write_lock():
             try:
-                # Reactivate for all models
                 key_mask = self.df.index.get_level_values("api_key") == key
                 if key_mask.any():
                     self.df.loc[key_mask, "is_active"] = True
                     self.df.loc[key_mask, "is_exhausted"] = False
-                    # Set updated flag to trigger _on_update_usage later
-                    updated = True
+                    await self._on_update_usage()
+                    return True
                 else:
                     logger.warning(f"Key not found for reactivation: {redact_key_for_logging(key)}")
                     return False
@@ -1058,14 +1064,7 @@ class KeyManager:
                 logger.error(f"Error reactivating key: {e}")
                 return False
         
-        # Call _on_update_usage outside lock to avoid deadlock
-        if updated:
-            async with self.lock:
-                await self._set_available_usage()
-                await self._set_exhausted_flags()
-            await self._commit_to_db()
-            logger.info(f"Manually reactivated key: {redact_key_for_logging(key)}")
-            return True
+        logger.info(f"Manually reactivated key: {redact_key_for_logging(key)}")
         return False
 
     async def handle_api_failure(
@@ -1130,7 +1129,7 @@ class KeyManager:
         if not self.is_ready:
             await self._check_ready()
         
-        async with self.lock:
+        async with self.lock.read_lock():
             df_copy = self.df.copy()
         
         state = {
