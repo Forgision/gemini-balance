@@ -93,12 +93,14 @@ async def upload_file_init(
         return JSONResponse(content=response_data, headers=response_headers)
 
     except HTTPException as e:
-        logger.error(f"Upload initialization failed: {e.detail}")
+        logger.error(f"Upload initialization failed: {e.detail}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": e.detail}}, status_code=e.status_code
         )
     except Exception as e:
-        logger.error(f"Unexpected error in upload initialization: {str(e)}")
+        logger.error(
+            f"Unexpected error in upload initialization: {str(e)}", exc_info=True
+        )
         return JSONResponse(
             content={"error": {"message": "Internal server error"}}, status_code=500
         )
@@ -124,12 +126,12 @@ async def list_files(
         )
 
     except HTTPException as e:
-        logger.error(f"List files failed: {e.detail}")
+        logger.error(f"List files failed: {e.detail}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": e.detail}}, status_code=e.status_code
         )
     except Exception as e:
-        logger.error(f"Unexpected error in list files: {str(e)}")
+        logger.error(f"Unexpected error in list files: {str(e)}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": "Internal server error"}}, status_code=500
         )
@@ -150,12 +152,12 @@ async def get_file(
         return await files_service.get_file(f"files/{file_id}", user_token)
 
     except HTTPException as e:
-        logger.error(f"Get file failed: {e.detail}")
+        logger.error(f"Get file failed: {e.detail}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": e.detail}}, status_code=e.status_code
         )
     except Exception as e:
-        logger.error(f"Unexpected error in get file: {str(e)}")
+        logger.error(f"Unexpected error in get file: {str(e)}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": "Internal server error"}}, status_code=500
         )
@@ -181,12 +183,12 @@ async def delete_file(
         )
 
     except HTTPException as e:
-        logger.error(f"Delete file failed: {e.detail}")
+        logger.error(f"Delete file failed: {e.detail}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": e.detail}}, status_code=e.status_code
         )
     except Exception as e:
-        logger.error(f"Unexpected error in delete file: {str(e)}")
+        logger.error(f"Unexpected error in delete file: {str(e)}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": "Internal server error"}}, status_code=500
         )
@@ -235,12 +237,12 @@ async def handle_upload(
         )
 
     except HTTPException as e:
-        logger.error(f"Upload handling failed: {e.detail}")
+        logger.error(f"Upload handling failed: {e.detail}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": e.detail}}, status_code=e.status_code
         )
     except Exception as e:
-        logger.error(f"Unexpected error in upload handling: {str(e)}")
+        logger.error(f"Unexpected error in upload handling: {str(e)}", exc_info=True)
         return JSONResponse(
             content={"error": {"message": "Internal server error"}}, status_code=500
         )

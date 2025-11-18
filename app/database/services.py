@@ -36,7 +36,7 @@ async def get_all_settings() -> List[Dict[str, Any]]:
         result = await database.fetch_all(query)
         return [dict(row) for row in result]
     except Exception as e:
-        logger.error(f"Failed to get all settings: {str(e)}")
+        logger.error(f"Failed to get all settings: {str(e)}", exc_info=True)
         raise
 
 
@@ -55,7 +55,7 @@ async def get_setting(key: str) -> Optional[Dict[str, Any]]:
         result = await database.fetch_one(query)
         return dict(result) if result else None
     except Exception as e:
-        logger.error(f"Failed to get setting {key}: {str(e)}")
+        logger.error(f"Failed to get setting {key}: {str(e)}", exc_info=True)
         raise
 
 
@@ -104,7 +104,7 @@ async def update_setting(
             logger.info(f"Inserted setting: {key}")
             return True
     except Exception as e:
-        logger.error(f"Failed to update setting {key}: {str(e)}")
+        logger.error(f"Failed to update setting {key}: {str(e)}", exc_info=True)
         return False
 
 
@@ -152,7 +152,7 @@ async def get_usage_stats_by_key_and_model(
 
         return record
     except Exception as e:
-        logger.error(f"Failed to get usage stats: {str(e)}")
+        logger.error(f"Failed to get usage stats: {str(e)}", exc_info=True)
         raise
 
 
@@ -168,7 +168,7 @@ async def get_all_usage_stats() -> List[Dict[str, Any]]:
         result = await database.fetch_all(query)
         return [dict(row) for row in result]
     except Exception as e:
-        logger.error(f"Failed to get all usage stats: {str(e)}")
+        logger.error(f"Failed to get all usage stats: {str(e)}", exc_info=True)
         raise
 
 
@@ -224,7 +224,7 @@ async def add_error_log(
         )
         return True
     except Exception as e:
-        logger.error(f"Failed to add error log: {str(e)}")
+        logger.error(f"Failed to add error log: {str(e)}", exc_info=True)
         return False
 
 
@@ -298,7 +298,9 @@ async def get_error_logs(
         result = await database.fetch_all(query)
         return [dict(row) for row in result]
     except Exception as e:
-        logger.exception(f"Failed to get error logs with filters: {str(e)}")
+        logger.error(
+            f"Failed to get error logs with filter", exc_info=True
+        )
         raise
 
 
@@ -348,7 +350,9 @@ async def get_error_logs_count(
         count_result = await database.fetch_one(query)
         return count_result[0] if count_result else 0
     except Exception as e:
-        logger.exception(f"Failed to count error logs with filters: {str(e)}")
+        logger.error(
+            f"Failed to count error logs with filters.", exc_info=True
+        )
         raise
 
 
@@ -381,7 +385,10 @@ async def get_error_log_details(log_id: int) -> Optional[Dict[str, Any]]:
         else:
             return None
     except Exception as e:
-        logger.exception(f"Failed to get error log details for ID {log_id}: {str(e)}")
+        logger.error(
+            f"Failed to get error log details for ID {log_id}.",
+            exc_info=True,
+        )
         raise
 
 
@@ -451,8 +458,9 @@ async def find_error_log_by_info(
         )
         return _to_dict(best)
     except Exception as e:
-        logger.exception(
-            f"Failed to find error log by info (key=***{gemini_key[-4:] if gemini_key else ''}, code={status_code}, ts={timestamp}, window={window_seconds}s): {str(e)}"
+        logger.error(
+            f"Failed to find error log by info (key=***{gemini_key[-4:] if gemini_key else ''}, code={status_code}, ts={timestamp}, window={window_seconds}s).",
+            exc_info=True,
         )
         raise
 
@@ -607,7 +615,7 @@ async def add_request_log(
         await database.execute(query)
         return True
     except Exception as e:
-        logger.error(f"Failed to add request log: {str(e)}")
+        logger.error(f"Failed to add request log: {str(e)}", exc_info=True)
         return False
 
 
@@ -673,7 +681,7 @@ async def create_file_record(
             raise Exception(f"Failed to create or find file record: {name}")
         return record
     except Exception as e:
-        logger.error(f"Failed to create file record: {str(e)}")
+        logger.error(f"Failed to create file record: {str(e)}", exc_info=True)
         raise
 
 
@@ -692,7 +700,9 @@ async def get_file_record_by_name(name: str) -> Optional[Dict[str, Any]]:
         result = await database.fetch_one(query)
         return dict(result) if result else None
     except Exception as e:
-        logger.error(f"Failed to get file record by name {name}: {str(e)}")
+        logger.error(
+            f"Failed to get file record by name {name}: {str(e)}", exc_info=True
+        )
         raise
 
 
@@ -735,7 +745,7 @@ async def update_file_record_state(
         logger.warning(f"File record not found for update: {file_name}")
         return False
     except Exception as e:
-        logger.error(f"Failed to update file record state: {str(e)}")
+        logger.error(f"Failed to update file record state: {str(e)}", exc_info=True)
         return False
 
 
@@ -806,7 +816,7 @@ async def list_file_records(
 
         return [dict(row) for row in results], next_page_token
     except Exception as e:
-        logger.error(f"Failed to list file records: {str(e)}")
+        logger.error(f"Failed to list file records: {str(e)}", exc_info=True)
         raise
 
 
@@ -825,7 +835,7 @@ async def delete_file_record(name: str) -> bool:
         await database.execute(query)
         return True
     except Exception as e:
-        logger.error(f"Failed to delete file record: {str(e)}")
+        logger.error(f"Failed to delete file record: {str(e)}", exc_info=True)
         return False
 
 
@@ -855,7 +865,7 @@ async def delete_expired_file_records() -> List[Dict[str, Any]]:
         logger.info(f"Deleted {len(expired_records)} expired file records")
         return [dict(record) for record in expired_records]
     except Exception as e:
-        logger.error(f"Failed to delete expired file records: {str(e)}")
+        logger.error(f"Failed to delete expired file records: {str(e)}", exc_info=True)
         raise
 
 
@@ -877,7 +887,7 @@ async def get_file_api_key(name: str) -> Optional[str]:
         result = await database.fetch_one(query)
         return result["api_key"] if result else None
     except Exception as e:
-        logger.error(f"Failed to get file API key: {str(e)}")
+        logger.error(f"Failed to get file API key: {str(e)}", exc_info=True)
         raise
 
 
@@ -959,7 +969,7 @@ async def update_usage_stats(
 
         return True
     except Exception as e:
-        logger.error(f"Failed to update usage stats: {str(e)}")
+        logger.error(f"Failed to update usage stats: {str(e)}", exc_info=True)
         return False
 
 
@@ -1001,5 +1011,5 @@ async def set_key_exhausted_status(
 
         return True
     except Exception as e:
-        logger.error(f"Failed to set key exhausted status: {str(e)}")
+        logger.error(f"Failed to set key exhausted status: {str(e)}", exc_info=True)
         return False

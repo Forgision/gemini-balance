@@ -199,7 +199,8 @@ def get_current_version(
         return default_version
     except IOError as e:
         helper_logger.error(
-            f"Error reading version file ('{version_file_path}'): {e}. Using default version '{default_version}'."
+            f"Error reading version file ('{version_file_path}'): {e}. Using default version '{default_version}'.",
+            exc_info=True,
         )
         return default_version
 

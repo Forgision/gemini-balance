@@ -208,7 +208,7 @@ class FilesService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Failed to initialize upload: {str(e)}")
+            logger.error(f"Failed to initialize upload: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
     async def _cleanup_expired_sessions(self):
@@ -229,7 +229,7 @@ class FilesService:
                         f"Cleaned up {len(expired_keys)} expired upload sessions"
                     )
         except Exception as e:
-            logger.error(f"Error cleaning up upload sessions: {str(e)}")
+            logger.error(f"Error cleaning up upload sessions: {str(e)}", exc_info=True)
 
     async def get_upload_session(self, key: str) -> Optional[Dict[str, Any]]:
         """Get upload session information (supports upload_id or full URL)"""
@@ -345,7 +345,7 @@ class FilesService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Failed to get file {file_name}: {str(e)}")
+            logger.error(f"Failed to get file {file_name}: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
     async def list_files(
@@ -408,7 +408,7 @@ class FilesService:
             return response
 
         except Exception as e:
-            logger.error(f"Failed to list files: {str(e)}")
+            logger.error(f"Failed to list files: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
     async def delete_file(self, file_name: str, user_token: str) -> bool:
@@ -461,7 +461,7 @@ class FilesService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Failed to delete file {file_name}: {str(e)}")
+            logger.error(f"Failed to delete file {file_name}: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
     async def check_file_state(self, file_name: str, api_key: str) -> str:
@@ -505,7 +505,7 @@ class FilesService:
                 return google_state
 
         except Exception as e:
-            logger.error(f"Failed to check file state: {str(e)}")
+            logger.error(f"Failed to check file state: {str(e)}", exc_info=True)
             return "UNKNOWN"
 
     async def cleanup_expired_files(self) -> int:
@@ -535,13 +535,14 @@ class FilesService:
                 except Exception as e:
                     # Log the error but continue processing other files
                     logger.error(
-                        f"Failed to delete file {file_record['name']} from API: {str(e)}"
+                        f"Failed to delete file {file_record['name']} from API: {str(e)}",
+                        exc_info=True,
                     )
 
             return len(expired_files)
 
         except Exception as e:
-            logger.error(f"Failed to cleanup expired files: {str(e)}")
+            logger.error(f"Failed to cleanup expired files: {str(e)}", exc_info=True)
             return 0
 
 

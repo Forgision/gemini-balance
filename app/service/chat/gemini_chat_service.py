@@ -395,7 +395,9 @@ class GeminiChatService:
             if status_code == 429:
                 await set_key_exhausted_status(api_key, model, True)
             error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
-            logger.error(f"Normal API call failed with error: {error_log_msg}")
+            logger.error(
+                f"Normal API call failed with error: {error_log_msg}", exc_info=True
+            )
 
             await add_error_log(
                 gemini_key=api_key,
@@ -442,7 +444,10 @@ class GeminiChatService:
             is_success = False
             status_code = e.args[0] if e.args else 500
             error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
-            logger.error(f"Count tokens API call failed with error: {error_log_msg}")
+            logger.error(
+                f"Count tokens API call failed with error: {error_log_msg}",
+                exc_info=True,
+            )
 
             await add_error_log(
                 gemini_key=api_key,
@@ -535,8 +540,12 @@ class GeminiChatService:
                 if isinstance(e, ApiClientException):
                     status_code = e.status_code
                     error_log_msg = e.message
-                elif hasattr(e, 'args'):
-                    status_code = e.args[0] if len(e.args) > 0 and isinstance(e.args[0], int) else 500
+                elif hasattr(e, "args"):
+                    status_code = (
+                        e.args[0]
+                        if len(e.args) > 0 and isinstance(e.args[0], int)
+                        else 500
+                    )
                     error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
                 else:
                     status_code = 500
@@ -567,11 +576,17 @@ class GeminiChatService:
                         f"Switched to new API key: {redact_key_for_logging(api_key)}"
                     )
                 else:
-                    logger.error(f"No valid API key available after {retries} retries.")
+                    logger.error(
+                        f"No valid API key available after {retries} retries.",
+                        exc_info=True,
+                    )
                     raise
 
                 if retries >= max_retries:
-                    logger.error(f"Max retries ({max_retries}) reached for streaming.")
+                    logger.error(
+                        f"Max retries ({max_retries}) reached for streaming.",
+                        exc_info=True,
+                    )
                     raise
             finally:
                 end_time = time.perf_counter()

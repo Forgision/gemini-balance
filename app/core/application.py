@@ -73,7 +73,7 @@ def _start_scheduler(app: FastAPI):
         start_scheduler()
         logger.info("Scheduler started successfully.")
     except Exception as e:
-        logger.error(f"Failed to start scheduler: {e}")
+        logger.error(f"Failed to start scheduler: {e}", exc_info=True)
 
 
 def _stop_scheduler():

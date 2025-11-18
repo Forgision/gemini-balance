@@ -325,17 +325,23 @@ class OpenAIChatService:
                 )
                 return result
             except Exception as response_error:
-                logger.error(
-                    f"Response processing failed for model {model}: {str(response_error)}"
-                )
-
+                
                 # Log detailed error information
                 if "parts" in str(response_error):
-                    logger.error("Response structure issue - missing or invalid parts")
                     if response.get("candidates"):
                         candidate = response["candidates"][0]
                         content = candidate.get("content", {})
-                        logger.error(f"Content structure: {content}")
+                        logger.error(f"Content structure: {content}", exc_info=True)
+                    else:
+                        logger.error(
+                        "Response structure issue - missing or invalid parts",
+                        exc_info=True,
+                    )
+                else:
+                    logger.error(
+                    f"Response processing failed for model {model}: {str(response_error)}",
+                    exc_info=True,
+                )
 
                 # Re-throw the exception
                 raise response_error
@@ -344,7 +350,7 @@ class OpenAIChatService:
             is_success = False
             status_code = e.args[0]
             error_log_msg = e.args[1]
-            logger.error(f"API call failed for model {model}: {error_log_msg}")
+            logger.error(f"API call failed for model {model}: {error_log_msg}", exc_info=True)
 
             # Specifically record max_tokens related errors
             gen_config = payload.get("generationConfig", {})
@@ -461,7 +467,8 @@ class OpenAIChatService:
                     usage_metadata = chunk.get("usageMetadata", {})
                 except json.JSONDecodeError:
                     logger.error(
-                        f"Failed to decode JSON from stream for model {model}: {chunk_str}"
+                        f"Failed to decode JSON from stream for model {model}: {chunk_str}",
+                        exc_info=True,
                     )
                     continue
 
@@ -665,7 +672,7 @@ class OpenAIChatService:
             is_success = False
             status_code = e.args[0]
             error_log_msg = e.args[1]
-            logger.error(error_log_msg)
+            logger.error(error_log_msg, exc_info=True)
             await add_error_log(
                 gemini_key=api_key,
                 model_name=model,
@@ -719,7 +726,7 @@ class OpenAIChatService:
             is_success = False
             status_code = e.args[0]
             error_log_msg = e.args[1]
-            logger.error(error_log_msg)
+            logger.error(error_log_msg, exc_info=True)
             await add_error_log(
                 gemini_key=api_key,
                 model_name=model,

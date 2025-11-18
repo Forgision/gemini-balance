@@ -29,7 +29,7 @@ class ModelService:
             gemini_models["models"] = filtered_models_list
             return gemini_models
         except Exception as e:
-            logger.error(f"Error processing model list: {e}")
+            logger.error(f"Error processing model list: {str(e)}", exc_info=True)
             return None
 
     async def get_gemini_openai_models(self, api_key: str) -> Optional[Dict[str, Any]]:

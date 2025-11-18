@@ -107,7 +107,9 @@ class ConfigService:
                             await database.execute(query=query_update)
                         logger.info(f"Updated {len(settings_to_update)} settings.")
             except Exception as e:
-                logger.error(f"Failed to bulk update/insert settings: {str(e)}")
+                logger.error(
+                    f"Failed to bulk update/insert settings: {str(e)}", exc_info=True
+                )
                 raise
 
         # Reset and reinitialize KeyManager
@@ -125,7 +127,7 @@ class ConfigService:
             app.state.key_manager = key_manager
             logger.info("KeyManager instance re-initialized with updated settings.")
         except Exception as e:
-            logger.error(f"Failed to re-initialize KeyManager: {str(e)}")
+            logger.error(f"Failed to re-initialize KeyManager: {str(e)}", exc_info=True)
             raise
 
         return await ConfigService.get_config()
@@ -237,7 +239,10 @@ class ConfigService:
             app.state.key_manager = key_manager
             logger.info("KeyManager instance re-initialized with reloaded settings.")
         except Exception as e:
-            logger.error(f"Failed to re-initialize KeyManager during reset: {str(e)}")
+            logger.error(
+                f"Failed to re-initialize KeyManager during reset: {str(e)}",
+                exc_info=True,
+            )
             raise
 
         # 3. Return the updated configuration

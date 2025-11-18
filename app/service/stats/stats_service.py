@@ -56,7 +56,9 @@ class StatsService:
                 }
             return {"total": 0, "success": 0, "failure": 0}
         except Exception as e:
-            logger.error(f"Failed to get calls in last {seconds} seconds: {e}")
+            logger.error(
+                f"Failed to get calls in last {seconds} seconds: {e}", exc_info=True
+            )
             return {"total": 0, "success": 0, "failure": 0}
 
     async def get_calls_in_last_minutes(self, minutes: int) -> dict[str, int]:
@@ -111,7 +113,9 @@ class StatsService:
                 }
             return {"total": 0, "success": 0, "failure": 0}
         except Exception as e:
-            logger.error(f"Failed to get calls in current month: {e}")
+            logger.error(
+                f"Failed to get calls in current month: {e}", exc_info=True
+            )
             return {"total": 0, "success": 0, "failure": 0}
 
     async def get_api_usage_stats(self) -> dict:
@@ -129,7 +133,7 @@ class StatsService:
                 "calls_month": stats_month,
             }
         except Exception as e:
-            logger.error(f"Failed to get API usage stats: {e}")
+            logger.error(f"Failed to get API usage stats: {e}", exc_info=True)
             default_stat = {"total": 0, "success": 0, "failure": 0}
             return {
                 "calls_1m": default_stat.copy(),
@@ -201,7 +205,10 @@ class StatsService:
             return details
 
         except Exception as e:
-            logger.error(f"Failed to get API call details for period '{period}': {e}")
+            logger.error(
+                f"Failed to get API call details for period '{period}': {e}",
+                exc_info=True,
+            )
             raise
 
     async def get_key_call_details(self, key: str, period: str) -> list[dict]:
@@ -256,7 +263,8 @@ class StatsService:
             return details
         except Exception as e:
             logger.error(
-                f"Failed to get key call details for key=...{key[-4:] if key else ''} period '{period}': {e}"
+                f"Failed to get key call details for key=...{key[-4:] if key else ''} period '{period}': {e}",
+                exc_info=True,
             )
             raise
 
@@ -295,7 +303,8 @@ class StatsService:
             ]
         except Exception as e:
             logger.error(
-                f"Failed to get attention keys ({status_code}) in last 24h: {e}"
+                f"Failed to get attention keys ({status_code}) in last 24h: {e}",
+                exc_info=True,
             )
             return []
 

@@ -113,7 +113,7 @@ async def list_models(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        logger.error(f"Error getting Gemini models list: {str(e)}")
+        logger.error(f"Error getting Gemini models list: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Internal server error while fetching Gemini models list",
@@ -223,7 +223,7 @@ async def stream_generate_content(
             return StreamingResponse(raw_stream, media_type="text/event-stream")
         except Exception as e:
             # If stream initialization fails, return a 500 error directly
-            logger.error(f"Stream initialization failed: {e}")
+            logger.error(f"Stream initialization failed: {e}", exc_info=True)
             return JSONResponse(
                 content={"error": {"message": "Stream initialization failed"}},
                 status_code=500,
@@ -386,7 +386,7 @@ async def reset_all_key_fail_counts(
             }
         )
     except Exception as e:
-        logger.error(f"Failed to reset key failure counts: {str(e)}")
+        logger.error(f"Failed to reset key failure counts: {str(e)}", exc_info=True)
         return JSONResponse(
             {"success": False, "message": f"Batch reset failed: {str(e)}"},
             status_code=500,
@@ -426,7 +426,8 @@ async def reset_selected_key_fail_counts(
                     )
             except Exception as key_error:
                 logger.error(
-                    f"Error resetting key {redact_key_for_logging(key)}: {str(key_error)}"
+                    f"Error resetting key {redact_key_for_logging(key)}: {str(key_error)}",
+                    exc_info=True,
                 )
                 errors.append(f"Key {key}: {str(key_error)}")
 
@@ -454,7 +455,8 @@ async def reset_selected_key_fail_counts(
         )
     except Exception as e:
         logger.error(
-            f"Failed to process reset selected key failure counts request: {str(e)}"
+            f"Failed to process reset selected key failure counts request: {str(e)}",
+            exc_info=True,
         )
         return JSONResponse(
             {"success": False, "message": f"Batch reset processing failed: {str(e)}"},
@@ -482,7 +484,7 @@ async def reset_key_fail_count(
             {"success": False, "message": "Specified key not found."}, status_code=404
         )
     except Exception as e:
-        logger.error(f"Failed to reset key failure count: {str(e)}")
+        logger.error(f"Failed to reset key failure count: {str(e)}", exc_info=True)
         return JSONResponse(
             {"success": False, "message": f"Reset failed: {str(e)}"}, status_code=500
         )
@@ -520,7 +522,7 @@ async def verify_key(
             await key_manager.reset_key_failure_count(api_key)
             return JSONResponse({"status": "valid"})
     except Exception as e:
-        logger.error(f"Key verification failed: {str(e)}")
+        logger.error(f"Key verification failed: {str(e)}", exc_info=True)
         # v2 doesn't track failure counts, so just return invalid status
         error_msg = str(e)
         if hasattr(e, 'args') and len(e.args) > 1:

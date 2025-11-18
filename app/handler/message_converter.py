@@ -183,10 +183,10 @@ class OpenAIMessageConverter(MessageConverter):
                 )
             return data, None
         except binascii.Error as e:
-            logger.error(f"Invalid Base64 data provided: {e}")
+            logger.error(f"Invalid Base64 data provided: {e}", exc_info=True)
             raise ValueError("Invalid Base64 data")
         except Exception as e:
-            logger.error(f"Error validating media data: {e}")
+            logger.error(f"Error validating media data: {e}", exc_info=True)
             raise
 
     def convert(
@@ -220,7 +220,8 @@ class OpenAIMessageConverter(MessageConverter):
                             )
                         except Exception as e:
                             logger.error(
-                                f"Failed to convert image URL {content_item['image_url']['url']}: {e}"
+                                f"Failed to convert image URL {content_item['image_url']['url']}: {e}",
+                                exc_info=True,
                             )
                             parts.append(
                                 {
@@ -273,11 +274,15 @@ class OpenAIMessageConverter(MessageConverter):
 
                         except ValueError as e:
                             logger.error(
-                                f"Skipping audio part due to validation error: {e}"
+                                f"Skipping audio part due to validation error: {e}",
+                                exc_info=True,
                             )
                             parts.append({"text": f"[Error processing audio: {e}]"})
-                        except Exception:
-                            logger.exception("Unexpected error processing audio part.")
+                        except Exception as e:
+                            logger.error(
+                                "Unexpected error processing audio part.",
+                                exc_info=True,
+                            )
                             parts.append(
                                 {"text": "[Unexpected error processing audio]"}
                             )
@@ -322,11 +327,15 @@ class OpenAIMessageConverter(MessageConverter):
 
                         except ValueError as e:
                             logger.error(
-                                f"Skipping video part due to validation error: {e}"
+                                f"Skipping video part due to validation error: {e}",
+                                exc_info=True,
                             )
                             parts.append({"text": f"[Error processing video: {e}]"})
-                        except Exception:
-                            logger.exception("Unexpected error processing video part.")
+                        except Exception as e:
+                            logger.error(
+                                "Unexpected error processing video part.",
+                                exc_info=True,
+                            )
                             parts.append(
                                 {"text": "[Unexpected error processing video]"}
                             )

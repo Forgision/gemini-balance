@@ -481,7 +481,9 @@ class AliyunOSSUploader(ImageUploader):
 
         except requests.RequestException as e:
             error_msg = f"OSS upload request failed: {str(e)}"
-            self.logger.error(f"OSS upload request failed for {filename}: {error_msg}")
+            self.logger.error(
+                f"OSS upload request failed for {filename}: {error_msg}", exc_info=True
+            )
             raise UploadError(
                 message=error_msg,
                 error_type=UploadErrorType.NETWORK_ERROR,
@@ -493,7 +495,8 @@ class AliyunOSSUploader(ImageUploader):
         except Exception as e:
             error_msg = f"OSS upload failed: {str(e)}"
             self.logger.error(
-                f"OSS upload unexpected error for {filename}: {error_msg}"
+                f"OSS upload unexpected error for {filename}: {error_msg}",
+                exc_info=True,
             )
             raise UploadError(
                 message=error_msg, error_type=UploadErrorType.UNKNOWN, original_error=e

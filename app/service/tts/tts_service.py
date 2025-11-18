@@ -68,7 +68,9 @@ class TTSService:
         except Exception as e:
             is_success = False
             error_log_msg = f"Generic error: {e}"
-            logger.error(f"An error occurred in TTSService: {error_log_msg}")
+            logger.error(
+                f"An error occurred in TTSService: {error_log_msg}", exc_info=True
+            )
             match = re.search(r"status code (\d+)", str(e))
             if match:
                 status_code = int(match.group(1))

@@ -236,7 +236,8 @@ def setup_api_stats_routes(app: FastAPI) -> None:
             return {"error": str(e)}, 400
         except Exception as e:
             logger.error(
-                f"Error fetching API stats details for period {period}: {str(e)}"
+                f"Error fetching API stats details for period {period}: {str(e)}",
+                exc_info=True,
             )
             return {"error": "Internal server error"}, 500
 
@@ -268,7 +269,7 @@ def setup_api_stats_routes(app: FastAPI) -> None:
             )
             return data
         except Exception as e:
-            logger.error(f"Error fetching attention keys: {e}")
+            logger.error(f"Error fetching attention keys: {e}", exc_info=True)
             return {"error": "Internal server error"}, 500
 
     @app.get("/api/stats/key-details")
@@ -293,6 +294,7 @@ def setup_api_stats_routes(app: FastAPI) -> None:
             return {"error": str(e)}, 400
         except Exception as e:
             logger.error(
-                f"Error fetching key stats details for period {period}: {str(e)}"
+                f"Error fetching key stats details for period {period}: {str(e)}",
+                exc_info=True,
             )
             return {"error": "Internal server error"}, 500

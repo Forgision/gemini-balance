@@ -132,7 +132,9 @@ async def process_get_error_logs(
                 )
                 validated_logs.append(error_log_item)
             except Exception as e:
-                logger.exception(f"Failed to validate log: {str(e)}, scheduling deletion")
+                logger.error(
+                    f"Failed to validate log: {str(e)}, scheduling deletion", exc_info=True
+                )
                 if background_tasks:
                     background_tasks.add_task(db_services.delete_error_log_by_id, log["id"])
                 else:

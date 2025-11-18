@@ -90,7 +90,9 @@ class OpenAICompatiableService:
             is_success = False
             status_code = e.args[0]
             error_log_msg = e.args[1]
-            logger.error(f"Normal API call failed with error: {error_log_msg}")
+            logger.error(
+                f"Normal API call failed with error: {error_log_msg}", exc_info=True
+            )
 
             await add_error_log(
                 gemini_key=api_key,
@@ -178,15 +180,21 @@ class OpenAICompatiableService:
                         )
                     else:
                         logger.error(
-                            f"No valid API key available after {retries} retries."
+                            f"No valid API key available after {retries} retries.",
+                            exc_info=True,
                         )
                         raise
                 else:
-                    logger.error("KeyManager not available for retry logic.")
+                    logger.error(
+                        "KeyManager not available for retry logic.", exc_info=True
+                    )
                     break
 
                 if retries >= max_retries:
-                    logger.error(f"Max retries ({max_retries}) reached for streaming.")
+                    logger.error(
+                        f"Max retries ({max_retries}) reached for streaming.",
+                        exc_info=True,
+                    )
                     raise
             finally:
                 end_time = time.perf_counter()

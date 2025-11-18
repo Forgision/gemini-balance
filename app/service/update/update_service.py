@@ -28,11 +28,14 @@ async def check_for_updates() -> Tuple[bool, Optional[str], Optional[str]]:
             return False, None, f"VERSION file ('{VERSION_FILE_PATH}') is empty."
     except FileNotFoundError:
         logger.error(
-            f"VERSION file not found at '{VERSION_FILE_PATH}'. Make sure it exists in the project root."
+            f"VERSION file not found at '{VERSION_FILE_PATH}'. Make sure it exists in the project root.",
+            exc_info=True,
         )
         return False, None, f"VERSION file not found at '{VERSION_FILE_PATH}'."
     except IOError as e:
-        logger.error(f"Error reading VERSION file ('{VERSION_FILE_PATH}'): {e}")
+        logger.error(
+            f"Error reading VERSION file ('{VERSION_FILE_PATH}'): {e}", exc_info=True
+        )
         return False, None, f"Error reading VERSION file ('{VERSION_FILE_PATH}')."
 
     logger.info(f"Current application version (from {VERSION_FILE_PATH}): {current_v}")
@@ -91,7 +94,8 @@ async def check_for_updates() -> Tuple[bool, Optional[str], Optional[str]]:
 
     except httpx.HTTPStatusError as e:
         logger.error(
-            f"HTTP error occurred while checking for updates: {e.response.status_code} - {e.response.text}"
+            f"HTTP error occurred while checking for updates: {e.response.status_code} - {e.response.text}",
+            exc_info=True,
         )
         # Avoid showing detailed error text to the user
         error_msg = f"Failed to get update information (HTTP {e.response.status_code})."
@@ -101,12 +105,15 @@ async def check_for_updates() -> Tuple[bool, Optional[str], Optional[str]]:
             error_msg += " API rate limit or permission issue."
         return False, None, error_msg
     except httpx.RequestError as e:
-        logger.error(f"Network error occurred while checking for updates: {e}")
+        logger.error(
+            f"Network error occurred while checking for updates: {e}", exc_info=True
+        )
         return False, None, "A network error occurred during the update check."
     except version.InvalidVersion:
         latest_v_str_for_log = latest_v_str if "latest_v_str" in locals() else "N/A"
         logger.error(
-            f"Invalid version format found. Current (from {VERSION_FILE_PATH}): '{current_v}', Latest: '{latest_v_str_for_log}'"
+            f"Invalid version format found. Current (from {VERSION_FILE_PATH}): '{current_v}', Latest: '{latest_v_str_for_log}'",
+            exc_info=True,
         )
         return False, None, "Encountered an invalid version format."
     except Exception as e:

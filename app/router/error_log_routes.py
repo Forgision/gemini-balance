@@ -91,7 +91,9 @@ async def get_error_logs_api(
         )
         return result
     except Exception as e:
-        logger.exception(f"Failed to get error logs list: {str(e)}")
+        logger.error(
+            f"Failed to get error logs list: {str(e)}", exc_info=True
+        )
         raise HTTPException(
             status_code=500, detail=f"Failed to get error logs list: {str(e)}"
         )
@@ -135,7 +137,10 @@ async def get_error_log_detail_api(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        logger.exception(f"Failed to get error log details for ID {log_id}: {str(e)}")
+        logger.error(
+            f"Failed to get error log details for ID {log_id}: {str(e)}",
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=500, detail=f"Failed to get error log details: {str(e)}"
         )
@@ -173,8 +178,9 @@ async def lookup_error_log_by_info(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        logger.exception(
-            f"Failed to lookup error log by info for key=***{gemini_key[-4:] if gemini_key else ''}: {str(e)}"
+        logger.error(
+            f"Failed to lookup error log by info for key=***{gemini_key[-4:] if gemini_key else ''}: {str(e)}",
+            exc_info=True,
         )
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -207,7 +213,10 @@ async def delete_error_logs_bulk_api(
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.exception(f"Error bulk deleting error logs with IDs {log_ids}: {str(e)}")
+        logger.error(
+            f"Error bulk deleting error logs with IDs {log_ids}: {str(e)}",
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=500, detail="Internal server error during bulk deletion"
         )
@@ -231,7 +240,10 @@ async def delete_all_error_logs_api(
         # No body needed for 204 response
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
-        logger.exception(f"Error deleting all error logs: {str(e)}")
+        logger.error(
+            f"Error deleting all error logs: {str(e)}",
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=500, detail="Internal server error during deletion of all logs"
         )
@@ -263,7 +275,10 @@ async def delete_error_log_api(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        logger.exception(f"Error deleting error log with ID {log_id}: {str(e)}")
+        logger.error(
+            f"Error deleting error log with ID {log_id}: {str(e)}",
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=500, detail="Internal server error during deletion"
         )

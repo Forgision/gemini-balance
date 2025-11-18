@@ -88,7 +88,9 @@ def setup_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(APIError)
     async def api_error_handler(request: Request, exc: APIError):
         """Handle API errors."""
-        logger.error(f"API Error: {exc.detail} (Code: {exc.error_code})")
+        logger.error(
+            f"API Error: {exc.detail} (Code: {exc.error_code})", exc_info=True
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": {"code": exc.error_code, "message": exc.detail}},
@@ -97,7 +99,9 @@ def setup_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         """Handle HTTP exceptions."""
-        logger.error(f"HTTP Exception: {exc.detail} (Status: {exc.status_code})")
+        logger.error(
+            f"HTTP Exception: {exc.detail} (Status: {exc.status_code})", exc_info=True
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": {"code": "http_error", "message": exc.detail}},
@@ -114,7 +118,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
                 {"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
             )
 
-        logger.error(f"Validation Error: {error_details}")
+        logger.error(f"Validation Error: {error_details}", exc_info=True)
         return JSONResponse(
             status_code=422,
             content={
@@ -129,7 +133,7 @@ def setup_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
         """Handle general exceptions."""
-        logger.exception(f"Unhandled Exception: {str(exc)}")
+        logger.error(f"Unhandled Exception: {str(exc)}", exc_info=True)
         return JSONResponse(
             status_code=500,
             content=str(exc),

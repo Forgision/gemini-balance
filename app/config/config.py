@@ -607,7 +607,8 @@ async def sync_initial_settings():
                         )
             except Exception as e:
                 logger.error(
-                    f"Failed to sync settings to database during startup: {str(e)}"
+                    f"Failed to sync settings to database during startup: {str(e)}",
+                    exc_info=True,
                 )
         else:
             logger.info(
@@ -620,12 +621,18 @@ async def sync_initial_settings():
             Logger.update_log_levels(log_level)
 
     except Exception as e:
-        logger.error(f"An unexpected error occurred during initial settings sync: {e}")
+        logger.error(
+            f"An unexpected error occurred during initial settings sync: {e}",
+            exc_info=True,
+        )
     finally:
         if database.is_connected:
             try:
                 pass
             except Exception as e:
-                logger.error(f"Error disconnecting database after initial sync: {e}")
+                logger.error(
+                    f"Error disconnecting database after initial sync: {e}",
+                    exc_info=True,
+                )
 
     logger.info("Initial settings synchronization finished.")

@@ -72,7 +72,7 @@ async def connect_to_db():
         else:
             logger.debug(f"Already connected to {settings.DATABASE_TYPE}")
     except Exception as e:
-        logger.error(f"Failed to connect to database: {str(e)}")
+        logger.error(f"Failed to connect to database: {str(e)}", exc_info=True)
         raise
 
 
@@ -84,4 +84,4 @@ async def disconnect_from_db():
         await database.disconnect()
         logger.info(f"Disconnected from {settings.DATABASE_TYPE}")
     except Exception as e:
-        logger.error(f"Failed to disconnect from database: {str(e)}")
+        logger.error(f"Failed to disconnect from database: {str(e)}", exc_info=True)

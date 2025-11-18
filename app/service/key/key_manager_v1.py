@@ -554,7 +554,9 @@ async def reset_key_manager_instance():
                 )
                 _preserved_next_key_in_cycle = None
             except Exception as e:
-                logger.error(f"Error preserving next key hint during reset: {e}")
+                logger.error(
+                    f"Error preserving next key hint during reset: {e}", exc_info=True
+                )
                 _preserved_next_key_in_cycle = None
 
             # 4. Save the next key hint for the vertex_key_cycle
@@ -571,7 +573,9 @@ async def reset_key_manager_instance():
                 )
                 _preserved_vertex_next_key_in_cycle = None
             except Exception as e:
-                logger.error(f"Error preserving next key hint during reset: {e}")
+                logger.error(
+                    f"Error preserving next key hint during reset: {e}", exc_info=True
+                )
                 _preserved_vertex_next_key_in_cycle = None
 
             _singleton_instance = None

@@ -56,7 +56,7 @@ class TTSGeminiChatService(GeminiChatService):
                 response = await super().generate_content(model, request, api_key)
                 return response
         except Exception as e:
-            logger.error(f"TTS API call failed with error: {e}")
+            logger.error(f"TTS API call failed with error: {e}", exc_info=True)
             raise
 
     async def _handle_tts_request(
@@ -154,7 +154,7 @@ class TTSGeminiChatService(GeminiChatService):
                 ),
             )
 
-            logger.error(f"TTS API call failed: {error_msg}")
+            logger.error(f"TTS API call failed: {error_msg}", exc_info=True)
             raise
 
         finally:

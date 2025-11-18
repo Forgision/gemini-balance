@@ -75,11 +75,14 @@ class GeminiApiClient(ApiClient):
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
-                logger.error(f"Failed to get model list: {e.response.status_code}")
-                logger.error(e.response.text)
+                logger.error(
+                    f"Failed to get model list: {e.response.status_code}",
+                    exc_info=True,
+                )
+                logger.error(e.response.text, exc_info=True)
                 return None
             except httpx.RequestError as e:
-                logger.error(f"Failed to request model list: {e}")
+                logger.error(f"Failed to request model list: {e}", exc_info=True)
                 return None
 
     async def generate_content(

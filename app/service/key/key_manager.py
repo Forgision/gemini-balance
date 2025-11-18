@@ -56,7 +56,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSessionLocal() as session:
             yield session
     except SQLAlchemyError as e:
-        logger.error(f"Database session error: {e}")
+        logger.error(f"Database session error: {e}", exc_info=True)
         raise
     finally:
         logger.debug("Database session released.")
@@ -70,7 +70,7 @@ async def init_database():
             await conn.run_sync(Base.metadata.create_all)
         logger.debug("Initializing UsageMatrix db done")
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"Error initializing database: {e}", exc_info=True)
         # Don't raise - allow the caller to handle the error
         raise
 
@@ -450,8 +450,8 @@ class KeyManager:
                 )
 
         except Exception as e:
-            logger.exception(
-                f"Exception to load from database: {e}"
+            logger.error(
+                f"Exception to load from database: {e}", exc_info=True
             )
 
     async def _set_available_usage(self):
@@ -564,7 +564,7 @@ class KeyManager:
             logger.info("KeyManager is ready.")
             return True
         except Exception as e:
-            logger.exception("KeyManager initialization is failed")
+            logger.error("KeyManager initialization is failed", exc_info=True)
             # Raise exception instead of returning False
             raise RuntimeError(f"KeyManager initialization failed: {e}") from e
 
@@ -589,18 +589,18 @@ class KeyManager:
             except asyncio.TimeoutError:
                 logger.warning("Background task did not stop in time, cancelling...")
                 self._background_task.cancel()
-                try:
-                    await self._background_task
-                except asyncio.CancelledError:
-                    pass
+            try:
+                await self._background_task
+            except asyncio.CancelledError:
+                pass
 
         # 3. Perform one final commit to the DB (only if initialized)
         if self.is_ready:
             logger.info("Performing final database commit...")
             try:
                 await self._commit_to_db()
-            except Exception:
-                logger.exception("Error during final commit")
+            except Exception as e:
+                logger.error("Error during final commit", exc_info=True)
                 
         self.is_ready = False
         logger.info("KeyManager shutdown complete.")
@@ -770,7 +770,7 @@ class KeyManager:
                     # Call _on_update_usage to update usage
                     await self._on_update_usage()
         except Exception as e:
-            logger.error(f"Error in update_usage: {e}")
+            logger.error(f"Error in update_usage: {e}", exc_info=True)
             return False
         
         return True
@@ -813,8 +813,8 @@ class KeyManager:
                     self.last_day_reset_ts = now_day
                     await self._on_update_usage()
             return True
-        except Exception:
-            logger.exception("Exception in reset_usage")
+        except Exception as e:
+            logger.error("Exception in reset_usage", exc_info=True)
             return False
 
     async def _commit_to_db(self):
@@ -892,8 +892,8 @@ class KeyManager:
                             session.add(instance)
                     await session.commit()
             logger.debug("Database commit successful.")
-        except Exception:
-            logger.exception("Database commit failed")
+        except Exception as e:
+            logger.error("Database commit failed", exc_info=True)
 
     async def backgroud_worker(self):
         """
@@ -922,8 +922,8 @@ class KeyManager:
             except asyncio.CancelledError:
                 logger.info("KeyManager backgroud worker cancelled.")
                 break
-            except Exception:
-                logger.exception("Exception in KeyManager backgroud worker")
+            except Exception as e:
+                logger.error("Exception in KeyManager backgroud worker", exc_info=True)
                 # Don't crash the loop, just wait and retry
                 await asyncio.sleep(5)
 
@@ -1061,7 +1061,7 @@ class KeyManager:
                     logger.warning(f"Key not found for reactivation: {redact_key_for_logging(key)}")
                     return False
             except Exception as e:
-                logger.error(f"Error reactivating key: {e}")
+                logger.error(f"Error reactivating key: {e}", exc_info=True)
                 return False
         
         logger.info(f"Manually reactivated key: {redact_key_for_logging(key)}")

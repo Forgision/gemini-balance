@@ -52,7 +52,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         async with AsyncSessionLocal() as session:
             yield session
     except SQLAlchemyError as e:
-        logger.error(f"Database session error: {e}")
+        logger.error(f"Database session error: {e}", exc_info=True)
         raise
     finally:
         logger.debug("Database session released.")
@@ -66,7 +66,7 @@ async def init_database():
             await conn.run_sync(Base.metadata.create_all)
         logger.debug("Initializing UsageMatrix db done")
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"Error initializing database: {e}", exc_info=True)
         # Don't raise - allow the caller to handle the error
         raise
 
@@ -572,10 +572,10 @@ class KeyManager:
                 self.is_ready = False
                 return False
             # For other ValueError cases, log and raise
-            logger.exception("KeyManager initialization is failed")
+            logger.error("KeyManager initialization is failed", exc_info=True)
             raise RuntimeError(f"KeyManager initialization failed: {e}") from e
         except Exception as e:
-            logger.exception("KeyManager initialization is failed")
+            logger.error("KeyManager initialization is failed", exc_info=True)
             # Raise exception instead of returning False
             raise RuntimeError(f"KeyManager initialization failed: {e}") from e
 
@@ -611,7 +611,7 @@ class KeyManager:
             try:
                 await self._commit_to_db()
             except Exception as e:
-                logger.exception("Error during final commit")
+                logger.error("Error during final commit", exc_info=True)
                 
         self.is_ready = False
         logger.info("KeyManager shutdown complete.")
@@ -768,7 +768,7 @@ class KeyManager:
             )
             return False
         except Exception as e:
-            logger.error(f"Error in update_usage: {e}")
+            logger.error(f"Error in update_usage: {e}", exc_info=True)
             return False
         
         if updated:
@@ -815,7 +815,7 @@ class KeyManager:
                 await self._on_update_usage()
             return True
         except Exception as e:
-            logger.exception(f"Error in reset_usage: {e}")
+            logger.error(f"Error in reset_usage: {e}", exc_info=True)
             return False
 
     async def _commit_to_db(self):
@@ -871,7 +871,7 @@ class KeyManager:
                 await session.commit()
             logger.debug("Database commit successful.")
         except Exception as e:
-            logger.error(f"Database commit failed: {e}")
+            logger.error(f"Database commit failed: {e}", exc_info=True)
 
     async def reset_usage_bg(self):
         """
@@ -900,7 +900,7 @@ class KeyManager:
                 logger.info("Background task cancelled.")
                 break
             except Exception as e:
-                logger.exception(f"Error in background task: {e}")
+                logger.error(f"Error in background task: {e}", exc_info=True)
                 # Don't crash the loop, just wait and retry
                 await asyncio.sleep(5)
 
@@ -1029,7 +1029,7 @@ class KeyManager:
         async with self.lock:
             try:
                 # Reactivate for all models
-                key_mask = self.df.index.get_level_values("api_key") == key
+                key_mask = self.df.index.get_level_values("api_key") == key #TODO: reset only keys which are active and exhausted
                 if key_mask.any():
                     self.df.loc[key_mask, "is_active"] = True
                     self.df.loc[key_mask, "is_exhausted"] = False
@@ -1039,7 +1039,7 @@ class KeyManager:
                     logger.warning(f"Key not found for reactivation: {redact_key_for_logging(key)}")
                     return False
             except Exception as e:
-                logger.error(f"Error reactivating key: {e}")
+                logger.error(f"Error reactivating key: {e}", exc_info=True)
                 return False
         
         # Call _on_update_usage outside lock to avoid deadlock
