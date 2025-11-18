@@ -599,7 +599,7 @@ class KeyManager:
             logger.info("Performing final database commit...")
             try:
                 await self._commit_to_db()
-            except Exception as e:
+            except Exception:
                 logger.error("Error during final commit", exc_info=True)
                 
         self.is_ready = False
@@ -813,7 +813,7 @@ class KeyManager:
                     self.last_day_reset_ts = now_day
                     await self._on_update_usage()
             return True
-        except Exception as e:
+        except Exception:
             logger.error("Exception in reset_usage", exc_info=True)
             return False
 
@@ -892,7 +892,7 @@ class KeyManager:
                             session.add(instance)
                     await session.commit()
             logger.debug("Database commit successful.")
-        except Exception as e:
+        except Exception:
             logger.error("Database commit failed", exc_info=True)
 
     async def backgroud_worker(self):
@@ -922,7 +922,7 @@ class KeyManager:
             except asyncio.CancelledError:
                 logger.info("KeyManager backgroud worker cancelled.")
                 break
-            except Exception as e:
+            except Exception:
                 logger.error("Exception in KeyManager backgroud worker", exc_info=True)
                 # Don't crash the loop, just wait and retry
                 await asyncio.sleep(5)
