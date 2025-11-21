@@ -417,11 +417,11 @@ async def sync_initial_settings():
             # 1. Load settings from the database
             db_settings_raw: List[Dict[str, Any]] = []
             try:
-                query = select(SettingsModel.key, SettingsModel.value)
+                query = select(SettingsModel)
                 result = await session.execute(query)
                 rows = result.scalars().all()
                 db_settings_raw = [
-                    {"key": dict(row._mapping)["key"], "value": dict(row._mapping)["value"]} for row in rows  # type: ignore[misc]
+                    {"key": row.key, "value": row.value} for row in rows  # type: ignore[misc]
                 ]
                 logger.info(f"Fetched {len(db_settings_raw)} settings from database.")
             except Exception as e:
