@@ -12,16 +12,18 @@ import litellm
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
+from app.dependencies import get_key_manager
 
-from fastapi import Request
+from fastapi import Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.config import settings
 from app.exception.api_exceptions import ApiClientException
 from app.log.logger import get_gemini_logger
 from app.service.client.api_client import GeminiApiClient
-from app.database.services import add_error_log, add_request_log, update_usage_stats
+from app.database.services import add_error_log, add_request_log
 from app.handler.response_handler import GeminiResponseHandler
+from app.service.key.key_manager import KeyManager
 
 
 logger = get_gemini_logger()
@@ -221,8 +223,9 @@ class MessagesResponse(BaseModel):
 
 
 class ClaudeProxyService:
-    def __init__(self):
+    def __init__(self, key_manager: KeyManager = Depends(get_key_manager)):
         self.gemini_response_handler = GeminiResponseHandler()
+        self.key_manager = key_manager
 
     def _convert_anthropic_to_gemini_format(
         self, anthropic_request: MessagesRequest
@@ -1134,11 +1137,7 @@ class ClaudeProxyService:
         session: AsyncSession,
     ) -> TokenCountResponse:
         """Count tokens for the given request using appropriate API client."""
-        if not fastapi_request or not hasattr(fastapi_request.app.state, "key_manager"):
-            raise RuntimeError("KeyManager not initialized. Request object required.")
-
-        key_manager = fastapi_request.app.state.key_manager
-        api_key_info = await key_manager.get_key(
+        api_key_info = await self.key_manager.get_key(
             model_name=request.model, is_vertex_key=False
         )
 
@@ -1255,7 +1254,7 @@ class ClaudeProxyService:
                 request_datetime=request_datetime,
             )
 
-            await key_manager.handle_api_failure(
+            await self.key_manager.handle_api_failure(
                 api_key=api_key_info,
                 model_name=request.model,
                 retries=0,
@@ -1287,11 +1286,7 @@ class ClaudeProxyService:
         session: AsyncSession,
     ):
         """Create a message using the Claude proxy."""
-        if not fastapi_request or not hasattr(fastapi_request.app.state, "key_manager"):
-            raise RuntimeError("KeyManager not initialized. Request object required.")
-
-        key_manager = fastapi_request.app.state.key_manager
-        api_key_info = await key_manager.get_key(
+        api_key_info = await self.key_manager.get_key(
             model_name=request.model, is_vertex_key=False
         )
 
@@ -1396,18 +1391,15 @@ class ClaudeProxyService:
 
                     # Update usage stats
                     if "usageMetadata" in gemini_response:
-                        await update_usage_stats(
-                            session,
-                            api_key=api_key_info,
-                            model_name=request.model,
-                            token_count=gemini_response["usageMetadata"].get(
-                                "totalTokenCount", 0
-                            ),
-                            tpm=gemini_response["usageMetadata"].get(
-                                "totalTokenCount", 0
-                            ),
+                        token_count = gemini_response["usageMetadata"].get(
+                            "totalTokenCount", 0
                         )
-
+                        await self.key_manager.update_usage(
+                            model_name=request.model,
+                            key_value=api_key_info,
+                            is_vertex_key=False,
+                            tokens_used=token_count,
+                        )
                     is_success = True
                     status_code = 200
                     return response
@@ -1467,7 +1459,7 @@ class ClaudeProxyService:
                 request_datetime=request_datetime,
             )
 
-            await key_manager.handle_api_failure(
+            await self.key_manager.handle_api_failure(
                 api_key=api_key_info,
                 model_name=request.model,
                 retries=0,

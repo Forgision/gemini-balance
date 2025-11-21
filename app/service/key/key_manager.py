@@ -721,8 +721,22 @@ class KeyManager:
         error_type: str | None = None,
     ):
         """
-        Updates the in-memory DataFrame with new usage data.
-        This is a fast, async, in-memory-only operation.
+        Update usage statistics for an API key.
+
+        This method updates the in-memory DataFrame usage statistics for the given API key, model name, and token usage.
+        The update operation is performed asynchronously and only affects the in-memory cache (no database writes). 
+        It increments usage counters such as rpd (requests per day), rpm (requests per minute), tpm (tokens per minute),
+        and updates fields like last_used.
+        
+        If an error occurred, the key may be marked as inactive (for permanent errors) or exhausted (for HTTP 429 errors).
+        
+        Args:
+            model_name (str): The model name the key was used for.
+            key_value (str): The API key string.
+            is_vertex_key (bool): Whether the key is for Vertex.
+            tokens_used (int): Number of tokens used.
+            error (bool, optional): Whether an error occurred.
+            error_type (Optional[str], optional): The type of error if any (e.g., "429" or "permanent").
         """
 
         # convert to int and handle NaN

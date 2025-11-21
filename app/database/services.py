@@ -317,9 +317,7 @@ async def get_error_logs(
         rows = result.fetchall()
         return [dict(row._mapping) for row in rows]
     except Exception as e:
-        logger.error(
-            "Failed to get error logs with filter: %s", e, exc_info=True
-        )
+        logger.error("Failed to get error logs with filter: %s", e, exc_info=True)
         raise
 
 
@@ -371,14 +369,14 @@ async def get_error_logs_count(
         count = result.scalar_one()
         return count if count else 0
     except Exception as e:
-        logger.error(
-            "Failed to count error logs with filters: %s", e, exc_info=True
-        )
+        logger.error("Failed to count error logs with filters: %s", e, exc_info=True)
         raise
 
 
 # New function: Get the details of a single error log
-async def get_error_log_details(session: AsyncSession, log_id: int) -> Optional[Dict[str, Any]]:
+async def get_error_log_details(
+    session: AsyncSession, log_id: int
+) -> Optional[Dict[str, Any]]:
     """
     Get detailed information of a single error log by ID
 
@@ -723,7 +721,9 @@ async def create_file_record(
         raise
 
 
-async def get_file_record_by_name(session: AsyncSession, name: str) -> Optional[Dict[str, Any]]:
+async def get_file_record_by_name(
+    session: AsyncSession, name: str
+) -> Optional[Dict[str, Any]]:
     """
     Get file record by file name
 
@@ -938,133 +938,3 @@ async def get_file_api_key(session: AsyncSession, name: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Failed to get file API key: {str(e)}", exc_info=True)
         raise
-
-
-async def update_usage_stats(
-    session: AsyncSession, api_key: str, model_name: str, token_count: int, tpm: int
-) -> bool:
-    """
-    Update usage statistics.
-
-    Args:
-        api_key: The API key used.
-        model_name: The model name used.
-        token_count: The number of tokens used.
-        tpm: The number of tokens per minute.
-
-    Returns:
-        bool: Whether the update was successful.
-    """
-    try:
-        now = datetime.now()
-        pacific_tz = timezone(timedelta(hours=-7))
-        now_pacific = now.astimezone(pacific_tz)
-
-        query = select(UsageStats).where(
-            UsageStats.api_key == api_key,
-            UsageStats.model_name == model_name,
-        )
-        result = await session.execute(query)
-        record = result.scalar_one_or_none()
-
-        if record:
-            values = {
-                "token_count": record.token_count + token_count,
-                "timestamp": now,
-            }
-
-            # Check if RPM and TPM need to be reset
-            if (
-                record.rpm_timestamp
-                and (now - record.rpm_timestamp).total_seconds() > 60
-            ):
-                values["rpm"] = 1
-                values["tpm"] = tpm
-                values["rpm_timestamp"] = now
-                values["tpm_timestamp"] = now
-            else:
-                values["rpm"] = record.rpm + 1
-                values["tpm"] = record.tpm + tpm
-
-            # Check if RPD needs to be reset
-            if (
-                record.rpd_timestamp
-                and record.rpd_timestamp.astimezone(pacific_tz).date()
-                < now_pacific.date()
-            ):
-                values["rpd"] = 1
-                values["rpd_timestamp"] = now
-            else:
-                values["rpd"] = record.rpd + 1
-
-            update_query = (
-                update(UsageStats).where(UsageStats.id == record.id).values(**values)
-            )
-            await session.execute(update_query)
-            await session.commit()
-        else:
-            # Insert new record
-            insert_query = insert(UsageStats).values(
-                api_key=api_key,
-                model_name=model_name,
-                rpm=1,
-                rpd=1,
-                token_count=token_count,
-                tpm=tpm,
-                timestamp=now,
-                rpm_timestamp=now,
-                tpm_timestamp=now,
-                rpd_timestamp=now,
-            )
-            await session.execute(insert_query)
-            await session.commit()
-
-        return True
-    except Exception as e:
-        logger.error(f"Failed to update usage stats: {str(e)}", exc_info=True)
-        return False
-
-
-async def set_key_exhausted_status(
-    session: AsyncSession, api_key: str, model_name: str, exhausted: bool
-) -> bool:
-    """
-    Set the exhausted status for a given API key and model.
-
-    Args:
-        api_key: The API key.
-        model_name: The model name.
-        exhausted: The exhausted status.
-
-    Returns:
-        bool: Whether the update was successful.
-    """
-    try:
-        query = select(UsageStats).where(
-            UsageStats.api_key == api_key,
-            UsageStats.model_name == model_name,
-        )
-        result = await session.execute(query)
-        record = result.scalar_one_or_none()
-
-        if record:
-            update_query = (
-                update(UsageStats)
-                .where(UsageStats.id == record.id)
-                .values(exhausted=exhausted)
-            )
-            await session.execute(update_query)
-            await session.commit()
-        else:
-            insert_query = insert(UsageStats).values(
-                api_key=api_key,
-                model_name=model_name,
-                exhausted=exhausted,
-            )
-            await session.execute(insert_query)
-            await session.commit()
-
-        return True
-    except Exception as e:
-        logger.error(f"Failed to set key exhausted status: {str(e)}", exc_info=True)
-        return False

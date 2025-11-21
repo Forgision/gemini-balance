@@ -39,3 +39,9 @@
 ## Database
 - Use sqlalchemy async functionality.
 - Always use sqlalchemy 2.0 syntax.
+
+
+## Current Goal
+- Update usage of service based on UsageState model for token and key exhaused statue to new KeyManager.update_usage method from [key_manager.py](./app/service/key/key_manager.py)
+<!-- ## Problems in project
+- In ClaudeProxyService.create_message on line  -->
