@@ -841,13 +841,27 @@ class KeyManager:
                         is_vertex_key,
                         api_key,
                     ), row in df_to_save.iterrows():  # type: ignore
+                        # Helper function to safely convert to int, handling NaN
+                        def to_int_safe(val) -> int:
+                            if isinstance(val, (int, float)):
+                                return int(val) if not pd.isna(val) else 0
+                            try:
+                                scalar = (
+                                    val.item() if hasattr(val, "item") else float(val)
+                                )
+                                return int(scalar) if not pd.isna(scalar) else 0
+                            except (ValueError, AttributeError, TypeError):
+                                return 0
+
                         values = {
                             "api_key": api_key,
                             "model_name": model_name,
-                            "rpm": int(row["rpm"]),
-                            "tpm": int(row["tpm"]),
-                            "rpd": int(row["rpd"]),
-                            "total_token_count": int(row.get("total_token_count", 0)),
+                            "rpm": to_int_safe(row["rpm"]),
+                            "tpm": to_int_safe(row["tpm"]),
+                            "rpd": to_int_safe(row["rpd"]),
+                            "total_token_count": to_int_safe(
+                                row.get("total_token_count", 0)
+                            ),
                             "minute_reset_time": self.last_minute_reset_ts,
                             "day_reset_time": self.last_day_reset_ts,
                             "vertex_key": bool(is_vertex_key),
@@ -872,11 +886,25 @@ class KeyManager:
                         is_vertex_key,
                         api_key,
                     ), row in df_to_save.iterrows():  # type: ignore
+                        # Helper function to safely convert to int, handling NaN
+                        def to_int_safe(val) -> int:
+                            if isinstance(val, (int, float)):
+                                return int(val) if not pd.isna(val) else 0
+                            try:
+                                scalar = (
+                                    val.item() if hasattr(val, "item") else float(val)
+                                )
+                                return int(scalar) if not pd.isna(scalar) else 0
+                            except (ValueError, AttributeError, TypeError):
+                                return 0
+
                         values = {
-                            "rpm": int(row["rpm"]),
-                            "tpm": int(row["tpm"]),
-                            "rpd": int(row["rpd"]),
-                            "total_token_count": int(row.get("total_token_count", 0)),
+                            "rpm": to_int_safe(row["rpm"]),
+                            "tpm": to_int_safe(row["tpm"]),
+                            "rpd": to_int_safe(row["rpd"]),
+                            "total_token_count": to_int_safe(
+                                row.get("total_token_count", 0)
+                            ),
                             "minute_reset_time": self.last_minute_reset_ts,
                             "day_reset_time": self.last_day_reset_ts,
                             "is_exhausted": bool(row["is_exhausted"]),

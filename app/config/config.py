@@ -237,7 +237,7 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
              it may return an empty collection (for lists/dicts) or the original `db_value` string
              (for primitives or unhandled types), with a warning or error logged.
     """
-    
+
     from app.log.logger import get_config_logger
 
     logger = get_config_logger()
@@ -319,7 +319,9 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                     parsed = json.loads(db_value)
                     if isinstance(parsed, dict):
                         # Explicitly build dict with proper types to satisfy mypy
-                        parsed_dict_float = {str(k): float(v) for k, v in parsed.items()}  # type: ignore[dict-item]
+                        parsed_dict_float = {
+                            str(k): float(v) for k, v in parsed.items()
+                        }  # type: ignore[dict-item]
                     else:
                         logger.warning(
                             f"Parsed DB value for key '{key}' is not a dictionary type. Value: {db_value}"
@@ -335,7 +337,8 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                             if isinstance(parsed, dict):
                                 # Explicitly build dict with proper types to satisfy mypy
                                 parsed_dict_float = {
-                                    str(k): float(v) for k, v in parsed.items()  # type: ignore[dict-item]
+                                    str(k): float(v)
+                                    for k, v in parsed.items()  # type: ignore[dict-item]
                                 }
                             else:
                                 logger.warning(
@@ -421,7 +424,8 @@ async def sync_initial_settings():
                 result = await session.execute(query)
                 rows = result.scalars().all()
                 db_settings_raw = [
-                    {"key": row.key, "value": row.value} for row in rows  # type: ignore[misc]
+                    {"key": row.key, "value": row.value}
+                    for row in rows  # type: ignore[misc]
                 ]
                 logger.info(f"Fetched {len(db_settings_raw)} settings from database.")
             except Exception as e:
@@ -431,7 +435,8 @@ async def sync_initial_settings():
                 # Continue even if database read fails, to ensure env/dotenv-based config can be synced to the DB
 
             db_settings_map: Dict[str, str] = {
-                s["key"]: s["value"] for s in db_settings_raw  # type: ignore[misc]
+                s["key"]: s["value"]
+                for s in db_settings_raw  # type: ignore[misc]
             }
 
             # 2. Merge database settings into memory settings (database takes precedence)
@@ -448,7 +453,9 @@ async def sync_initial_settings():
                     target_type = Settings.__annotations__.get(key)
                     if target_type:
                         try:
-                            parsed_db_value = _parse_db_value(key, db_value, target_type)
+                            parsed_db_value = _parse_db_value(
+                                key, db_value, target_type
+                            )
                             memory_value = getattr(settings, key)
 
                             # Compare the parsed value with the value in memory
@@ -542,66 +549,68 @@ async def sync_initial_settings():
             # Execute bulk insert and update in a transaction (after the for loop)
             if settings_to_insert or settings_to_update:
                 try:
-                    async with session.begin():
-                        if settings_to_insert:
-                            # Get existing descriptions to avoid overwriting
-                            query_existing = select(
-                                SettingsModel.key, SettingsModel.description
-                            ).where(
-                                SettingsModel.key.in_(
-                                    [s["key"] for s in settings_to_insert]
-                                )
+                    if settings_to_insert:
+                        # Get existing descriptions to avoid overwriting
+                        query_existing = select(
+                            SettingsModel.key, SettingsModel.description
+                        ).where(
+                            SettingsModel.key.in_(
+                                [s["key"] for s in settings_to_insert]
                             )
-                            result_existing = await session.execute(query_existing)
-                            rows_existing = result_existing.fetchall()
-                            existing_desc = {
-                                dict(row._mapping)["key"]: dict(row._mapping)["description"]
-                                for row in rows_existing
-                            }
-                            for item in settings_to_insert:
-                                item["description"] = existing_desc.get(
-                                    item["key"], item["description"]
-                                )
-
-                            query_insert = insert(SettingsModel).values(settings_to_insert)
-                            await session.execute(query_insert)
-                            logger.info(
-                                f"Synced (inserted) {len(settings_to_insert)} settings to database."
+                        )
+                        result_existing = await session.execute(query_existing)
+                        rows_existing = result_existing.fetchall()
+                        existing_desc = {
+                            dict(row._mapping)["key"]: dict(row._mapping)["description"]
+                            for row in rows_existing
+                        }
+                        for item in settings_to_insert:
+                            item["description"] = existing_desc.get(
+                                item["key"], item["description"]
                             )
 
-                        if settings_to_update:
-                            # Get existing descriptions to avoid overwriting
-                            query_existing = select(
-                                SettingsModel.key, SettingsModel.description
-                            ).where(
-                                SettingsModel.key.in_(
-                                    [s["key"] for s in settings_to_update]
-                                )
-                            )
-                            result_existing = await session.execute(query_existing)
-                            rows_existing = result_existing.fetchall()
-                            existing_desc = {
-                                dict(row._mapping)["key"]: dict(row._mapping)["description"]
-                                for row in rows_existing
-                            }
+                        query_insert = insert(SettingsModel).values(settings_to_insert)
+                        await session.execute(query_insert)
+                        logger.info(
+                            f"Synced (inserted) {len(settings_to_insert)} settings to database."
+                        )
 
-                            for setting_data in settings_to_update:
-                                setting_data["description"] = existing_desc.get(
-                                    setting_data["key"], setting_data["description"]
-                                )
-                                query_update = (
-                                    update(SettingsModel)
-                                    .where(SettingsModel.key == setting_data["key"])
-                                    .values(
-                                        value=setting_data["value"],
-                                        description=setting_data["description"],
-                                        updated_at=setting_data["updated_at"],
-                                    )
-                                )
-                                await session.execute(query_update)
-                            logger.info(
-                                f"Synced (updated) {len(settings_to_update)} settings to database."
+                    if settings_to_update:
+                        # Get existing descriptions to avoid overwriting
+                        query_existing = select(
+                            SettingsModel.key, SettingsModel.description
+                        ).where(
+                            SettingsModel.key.in_(
+                                [s["key"] for s in settings_to_update]
                             )
+                        )
+                        result_existing = await session.execute(query_existing)
+                        rows_existing = result_existing.fetchall()
+                        existing_desc = {
+                            dict(row._mapping)["key"]: dict(row._mapping)["description"]
+                            for row in rows_existing
+                        }
+
+                        for setting_data in settings_to_update:
+                            setting_data["description"] = existing_desc.get(
+                                setting_data["key"], setting_data["description"]
+                            )
+                            query_update = (
+                                update(SettingsModel)
+                                .where(SettingsModel.key == setting_data["key"])
+                                .values(
+                                    value=setting_data["value"],
+                                    description=setting_data["description"],
+                                    updated_at=setting_data["updated_at"],
+                                )
+                            )
+                            await session.execute(query_update)
+                        logger.info(
+                            f"Synced (updated) {len(settings_to_update)} settings to database."
+                        )
+
+                    # Commit the transaction
+                    await session.commit()
                 except Exception as e:
                     logger.error(
                         f"Failed to sync settings to database during startup: {str(e)}",
