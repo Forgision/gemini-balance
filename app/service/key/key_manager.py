@@ -323,6 +323,7 @@ class KeyManager:
 
         df = pd.DataFrame(defaults)
         df.set_index(self._INDEX_LEVEL, inplace=True, drop=True)
+        df.sort_index(inplace=True)
         # Updating dataframe
         async with self.lock.write_lock():
             self.df = df
@@ -724,12 +725,12 @@ class KeyManager:
         Update usage statistics for an API key.
 
         This method updates the in-memory DataFrame usage statistics for the given API key, model name, and token usage.
-        The update operation is performed asynchronously and only affects the in-memory cache (no database writes). 
+        The update operation is performed asynchronously and only affects the in-memory cache (no database writes).
         It increments usage counters such as rpd (requests per day), rpm (requests per minute), tpm (tokens per minute),
         and updates fields like last_used.
-        
+
         If an error occurred, the key may be marked as inactive (for permanent errors) or exhausted (for HTTP 429 errors).
-        
+
         Args:
             model_name (str): The model name the key was used for.
             key_value (str): The API key string.
@@ -804,7 +805,7 @@ class KeyManager:
                     }
                     new_df = pd.DataFrame([new_entry])
                     new_df.set_index(self._INDEX_LEVEL, inplace=True, drop=True)
-                    self.df = pd.concat([self.df, new_df])
+                    self.df = pd.concat([self.df, new_df]).sort_index()
                     logger.info(f"Created entry for unknown model: {model_name}")
 
                     # Call _on_update_usage to update usage
