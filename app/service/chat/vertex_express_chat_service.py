@@ -284,7 +284,10 @@ class GeminiChatService:
                 f"Normal API call failed with error: {error_log_msg}", exc_info=True
             )
 
-            await add_error_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
                 gemini_key=api_key,
                 model_name=model,
                 error_type="gemini-chat-non-stream",
@@ -297,7 +300,10 @@ class GeminiChatService:
         finally:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
-            await add_request_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,
@@ -368,44 +374,50 @@ class GeminiChatService:
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
                 )
 
-                await add_error_log(
-                    gemini_key=current_attempt_key,
-                    model_name=model,
-                    error_type="gemini-chat-stream",
-                    error_log=error_log_msg,
-                    error_code=status_code,
-                    request_msg=(
-                        payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None
-                    ),
-                    request_datetime=request_datetime,
-                )
-
-                api_key = await self.key_manager.handle_api_failure(
-                    current_attempt_key, model, retries, status_code=status_code
-                )
-                if api_key:
-                    logger.info(
-                        f"Switched to new API key: {redact_key_for_logging(api_key)}"
+                from app.database.connection import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    await add_error_log(
+                        session,
+                        gemini_key=current_attempt_key,
+                        model_name=model,
+                        error_type="gemini-chat-stream",
+                        error_log=error_log_msg,
+                        error_code=status_code,
+                        request_msg=(
+                            payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None
+                        ),
+                        request_datetime=request_datetime,
                     )
-                else:
-                    logger.error(f"No valid API key available after {retries} retries.",
-                                 exc_info=True)
-                    raise
 
-                if retries >= max_retries:
-                    logger.error(
-                        f"Max retries ({max_retries}) reached for streaming.",
-                        exc_info=True,
+                    api_key = await self.key_manager.handle_api_failure(
+                        current_attempt_key, model, retries, status_code=status_code
                     )
-                    raise
+                    if api_key:
+                        logger.info(
+                            f"Switched to new API key: {redact_key_for_logging(api_key)}"
+                        )
+                    else:
+                        logger.error(f"No valid API key available after {retries} retries.",
+                                    exc_info=True)
+                        raise
+
+                    if retries >= max_retries:
+                        logger.error(
+                            f"Max retries ({max_retries}) reached for streaming.",
+                            exc_info=True,
+                        )
+                        raise
             finally:
                 end_time = time.perf_counter()
                 latency_ms = int((end_time - start_time) * 1000)
-                await add_request_log(
-                    model_name=model,
-                    api_key=final_api_key,
-                    is_success=is_success,
-                    status_code=status_code,
-                    latency_ms=latency_ms,
-                    request_time=request_datetime,
-                )
+                from app.database.connection import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    await add_request_log(
+                        session,
+                        model_name=model,
+                        api_key=final_api_key,
+                        is_success=is_success,
+                        status_code=status_code,
+                        latency_ms=latency_ms,
+                        request_time=request_datetime,
+                    )

@@ -26,8 +26,8 @@ from app.service.key.key_manager import (
     KeyManager,
     UsageMatrix,
     Base,
-    get_db,
 )
+from app.database.connection import get_db
 
 
 # ============================================================================
@@ -786,7 +786,7 @@ async def test_commit_to_db_saves_state(key_manager):
         stmt = select(UsageMatrix).where(
             UsageMatrix.api_key == key,
             UsageMatrix.model_name == model,
-            UsageMatrix.vertex_key == False,
+            UsageMatrix.vertex_key == False,  # noqa: E712
         )
         result = await session.execute(stmt)
         record = result.scalars().first()

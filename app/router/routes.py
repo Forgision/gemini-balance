@@ -2,13 +2,15 @@
 Route configuration module, responsible for setting up and configuring the application's routes.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.config import settings
 from app.core.security import verify_auth_token
 from app.log.logger import get_routes_logger
+from app.database.connection import get_db
 from app.router import (
     claude_routes,
     config_routes,
@@ -103,7 +105,9 @@ def setup_page_routes(app: FastAPI) -> None:
             return RedirectResponse(url="/", status_code=302)
 
     @app.get("/keys", response_class=HTMLResponse)
-    async def keys_page(request: Request):
+    async def keys_page(
+        request: Request, session: AsyncSession = Depends(get_db)
+    ):
         """Key management page."""
         try:
             auth_token = request.cookies.get("auth_token")
@@ -122,7 +126,7 @@ def setup_page_routes(app: FastAPI) -> None:
             invalid_key_count = len(keys_status["invalid_keys"])
 
             stats_service = StatsService()
-            api_stats = await stats_service.get_api_usage_stats()
+            api_stats = await stats_service.get_api_usage_stats(session)
             logger.info(f"API stats retrieved: {api_stats}")
 
             logger.info(f"Keys status retrieved successfully. Total keys: {total_keys}")
@@ -217,7 +221,11 @@ def setup_api_stats_routes(app: FastAPI) -> None:
     """
 
     @app.get("/api/stats/details")
-    async def api_stats_details(request: Request, period: str):
+    async def api_stats_details(
+        request: Request,
+        period: str,
+        session: AsyncSession = Depends(get_db),
+    ):
         """Get API call details for a specified period."""
         try:
             auth_token = request.cookies.get("auth_token")
@@ -227,7 +235,7 @@ def setup_api_stats_routes(app: FastAPI) -> None:
 
             logger.info(f"Fetching API call details for period: {period}")
             stats_service = StatsService()
-            details = await stats_service.get_api_call_details(period)
+            details = await stats_service.get_api_call_details(session, period)
             return details
         except ValueError as e:
             logger.warning(
@@ -243,7 +251,10 @@ def setup_api_stats_routes(app: FastAPI) -> None:
 
     @app.get("/api/stats/attention-keys")
     async def api_stats_attention_keys(
-        request: Request, limit: int = 20, status_code: int = 429
+        request: Request,
+        limit: int = 20,
+        status_code: int = 429,
+        session: AsyncSession = Depends(get_db),
     ):
         """Return the keys with the most specified error codes in the last 24 hours (only includes keys in the in-memory list). Default error code is 429."""
         try:
@@ -265,7 +276,7 @@ def setup_api_stats_routes(app: FastAPI) -> None:
             )
             stats_service = StatsService()
             data = await stats_service.get_attention_keys_last_24h(
-                in_memory_keys, limit, status_code
+                session, in_memory_keys, limit, status_code
             )
             return data
         except Exception as e:
@@ -273,7 +284,12 @@ def setup_api_stats_routes(app: FastAPI) -> None:
             return {"error": "Internal server error"}, 500
 
     @app.get("/api/stats/key-details")
-    async def api_stats_key_details(request: Request, key: str, period: str):
+    async def api_stats_key_details(
+        request: Request,
+        key: str,
+        period: str,
+        session: AsyncSession = Depends(get_db),
+    ):
         """Get call details for a specific key in a specified period."""
         try:
             auth_token = request.cookies.get("auth_token")
@@ -285,7 +301,7 @@ def setup_api_stats_routes(app: FastAPI) -> None:
                 f"Fetching key call details for key=...{key[-4:] if key else ''}, period: {period}"
             )
             stats_service = StatsService()
-            details = await stats_service.get_key_call_details(key, period)
+            details = await stats_service.get_key_call_details(session, key, period)
             return details
         except ValueError as e:
             logger.warning(

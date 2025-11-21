@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.config import settings
 from app.core.security import SecurityService
+from app.database.connection import get_db
 from app.dependencies import get_key_manager, get_openai_chat_service
 from app.domain.openai_models import (
     ChatRequest,
@@ -168,6 +170,7 @@ async def embedding(
     request: EmbeddingRequest,
     allowed_token=Depends(security_service.verify_authorization),
     key_manager: KeyManager = Depends(get_key_manager),
+    session: AsyncSession = Depends(get_db),
 ):
     """Handles OpenAI text embedding requests."""
     operation_name = "embedding"
@@ -177,7 +180,10 @@ async def embedding(
         logger.info(f"Using allowed token: {allowed_token}")
         logger.info(f"Using API key: {redact_key_for_logging(api_key)}")
         response = await embedding_service.create_embedding(
-            input_text=request.input, model=request.model, api_key=api_key
+            input_text=request.input,
+            model=request.model,
+            api_key=api_key,
+            session=session,
         )
         return response
 
@@ -210,6 +216,7 @@ async def text_to_speech(
     allowed_token=Depends(security_service.verify_authorization),
     api_key: str = Depends(get_next_working_key_wrapper),
     tts_service: TTSService = Depends(get_tts_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """Handles OpenAI TTS requests."""
     operation_name = "text_to_speech"
@@ -218,5 +225,5 @@ async def text_to_speech(
         logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
         logger.info(f"Using allowed token: {allowed_token}")
         logger.info(f"Using API key: {redact_key_for_logging(api_key)}")
-        audio_data = await tts_service.create_tts(request, api_key)
+        audio_data = await tts_service.create_tts(request, api_key, session=session)
         return Response(content=audio_data, media_type="audio/wav")

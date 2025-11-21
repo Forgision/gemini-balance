@@ -10,7 +10,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # This is crucial to ensure the app is configured for testing
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env.test", override=True)
 
-
 # Only load truly global fixtures that are used across all test modules
 # Module-specific fixtures should be in their respective conftest.py files
 pytest_plugins = [
@@ -20,3 +19,4 @@ pytest_plugins = [
     # Note: app fixtures are in tests/fixtures/app.py (for non-route tests)
     # Note: route fixtures are in tests/routes/conftest.py
 ]
+

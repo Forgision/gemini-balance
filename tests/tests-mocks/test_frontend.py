@@ -6,10 +6,6 @@ import platform
 import pytest
 from pydoll.browser import Chrome
 from pydoll.browser.options import ChromiumOptions
-from pydoll.constants import Key
-
-
-import pytest
 import uvicorn
 import threading
 import time
@@ -31,7 +27,7 @@ TEST_SERVER_PORT = 8002
 TEST_SERVER_HOST = "127.0.0.1"
 
 
-class TestServer(uvicorn.Server):
+class LiveServer(uvicorn.Server):
     """
     Custom uvicorn server to run in a background thread.
     Disables signal handlers to allow it to run in a non-main thread.
@@ -69,7 +65,7 @@ def live_server_url(test_app):
     config = uvicorn.Config(
         test_app, host=TEST_SERVER_HOST, port=port, log_level="error"
     )
-    server = TestServer(config=config)
+    server = LiveServer(config=config)
     server.run_in_thread()
 
     base_url = f"http://{TEST_SERVER_HOST}:{port}"

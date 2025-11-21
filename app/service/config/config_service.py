@@ -12,11 +12,12 @@ from sqlalchemy import insert, update
 
 from app.config.config import Settings as ConfigSettings
 from app.config.config import settings
-from app.database.connection import database
+from app.database.connection import AsyncSessionLocal
 from app.database.models import Settings
 from app.database.services import get_all_settings
 from app.log.logger import get_config_routes_logger
-from app.service.key.key_manager import KeyManager, AsyncSessionLocal
+from app.service.key.key_manager import KeyManager
+
 from fastapi import FastAPI
 from app.service.model.model_service import ModelService
 
@@ -31,92 +32,104 @@ class ConfigService:
         return settings.model_dump()
 
     @staticmethod
-    async def update_config(config_data: Dict[str, Any], app: FastAPI) -> Dict[str, Any]:
+    async def update_config(
+        config_data: Dict[str, Any], app: FastAPI
+    ) -> Dict[str, Any]:
         for key, value in config_data.items():
             if hasattr(settings, key):
                 setattr(settings, key, value)
                 logger.debug(f"Updated setting in memory: {key}")
 
-        # Get existing settings
-        existing_settings_raw: List[Dict[str, Any]] = await get_all_settings()
-        existing_settings_map: Dict[str, Dict[str, Any]] = {
-            s["key"]: s for s in existing_settings_raw
-        }
-        existing_keys = set(existing_settings_map.keys())
-
-        settings_to_update: List[Dict[str, Any]] = []
-        settings_to_insert: List[Dict[str, Any]] = []
-        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-
-        # Prepare data for update or insertion
-        for key, value in config_data.items():
-            # Handle different value types
-            if isinstance(value, list):
-                db_value = json.dumps(value)
-            elif isinstance(value, dict):
-                db_value = json.dumps(value)
-            elif isinstance(value, bool):
-                db_value = str(value).lower()
-            else:
-                db_value = str(value)
-
-            # Only update if the value has changed
-            if key in existing_keys and existing_settings_map[key]["value"] == db_value:
-                continue
-
-            description = f"{key} configuration item"
-
-            data = {
-                "key": key,
-                "value": db_value,
-                "description": description,
-                "updated_at": now,
+        # Get existing settings using a session
+        async with AsyncSessionLocal() as session:
+            existing_settings_raw: List[Dict[str, Any]] = await get_all_settings(
+                session
+            )
+            existing_settings_map: Dict[str, Dict[str, Any]] = {
+                s["key"]: s for s in existing_settings_raw
             }
+            existing_keys = set(existing_settings_map.keys())
 
-            if key in existing_keys:
-                data["description"] = existing_settings_map[key].get(
-                    "description", description
-                )
-                settings_to_update.append(data)
-            else:
-                data["created_at"] = now
-                settings_to_insert.append(data)
+            settings_to_update: List[Dict[str, Any]] = []
+            settings_to_insert: List[Dict[str, Any]] = []
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
 
-        # Execute bulk insert and update in a transaction
-        if settings_to_insert or settings_to_update:
-            try:
-                async with database.transaction():
-                    if settings_to_insert:
-                        query_insert = insert(Settings).values(settings_to_insert)
-                        await database.execute(query=query_insert)
-                        logger.info(
-                            f"Bulk inserted {len(settings_to_insert)} settings."
-                        )
+            # Prepare data for update or insertion
+            for key, value in config_data.items():
+                # Handle different value types
+                if isinstance(value, list):
+                    db_value = json.dumps(value)
+                elif isinstance(value, dict):
+                    db_value = json.dumps(value)
+                elif isinstance(value, bool):
+                    db_value = str(value).lower()
+                else:
+                    db_value = str(value)
 
-                    if settings_to_update:
-                        for setting_data in settings_to_update:
-                            query_update = (
-                                update(Settings)
-                                .where(Settings.key == setting_data["key"])
-                                .values(
-                                    value=setting_data["value"],
-                                    description=setting_data["description"],
-                                    updated_at=setting_data["updated_at"],
-                                )
+                # Only update if the value has changed
+                if (
+                    key in existing_keys
+                    and existing_settings_map[key]["value"] == db_value
+                ):
+                    continue
+
+                description = f"{key} configuration item"
+
+                data = {
+                    "key": key,
+                    "value": db_value,
+                    "description": description,
+                    "updated_at": now,
+                }
+
+                if key in existing_keys:
+                    data["description"] = existing_settings_map[key].get(
+                        "description", description
+                    )
+                    settings_to_update.append(data)
+                else:
+                    data["created_at"] = now
+                    settings_to_insert.append(data)
+
+            # Execute bulk insert and update in a transaction
+            if settings_to_insert or settings_to_update:
+                try:
+                    # Commit any existing transaction (from get_all_settings) before starting a new one
+                    await session.commit()
+
+                    async with session.begin():
+                        if settings_to_insert:
+                            query_insert = insert(Settings).values(settings_to_insert)
+                            await session.execute(query_insert)
+                            logger.info(
+                                f"Bulk inserted {len(settings_to_insert)} settings."
                             )
-                            await database.execute(query=query_update)
-                        logger.info(f"Updated {len(settings_to_update)} settings.")
-            except Exception as e:
-                logger.error(
-                    f"Failed to bulk update/insert settings: {str(e)}", exc_info=True
-                )
-                raise
+
+                        if settings_to_update:
+                            for setting_data in settings_to_update:
+                                query_update = (
+                                    update(Settings)
+                                    .where(Settings.key == setting_data["key"])
+                                    .values(
+                                        value=setting_data["value"],
+                                        description=setting_data["description"],
+                                        updated_at=setting_data["updated_at"],
+                                    )
+                                )
+                                await session.execute(query_update)
+                            logger.info(f"Updated {len(settings_to_update)} settings.")
+                except Exception as e:
+                    logger.error(
+                        f"Failed to bulk update/insert settings: {str(e)}",
+                        exc_info=True,
+                    )
+                    raise
 
         # Reset and reinitialize KeyManager
         try:
             if hasattr(app.state, "key_manager") and app.state.key_manager:
                 await app.state.key_manager.shutdown()
-            
+
             # Create new instance
             key_manager = KeyManager(
                 api_keys=settings.API_KEYS,
@@ -161,7 +174,9 @@ class ConfigService:
             return {"success": False, "message": f"Key '{key_to_delete}' not found."}
 
     @staticmethod
-    async def delete_selected_keys(keys_to_delete: List[str], app: FastAPI) -> Dict[str, Any]:
+    async def delete_selected_keys(
+        keys_to_delete: List[str], app: FastAPI
+    ) -> Dict[str, Any]:
         """Bulk delete selected API keys"""
         if not isinstance(settings.API_KEYS, list):
             settings.API_KEYS = []
@@ -228,7 +243,7 @@ class ConfigService:
         try:
             if hasattr(app.state, "key_manager") and app.state.key_manager:
                 await app.state.key_manager.shutdown()
-            
+
             # Create new instance
             key_manager = KeyManager(
                 api_keys=settings.API_KEYS,
@@ -249,7 +264,9 @@ class ConfigService:
         return await ConfigService.get_config()
 
     @staticmethod
-    async def fetch_ui_models(app: FastAPI) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+    async def fetch_ui_models(
+        app: FastAPI,
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """Get the list of models for UI display"""
         try:
             if not hasattr(app.state, "key_manager"):

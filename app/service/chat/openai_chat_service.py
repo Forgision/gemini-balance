@@ -363,7 +363,10 @@ class OpenAIChatService:
             if "parts" in error_log_msg:
                 logger.error("This is likely a response processing error")
 
-            await add_error_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
                 gemini_key=api_key,
                 model_name=model,
                 error_type="openai-chat-non-stream",
@@ -380,7 +383,10 @@ class OpenAIChatService:
                 f"Normal completion finished - Success: {is_success}, Latency: {latency_ms}ms"
             )
 
-            await add_request_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,
@@ -564,54 +570,60 @@ class OpenAIChatService:
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries} with key {current_attempt_key}"
                 )
 
-                await add_error_log(
-                    gemini_key=current_attempt_key,
-                    model_name=model,
-                    error_type="openai-chat-stream",
-                    error_log=error_log_msg,
-                    error_code=status_code,
-                    request_msg=(
-                        payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None
-                    ),
-                    request_datetime=request_datetime,
-                )
-
-                if self.key_manager:
-                    new_api_key = await self.key_manager.handle_api_failure(
-                        current_attempt_key, model, retries, status_code=status_code
+                from app.database.connection import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    await add_error_log(
+                        session,
+                        gemini_key=current_attempt_key,
+                        model_name=model,
+                        error_type="openai-chat-stream",
+                        error_log=error_log_msg,
+                        error_code=status_code,
+                        request_msg=(
+                            payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None
+                        ),
+                        request_datetime=request_datetime,
                     )
-                    if new_api_key and new_api_key != current_attempt_key:
-                        final_api_key = new_api_key
-                        logger.info(
-                            f"Switched to new API key for next attempt: {final_api_key}"
+
+                    if self.key_manager:
+                        new_api_key = await self.key_manager.handle_api_failure(
+                            current_attempt_key, model, retries, status_code=status_code
                         )
-                    elif not new_api_key:
+                        if new_api_key and new_api_key != current_attempt_key:
+                            final_api_key = new_api_key
+                            logger.info(
+                                f"Switched to new API key for next attempt: {final_api_key}"
+                            )
+                        elif not new_api_key:
+                            logger.error(
+                                f"No valid API key available after {retries} retries, ceasing attempts for this request."
+                            )
+                            raise
+                    else:
                         logger.error(
-                            f"No valid API key available after {retries} retries, ceasing attempts for this request."
+                            "KeyManager not available, cannot switch API key. Ceasing attempts for this request."
+                        )
+                        break
+
+                    if retries >= max_retries:
+                        logger.error(
+                            f"Max retries ({max_retries}) reached for streaming model {model}."
                         )
                         raise
-                else:
-                    logger.error(
-                        "KeyManager not available, cannot switch API key. Ceasing attempts for this request."
-                    )
-                    break
-
-                if retries >= max_retries:
-                    logger.error(
-                        f"Max retries ({max_retries}) reached for streaming model {model}."
-                    )
-                    raise
             finally:
                 end_time = time.perf_counter()
                 latency_ms = int((end_time - start_time) * 1000)
-                await add_request_log(
-                    model_name=model,
-                    api_key=current_attempt_key,
-                    is_success=is_success,
-                    status_code=status_code,
-                    latency_ms=latency_ms,
-                    request_time=request_datetime,
-                )
+                from app.database.connection import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    await add_request_log(
+                        session,
+                        model_name=model,
+                        api_key=current_attempt_key,
+                        is_success=is_success,
+                        status_code=status_code,
+                        latency_ms=latency_ms,
+                        request_time=request_datetime,
+                    )
 
     async def create_image_chat_completion(
         self, request: ChatRequest, api_key: str
@@ -673,7 +685,10 @@ class OpenAIChatService:
             status_code = e.args[0]
             error_log_msg = e.args[1]
             logger.error(error_log_msg, exc_info=True)
-            await add_error_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
                 gemini_key=api_key,
                 model_name=model,
                 error_type="openai-image-stream",
@@ -693,7 +708,10 @@ class OpenAIChatService:
             logger.info(
                 f"Stream image completion for model {model} took {latency_ms} ms. Success: {is_success}"
             )
-            await add_request_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,
@@ -727,7 +745,10 @@ class OpenAIChatService:
             status_code = e.args[0]
             error_log_msg = e.args[1]
             logger.error(error_log_msg, exc_info=True)
-            await add_error_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
                 gemini_key=api_key,
                 model_name=model,
                 error_type="openai-image-non-stream",
@@ -747,7 +768,10 @@ class OpenAIChatService:
             logger.info(
                 f"Normal image completion for model {model} took {latency_ms} ms. Success: {is_success}"
             )
-            await add_request_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,

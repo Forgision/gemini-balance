@@ -65,11 +65,8 @@ def route_async_db_engine(route_monkeypatch):
     Used for the UsageMatrix table in KeyManager.
     Creates a separate engine instance without reloading modules.
     """
-    # Patch the async database URL to use in-memory database
-    route_monkeypatch.setattr(settings, "KEY_MATRIX_DB_URL", "sqlite+aiosqlite:///:memory:")
-    
     # Create a separate async engine for tests without reloading the module
-    from app.service.key.key_manager import Base
+    from app.database.connection import Base
     
     # Create a new async engine instance for testing
     test_async_engine = create_async_engine(

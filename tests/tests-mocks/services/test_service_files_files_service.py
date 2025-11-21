@@ -73,11 +73,20 @@ async def test_get_file(files_service, mock_async_client):
         "state": FileState.ACTIVE
     }
 
-    with patch("app.service.files.files_service.db_services.get_file_record_by_name", AsyncMock(return_value=mock_file_record)), \
-         patch("app.service.files.files_service.AsyncClient", return_value=mock_client_instance), \
-         patch("app.service.files.files_service.db_services.update_file_record_state", new_callable=AsyncMock):
+    mock_session = AsyncMock()
+    with patch(
+        "app.service.files.files_service.db_services.get_file_record_by_name",
+        AsyncMock(return_value=mock_file_record),
+    ), patch(
+        "app.service.files.files_service.AsyncClient", return_value=mock_client_instance
+    ), patch(
+        "app.service.files.files_service.db_services.update_file_record_state",
+        new_callable=AsyncMock,
+    ):
 
-        file_metadata = await files_service.get_file("files/test-file", "test_user")
+        file_metadata = await files_service.get_file(
+            "files/test-file", "test_user", session=mock_session
+        )
 
     assert isinstance(file_metadata, FileMetadata)
     assert file_metadata.name == "files/test-file"
@@ -94,8 +103,12 @@ async def test_list_files(files_service):
         },
     ]
 
-    with patch("app.service.files.files_service.db_services.list_file_records", AsyncMock(return_value=(mock_files, None))):
-        response = await files_service.list_files()
+    mock_session = AsyncMock()
+    with patch(
+        "app.service.files.files_service.db_services.list_file_records",
+        AsyncMock(return_value=(mock_files, None)),
+    ):
+        response = await files_service.list_files(session=mock_session)
 
     assert isinstance(response, ListFilesResponse)
     assert len(response.files) == 1
@@ -110,14 +123,23 @@ async def test_delete_file(files_service, mock_async_client):
 
     mock_file_record = {"name": "files/test-delete", "api_key": "test_api_key"}
 
-    with patch("app.service.files.files_service.db_services.get_file_record_by_name", AsyncMock(return_value=mock_file_record)), \
-         patch("app.service.files.files_service.AsyncClient", return_value=mock_client_instance), \
-         patch("app.service.files.files_service.db_services.delete_file_record", new_callable=AsyncMock) as mock_delete_db:
+    mock_session = AsyncMock()
+    with patch(
+        "app.service.files.files_service.db_services.get_file_record_by_name",
+        AsyncMock(return_value=mock_file_record),
+    ), patch(
+        "app.service.files.files_service.AsyncClient", return_value=mock_client_instance
+    ), patch(
+        "app.service.files.files_service.db_services.delete_file_record",
+        new_callable=AsyncMock,
+    ) as mock_delete_db:
 
-        success = await files_service.delete_file("files/test-delete", "test_user")
+        success = await files_service.delete_file(
+            "files/test-delete", "test_user", session=mock_session
+        )
 
     assert success is True
-    mock_delete_db.assert_called_once_with("files/test-delete")
+    mock_delete_db.assert_awaited_once_with(mock_session, "files/test-delete")
 
 @pytest.mark.asyncio
 async def test_cleanup_expired_files(files_service, mock_async_client):

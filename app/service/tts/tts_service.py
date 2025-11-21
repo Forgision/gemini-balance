@@ -12,6 +12,7 @@ from app.core.constants import TTS_VOICE_NAMES
 from app.database.services import add_error_log, add_request_log
 from app.domain.openai_models import TTSRequest
 from app.log.logger import get_openai_logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_openai_logger()
 
@@ -28,7 +29,9 @@ def _create_wav_file(audio_data: bytes) -> bytes:
 
 
 class TTSService:
-    async def create_tts(self, request: TTSRequest, api_key: str) -> Optional[bytes]:
+    async def create_tts(
+        self, request: TTSRequest, api_key: str, session: AsyncSession
+    ) -> Optional[bytes]:
         """
         Create audio using the Google Gemini SDK.
         """
@@ -82,6 +85,7 @@ class TTSService:
             latency_ms = int((end_time - start_time) * 1000)
             if not is_success:
                 await add_error_log(
+                    session,
                     gemini_key=api_key,
                     model_name=settings.TTS_MODEL,
                     error_type="google-tts",
@@ -94,6 +98,7 @@ class TTSService:
                     ),
                 )
             await add_request_log(
+                session,
                 model_name=settings.TTS_MODEL,
                 api_key=api_key,
                 is_success=is_success,

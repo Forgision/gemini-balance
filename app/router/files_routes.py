@@ -5,8 +5,10 @@ Files API routes
 from typing import Optional, Union
 from fastapi import APIRouter, Request, Query, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.config import settings
+from app.database.connection import get_db
 from app.dependencies import get_files_service
 from app.domain.file_models import FileMetadata, ListFilesResponse, DeleteFileResponse
 from app.log.logger import get_files_logger
@@ -114,6 +116,7 @@ async def list_files(
     ),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
     files_service=Depends(get_files_service),
+    session: AsyncSession = Depends(get_db),
 ) -> Union[ListFilesResponse, JSONResponse]:
     """List files"""
     logger.debug(f"List files: {page_size=}, {page_token=}, {auth_token=}")
@@ -122,7 +125,10 @@ async def list_files(
         user_token = auth_token if settings.FILES_USER_ISOLATION_ENABLED else None
         # Call the service
         return await files_service.list_files(
-            page_size=page_size, page_token=page_token, user_token=user_token
+            session=session,
+            page_size=page_size,
+            page_token=page_token,
+            user_token=user_token,
         )
 
     except HTTPException as e:
@@ -142,6 +148,7 @@ async def get_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
     files_service=Depends(get_files_service),
+    session: AsyncSession = Depends(get_db),
 ) -> Union[FileMetadata, JSONResponse]:
     """Get file information"""
     logger.debug(f"Get file request: {file_id=}, {auth_token=}")
@@ -149,7 +156,9 @@ async def get_file(
         # Use the authentication token as user_token
         user_token = auth_token
         # Call the service
-        return await files_service.get_file(f"files/{file_id}", user_token)
+        return await files_service.get_file(
+            file_name=f"files/{file_id}", user_token=user_token, session=session
+        )
 
     except HTTPException as e:
         logger.error(f"Get file failed: {e.detail}", exc_info=True)
@@ -168,6 +177,7 @@ async def delete_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
     files_service=Depends(get_files_service),
+    session: AsyncSession = Depends(get_db),
 ) -> Union[DeleteFileResponse, JSONResponse]:
     """Delete file"""
     logger.info(f"Delete file: {file_id=}, {auth_token=}")
@@ -175,7 +185,9 @@ async def delete_file(
         # Use the authentication token as user_token
         user_token = auth_token
         # Call the service
-        success = await files_service.delete_file(f"files/{file_id}", user_token)
+        success = await files_service.delete_file(
+            file_name=f"files/{file_id}", user_token=user_token, session=session
+        )
 
         return DeleteFileResponse(
             success=success,
@@ -277,9 +289,30 @@ async def gemini_list_files(
     page_token: Optional[str] = Query(None, alias="pageToken"),
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
     files_service=Depends(get_files_service),
+    session: AsyncSession = Depends(get_db),
 ) -> Union[ListFilesResponse, JSONResponse]:
     """List files (Gemini prefix)"""
-    return await list_files(page_size, page_token, auth_token, files_service)
+    logger.debug(f"Gemini list files: {page_size=}, {page_token=}, {auth_token=}")
+    try:
+        user_token = auth_token if settings.FILES_USER_ISOLATION_ENABLED else None
+        return await files_service.list_files(
+            session=session,
+            page_size=page_size,
+            page_token=page_token,
+            user_token=user_token,
+        )
+    except HTTPException as e:
+        logger.error(f"Gemini list files failed: {e.detail}", exc_info=True)
+        return JSONResponse(
+            content={"error": {"message": e.detail}}, status_code=e.status_code
+        )
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in Gemini list files: {str(e)}", exc_info=True
+        )
+        return JSONResponse(
+            content={"error": {"message": "Internal server error"}}, status_code=500
+        )
 
 
 @router.get("/gemini/v1beta/files/{file_id:path}", response_model=FileMetadata)
@@ -287,9 +320,27 @@ async def gemini_get_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
     files_service=Depends(get_files_service),
+    session: AsyncSession = Depends(get_db),
 ) -> Union[FileMetadata, JSONResponse]:
     """Get file information (Gemini prefix)"""
-    return await get_file(file_id, auth_token, files_service)
+    logger.debug(f"Gemini get file request: {file_id=}, {auth_token=}")
+    try:
+        user_token = auth_token
+        return await files_service.get_file(
+            file_name=f"files/{file_id}", user_token=user_token, session=session
+        )
+    except HTTPException as e:
+        logger.error(f"Gemini get file failed: {e.detail}", exc_info=True)
+        return JSONResponse(
+            content={"error": {"message": e.detail}}, status_code=e.status_code
+        )
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in Gemini get file: {str(e)}", exc_info=True
+        )
+        return JSONResponse(
+            content={"error": {"message": "Internal server error"}}, status_code=500
+        )
 
 
 @router.delete("/gemini/v1beta/files/{file_id:path}", response_model=DeleteFileResponse)
@@ -297,6 +348,28 @@ async def gemini_delete_file(
     file_id: str,
     auth_token: str = Depends(security_service.verify_key_or_goog_api_key),
     files_service=Depends(get_files_service),
+    session: AsyncSession = Depends(get_db),
 ) -> Union[DeleteFileResponse, JSONResponse]:
     """Delete file (Gemini prefix)"""
-    return await delete_file(file_id, auth_token, files_service)
+    logger.info(f"Gemini delete file: {file_id=}, {auth_token=}")
+    try:
+        user_token = auth_token
+        success = await files_service.delete_file(
+            file_name=f"files/{file_id}", user_token=user_token, session=session
+        )
+        return DeleteFileResponse(
+            success=success,
+            message="File deleted successfully" if success else "Failed to delete file",
+        )
+    except HTTPException as e:
+        logger.error(f"Gemini delete file failed: {e.detail}", exc_info=True)
+        return JSONResponse(
+            content={"error": {"message": e.detail}}, status_code=e.status_code
+        )
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in Gemini delete file: {str(e)}", exc_info=True
+        )
+        return JSONResponse(
+            content={"error": {"message": "Internal server error"}}, status_code=500
+        )

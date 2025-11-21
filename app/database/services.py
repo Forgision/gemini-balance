@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from sqlalchemy import asc, delete, desc, func, insert, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.connection import database
 from app.database.models import (
     ErrorLog,
     FileRecord,
@@ -24,27 +24,32 @@ from app.utils.helpers import redact_key_for_logging
 logger = get_database_logger()
 
 
-async def get_all_settings() -> List[Dict[str, Any]]:
+async def get_all_settings(session: AsyncSession) -> List[Dict[str, Any]]:
     """
     Get all settings
+
+    Args:
+        session: Database session
 
     Returns:
         List[Dict[str, Any]]: List of settings
     """
     try:
         query = select(Settings)
-        result = await database.fetch_all(query)
-        return [dict(row) for row in result]
+        result = await session.execute(query)
+        rows = result.scalars().all()
+        return [dict(row.__dict__) for row in rows]
     except Exception as e:
         logger.error(f"Failed to get all settings: {str(e)}", exc_info=True)
         raise
 
 
-async def get_setting(key: str) -> Optional[Dict[str, Any]]:
+async def get_setting(session: AsyncSession, key: str) -> Optional[Dict[str, Any]]:
     """
     Get the setting for the specified key
 
     Args:
+        session: Database session
         key: Setting key name
 
     Returns:
@@ -52,20 +57,22 @@ async def get_setting(key: str) -> Optional[Dict[str, Any]]:
     """
     try:
         query = select(Settings).where(Settings.key == key)
-        result = await database.fetch_one(query)
-        return dict(result) if result else None
+        result = await session.execute(query)
+        row = result.scalar_one_or_none()
+        return dict(row.__dict__) if row else None
     except Exception as e:
         logger.error(f"Failed to get setting {key}: {str(e)}", exc_info=True)
         raise
 
 
 async def update_setting(
-    key: str, value: str, description: Optional[str] = None
+    session: AsyncSession, key: str, value: str, description: Optional[str] = None
 ) -> bool:
     """
     Update setting
 
     Args:
+        session: Database session
         key: Setting key name
         value: Setting value
         description: Setting description
@@ -75,11 +82,11 @@ async def update_setting(
     """
     try:
         # Check if the setting exists
-        setting = await get_setting(key)
+        setting = await get_setting(session, key)
 
         if setting:
             # Update setting
-            query = (
+            await session.execute(
                 update(Settings)
                 .where(Settings.key == key)
                 .values(
@@ -88,19 +95,21 @@ async def update_setting(
                     updated_at=datetime.now(),
                 )
             )
-            await database.execute(query)
+            await session.commit()
             logger.info(f"Updated setting: {key}")
             return True
         else:
             # Insert setting
-            query = insert(Settings).values(
-                key=key,
-                value=value,
-                description=description,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+            await session.execute(
+                insert(Settings).values(
+                    key=key,
+                    value=value,
+                    description=description,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
             )
-            await database.execute(query)
+            await session.commit()
             logger.info(f"Inserted setting: {key}")
             return True
     except Exception as e:
@@ -109,12 +118,13 @@ async def update_setting(
 
 
 async def get_usage_stats_by_key_and_model(
-    api_key: str, model_name: str
+    session: AsyncSession, api_key: str, model_name: str
 ) -> Optional[Dict[str, Any]]:
     """
     Get usage statistics for a given API key and model.
 
     Args:
+        session: Database session
         api_key: The API key.
         model_name: The model name.
 
@@ -126,11 +136,12 @@ async def get_usage_stats_by_key_and_model(
             UsageStats.api_key == api_key,
             UsageStats.model_name == model_name,
         )
-        result = await database.fetch_one(query)
-        if not result:
+        result = await session.execute(query)
+        row = result.scalar_one_or_none()
+        if not row:
             return None
 
-        record = dict(result)
+        record = dict(row.__dict__)
         now = datetime.now()
 
         # Check if RPM and TPM need to be reset
@@ -156,23 +167,28 @@ async def get_usage_stats_by_key_and_model(
         raise
 
 
-async def get_all_usage_stats() -> List[Dict[str, Any]]:
+async def get_all_usage_stats(session: AsyncSession) -> List[Dict[str, Any]]:
     """
     Get all usage statistics.
+
+    Args:
+        session: Database session
 
     Returns:
         List[Dict[str, Any]]: A list of usage statistics.
     """
     try:
         query = select(UsageStats)
-        result = await database.fetch_all(query)
-        return [dict(row) for row in result]
+        result = await session.execute(query)
+        rows = result.scalars().all()
+        return [dict(row.__dict__) for row in rows]
     except Exception as e:
         logger.error(f"Failed to get all usage stats: {str(e)}", exc_info=True)
         raise
 
 
 async def add_error_log(
+    session: AsyncSession,
     gemini_key: Optional[str] = None,
     model_name: Optional[str] = None,
     error_type: Optional[str] = None,
@@ -218,7 +234,8 @@ async def add_error_log(
             request_msg=request_msg_json,
             request_time=(request_datetime if request_datetime else datetime.now()),
         )
-        await database.execute(query)
+        await session.execute(query)
+        await session.commit()
         logger.info(
             f"Added error log for key: {redact_key_for_logging(gemini_key if gemini_key is not None else 'N/A')}"
         )
@@ -229,6 +246,7 @@ async def add_error_log(
 
 
 async def get_error_logs(
+    session: AsyncSession,
     limit: int = 20,
     offset: int = 0,
     key_search: Optional[str] = None,
@@ -295,16 +313,18 @@ async def get_error_logs(
 
         query = query.limit(limit).offset(offset)
 
-        result = await database.fetch_all(query)
-        return [dict(row) for row in result]
+        result = await session.execute(query)
+        rows = result.fetchall()
+        return [dict(row._mapping) for row in rows]
     except Exception as e:
         logger.error(
-            f"Failed to get error logs with filter", exc_info=True
+            "Failed to get error logs with filter: %s", e, exc_info=True
         )
         raise
 
 
 async def get_error_logs_count(
+    session: AsyncSession,
     key_search: Optional[str] = None,
     error_search: Optional[str] = None,
     error_code_search: Optional[str] = None,
@@ -347,17 +367,18 @@ async def get_error_logs_count(
                     f"Invalid format for error_code_search in count: '{error_code_search}'. Expected an integer. Skipping error code filter."
                 )
 
-        count_result = await database.fetch_one(query)
-        return count_result[0] if count_result else 0
+        result = await session.execute(query)
+        count = result.scalar_one()
+        return count if count else 0
     except Exception as e:
         logger.error(
-            f"Failed to count error logs with filters.", exc_info=True
+            "Failed to count error logs with filters: %s", e, exc_info=True
         )
         raise
 
 
 # New function: Get the details of a single error log
-async def get_error_log_details(log_id: int) -> Optional[Dict[str, Any]]:
+async def get_error_log_details(session: AsyncSession, log_id: int) -> Optional[Dict[str, Any]]:
     """
     Get detailed information of a single error log by ID
 
@@ -369,10 +390,11 @@ async def get_error_log_details(log_id: int) -> Optional[Dict[str, Any]]:
     """
     try:
         query = select(ErrorLog).where(ErrorLog.id == log_id)
-        result = await database.fetch_one(query)
-        if result:
+        result = await session.execute(query)
+        row = result.scalar_one_or_none()
+        if row:
             # Convert request_msg (JSONB) to a string for return in the API
-            log_dict = dict(result)
+            log_dict = dict(row.__dict__)
             if "request_msg" in log_dict and log_dict["request_msg"] is not None:
                 # Ensure that even None or non-JSON data can be handled
                 try:
@@ -386,7 +408,9 @@ async def get_error_log_details(log_id: int) -> Optional[Dict[str, Any]]:
             return None
     except Exception as e:
         logger.error(
-            f"Failed to get error log details for ID {log_id}.",
+            "Failed to get error log details for ID %s: %s",
+            log_id,
+            e,
             exc_info=True,
         )
         raise
@@ -394,6 +418,7 @@ async def get_error_log_details(log_id: int) -> Optional[Dict[str, Any]]:
 
 # New function: Find the closest error log by gemini_key / error_code / time window
 async def find_error_log_by_info(
+    session: AsyncSession,
     gemini_key: str,
     timestamp: datetime,
     status_code: Optional[int] = None,
@@ -428,21 +453,24 @@ async def find_error_log_by_info(
             query = base_query.where(ErrorLog.error_code == status_code).order_by(
                 ErrorLog.request_time.desc()
             )
-            candidates = await database.fetch_all(query)
+            result = await session.execute(query)
+            candidates = result.scalars().all()
             if not candidates:
                 # Fallback: without status code, only by time window
                 query2 = base_query.order_by(ErrorLog.request_time.desc())
-                candidates = await database.fetch_all(query2)
+                result2 = await session.execute(query2)
+                candidates = result2.scalars().all()
         else:
             query = base_query.order_by(ErrorLog.request_time.desc())
-            candidates = await database.fetch_all(query)
+            result = await session.execute(query)
+            candidates = result.scalars().all()
 
         if not candidates:
             return None
 
         # Select the one closest to the timestamp in Python
         def _to_dict(row: Any) -> Dict[str, Any]:
-            d = dict(row)
+            d = dict(row.__dict__)
             if "request_msg" in d and d["request_msg"] is not None:
                 try:
                     d["request_msg"] = json.dumps(
@@ -454,18 +482,23 @@ async def find_error_log_by_info(
 
         best = min(
             candidates,
-            key=lambda r: abs((r["request_time"] - timestamp).total_seconds()),
+            key=lambda r: abs((r.request_time - timestamp).total_seconds()),
         )
         return _to_dict(best)
     except Exception as e:
         logger.error(
-            f"Failed to find error log by info (key=***{gemini_key[-4:] if gemini_key else ''}, code={status_code}, ts={timestamp}, window={window_seconds}s).",
+            "Failed to find error log by info (key=***%s, code=%s, ts=%s, window=%ss): %s",
+            gemini_key[-4:] if gemini_key else "",
+            status_code,
+            timestamp,
+            window_seconds,
+            e,
             exc_info=True,
         )
         raise
 
 
-async def delete_error_logs_by_ids(log_ids: List[int]) -> int:
+async def delete_error_logs_by_ids(session: AsyncSession, log_ids: List[int]) -> int:
     """
     Bulk delete error logs based on the provided list of IDs (asynchronous).
 
@@ -474,20 +507,17 @@ async def delete_error_logs_by_ids(log_ids: List[int]) -> int:
 
     Returns:
         int: The number of logs actually deleted.
+
+    NOTE:
+        This function does not commit; callers using the FastAPI dependency should rely
+        on the shared session's lifecycle (e.g., `get_db`) to handle commit/rollback.
     """
     if not log_ids:
         return 0
     try:
-        # Use databases to perform the deletion
+        # Perform the deletion; caller (get_db dependency) will handle commit/rollback
         query = delete(ErrorLog).where(ErrorLog.id.in_(log_ids))
-        # execute returns the number of affected rows, but the databases library's execute does not directly return rowcount
-        # We need to query for existence first, or rely on database constraints/triggers (if applicable)
-        # Alternatively, we can perform the deletion and assume success unless an exception is thrown
-        # For simplicity, we perform the deletion and log it, without accurately returning the number of deletions
-        # If an accurate count is needed, a SELECT COUNT(*) needs to be executed first
-        await database.execute(query)
-        # Note: databases' execute does not return rowcount, so we cannot directly return the number of deletions
-        # Return the length of log_ids as the number of attempted deletions, or return 0/1 to indicate that the operation was attempted
+        await session.execute(query)
         logger.info(f"Attempted bulk deletion for error logs with IDs: {log_ids}")
         return len(log_ids)  # Return the number of attempted deletions
     except Exception as e:
@@ -498,7 +528,7 @@ async def delete_error_logs_by_ids(log_ids: List[int]) -> int:
         raise
 
 
-async def delete_error_log_by_id(log_id: int) -> bool:
+async def delete_error_log_by_id(session: AsyncSession, log_id: int) -> bool:
     """
     Delete a single error log by ID (asynchronous).
 
@@ -511,7 +541,8 @@ async def delete_error_log_by_id(log_id: int) -> bool:
     try:
         # Check for existence first (optional, but more explicit)
         check_query = select(ErrorLog.id).where(ErrorLog.id == log_id)
-        exists = await database.fetch_one(check_query)
+        result = await session.execute(check_query)
+        exists = result.scalar_one_or_none()
 
         if not exists:
             logger.warning(
@@ -521,7 +552,8 @@ async def delete_error_log_by_id(log_id: int) -> bool:
 
         # Perform the deletion
         delete_query = delete(ErrorLog).where(ErrorLog.id == log_id)
-        await database.execute(delete_query)
+        await session.execute(delete_query)
+        await session.commit()
         logger.info(f"Successfully deleted error log with ID: {log_id}")
         return True
     except Exception as e:
@@ -529,7 +561,7 @@ async def delete_error_log_by_id(log_id: int) -> bool:
         raise
 
 
-async def delete_all_error_logs() -> int:
+async def delete_all_error_logs(session: AsyncSession) -> int:
     """
     Delete all error logs in batches to avoid timeouts and performance issues with large amounts of data.
 
@@ -545,15 +577,17 @@ async def delete_all_error_logs() -> int:
         while True:
             # 1) Read a batch of IDs to be deleted, selecting only the ID column to improve efficiency
             id_query = select(ErrorLog.id).order_by(ErrorLog.id).limit(batch_size)
-            rows = await database.fetch_all(id_query)
+            result = await session.execute(id_query)
+            rows = result.fetchall()
             if not rows:
                 break
 
-            ids = [row["id"] for row in rows]
+            ids = [row[0] for row in rows]
 
             # 2) Bulk delete by ID
             delete_query = delete(ErrorLog).where(ErrorLog.id.in_(ids))
-            await database.execute(delete_query)
+            await session.execute(delete_query)
+            await session.commit()
 
             deleted_in_batch = len(ids)
             total_deleted_count += deleted_in_batch
@@ -580,6 +614,7 @@ async def delete_all_error_logs() -> int:
 
 # New function: Add request log
 async def add_request_log(
+    session: AsyncSession,
     model_name: Optional[str],
     api_key: Optional[str],
     is_success: bool,
@@ -612,7 +647,8 @@ async def add_request_log(
             latency_ms=latency_ms,
             token_count=token_count,
         )
-        await database.execute(query)
+        await session.execute(query)
+        await session.commit()
         return True
     except Exception as e:
         logger.error(f"Failed to add request log: {str(e)}", exc_info=True)
@@ -623,6 +659,7 @@ async def add_request_log(
 
 
 async def create_file_record(
+    session: AsyncSession,
     name: str,
     mime_type: str,
     size_bytes: int,
@@ -673,10 +710,11 @@ async def create_file_record(
             upload_url=upload_url,
             user_token=user_token,
         )
-        await database.execute(query)
+        await session.execute(query)
+        await session.commit()
 
         # Return the created record
-        record = await get_file_record_by_name(name)
+        record = await get_file_record_by_name(session, name)
         if record is None:
             raise Exception(f"Failed to create or find file record: {name}")
         return record
@@ -685,7 +723,7 @@ async def create_file_record(
         raise
 
 
-async def get_file_record_by_name(name: str) -> Optional[Dict[str, Any]]:
+async def get_file_record_by_name(session: AsyncSession, name: str) -> Optional[Dict[str, Any]]:
     """
     Get file record by file name
 
@@ -697,8 +735,9 @@ async def get_file_record_by_name(name: str) -> Optional[Dict[str, Any]]:
     """
     try:
         query = select(FileRecord).where(FileRecord.name == name)
-        result = await database.fetch_one(query)
-        return dict(result) if result else None
+        result = await session.execute(query)
+        row = result.scalar_one_or_none()
+        return dict(row.__dict__) if row else None
     except Exception as e:
         logger.error(
             f"Failed to get file record by name {name}: {str(e)}", exc_info=True
@@ -707,6 +746,7 @@ async def get_file_record_by_name(name: str) -> Optional[Dict[str, Any]]:
 
 
 async def update_file_record_state(
+    session: AsyncSession,
     file_name: str,
     state: FileState,
     update_time: Optional[datetime] = None,
@@ -736,9 +776,12 @@ async def update_file_record_state(
             values["sha256_hash"] = sha256_hash
 
         query = update(FileRecord).where(FileRecord.name == file_name).values(**values)
-        result = await database.execute(query)
+        await session.execute(query)
+        await session.commit()
 
-        if result:
+        # Check if update was successful by querying the record
+        updated_record = await get_file_record_by_name(session, file_name)
+        if updated_record:
             logger.info(f"Updated file record state for {file_name} to {state}")
             return True
 
@@ -750,6 +793,7 @@ async def update_file_record_state(
 
 
 async def list_file_records(
+    session: AsyncSession,
     user_token: Optional[str] = None,
     api_key: Optional[str] = None,
     page_size: int = 10,
@@ -792,18 +836,19 @@ async def list_file_records(
         # Sort by ID in ascending order, using OFFSET and LIMIT
         query = query.order_by(FileRecord.id).offset(offset).limit(page_size + 1)
 
-        results = await database.fetch_all(query)
+        result = await session.execute(query)
+        rows = result.scalars().all()
 
-        logger.debug(f"Query returned {len(results)} records")
-        if results:
+        logger.debug(f"Query returned {len(rows)} records")
+        if rows:
             logger.debug(
-                f"First record ID: {results[0]['id']}, Last record ID: {results[-1]['id']}"
+                f"First record ID: {rows[0].id}, Last record ID: {rows[-1].id}"
             )
 
         # Handle pagination
-        has_next = len(results) > page_size
+        has_next = len(rows) > page_size
         if has_next:
-            results = results[:page_size]
+            rows = rows[:page_size]
             # The offset for the next page is the current offset plus the number of records returned on this page
             next_offset = offset + page_size
             next_page_token = str(next_offset)
@@ -812,15 +857,15 @@ async def list_file_records(
             )
         else:
             next_page_token = None
-            logger.debug(f"No next page, returning {len(results)} results")
+            logger.debug(f"No next page, returning {len(rows)} results")
 
-        return [dict(row) for row in results], next_page_token
+        return [dict(row.__dict__) for row in rows], next_page_token
     except Exception as e:
         logger.error(f"Failed to list file records: {str(e)}", exc_info=True)
         raise
 
 
-async def delete_file_record(name: str) -> bool:
+async def delete_file_record(session: AsyncSession, name: str) -> bool:
     """
     Delete file record
 
@@ -832,14 +877,15 @@ async def delete_file_record(name: str) -> bool:
     """
     try:
         query = delete(FileRecord).where(FileRecord.name == name)
-        await database.execute(query)
+        await session.execute(query)
+        await session.commit()
         return True
     except Exception as e:
         logger.error(f"Failed to delete file record: {str(e)}", exc_info=True)
         return False
 
 
-async def delete_expired_file_records() -> List[Dict[str, Any]]:
+async def delete_expired_file_records(session: AsyncSession) -> List[Dict[str, Any]]:
     """
     Delete expired file records
 
@@ -851,7 +897,8 @@ async def delete_expired_file_records() -> List[Dict[str, Any]]:
         query = select(FileRecord).where(
             FileRecord.expiration_time <= datetime.now(timezone.utc)
         )
-        expired_records = await database.fetch_all(query)
+        result = await session.execute(query)
+        expired_records = result.scalars().all()
 
         if not expired_records:
             return []
@@ -860,16 +907,17 @@ async def delete_expired_file_records() -> List[Dict[str, Any]]:
         delete_query = delete(FileRecord).where(
             FileRecord.expiration_time <= datetime.now(timezone.utc)
         )
-        await database.execute(delete_query)
+        await session.execute(delete_query)
+        await session.commit()
 
         logger.info(f"Deleted {len(expired_records)} expired file records")
-        return [dict(record) for record in expired_records]
+        return [dict(record.__dict__) for record in expired_records]
     except Exception as e:
         logger.error(f"Failed to delete expired file records: {str(e)}", exc_info=True)
         raise
 
 
-async def get_file_api_key(name: str) -> Optional[str]:
+async def get_file_api_key(session: AsyncSession, name: str) -> Optional[str]:
     """
     Get the API Key corresponding to the file
 
@@ -884,15 +932,16 @@ async def get_file_api_key(name: str) -> Optional[str]:
             (FileRecord.name == name)
             & (FileRecord.expiration_time > datetime.now(timezone.utc))
         )
-        result = await database.fetch_one(query)
-        return result["api_key"] if result else None
+        result = await session.execute(query)
+        row = result.first()
+        return row[0] if row else None
     except Exception as e:
         logger.error(f"Failed to get file API key: {str(e)}", exc_info=True)
         raise
 
 
 async def update_usage_stats(
-    api_key: str, model_name: str, token_count: int, tpm: int
+    session: AsyncSession, api_key: str, model_name: str, token_count: int, tpm: int
 ) -> bool:
     """
     Update usage statistics.
@@ -915,42 +964,44 @@ async def update_usage_stats(
             UsageStats.api_key == api_key,
             UsageStats.model_name == model_name,
         )
-        record = await database.fetch_one(query)
+        result = await session.execute(query)
+        record = result.scalar_one_or_none()
 
         if record:
             values = {
-                "token_count": UsageStats.token_count + token_count,
+                "token_count": record.token_count + token_count,
                 "timestamp": now,
             }
 
             # Check if RPM and TPM need to be reset
             if (
-                record["rpm_timestamp"]
-                and (now - record["rpm_timestamp"]).total_seconds() > 60
+                record.rpm_timestamp
+                and (now - record.rpm_timestamp).total_seconds() > 60
             ):
                 values["rpm"] = 1
                 values["tpm"] = tpm
                 values["rpm_timestamp"] = now
                 values["tpm_timestamp"] = now
             else:
-                values["rpm"] = UsageStats.rpm + 1
-                values["tpm"] = UsageStats.tpm + tpm
+                values["rpm"] = record.rpm + 1
+                values["tpm"] = record.tpm + tpm
 
             # Check if RPD needs to be reset
             if (
-                record["rpd_timestamp"]
-                and record["rpd_timestamp"].astimezone(pacific_tz).date()
+                record.rpd_timestamp
+                and record.rpd_timestamp.astimezone(pacific_tz).date()
                 < now_pacific.date()
             ):
                 values["rpd"] = 1
                 values["rpd_timestamp"] = now
             else:
-                values["rpd"] = UsageStats.rpd + 1
+                values["rpd"] = record.rpd + 1
 
             update_query = (
-                update(UsageStats).where(UsageStats.id == record["id"]).values(**values)
+                update(UsageStats).where(UsageStats.id == record.id).values(**values)
             )
-            await database.execute(update_query)
+            await session.execute(update_query)
+            await session.commit()
         else:
             # Insert new record
             insert_query = insert(UsageStats).values(
@@ -965,7 +1016,8 @@ async def update_usage_stats(
                 tpm_timestamp=now,
                 rpd_timestamp=now,
             )
-            await database.execute(insert_query)
+            await session.execute(insert_query)
+            await session.commit()
 
         return True
     except Exception as e:
@@ -974,7 +1026,7 @@ async def update_usage_stats(
 
 
 async def set_key_exhausted_status(
-    api_key: str, model_name: str, exhausted: bool
+    session: AsyncSession, api_key: str, model_name: str, exhausted: bool
 ) -> bool:
     """
     Set the exhausted status for a given API key and model.
@@ -992,22 +1044,25 @@ async def set_key_exhausted_status(
             UsageStats.api_key == api_key,
             UsageStats.model_name == model_name,
         )
-        record = await database.fetch_one(query)
+        result = await session.execute(query)
+        record = result.scalar_one_or_none()
 
         if record:
             update_query = (
                 update(UsageStats)
-                .where(UsageStats.id == record["id"])
+                .where(UsageStats.id == record.id)
                 .values(exhausted=exhausted)
             )
-            await database.execute(update_query)
+            await session.execute(update_query)
+            await session.commit()
         else:
             insert_query = insert(UsageStats).values(
                 api_key=api_key,
                 model_name=model_name,
                 exhausted=exhausted,
             )
-            await database.execute(insert_query)
+            await session.execute(insert_query)
+            await session.commit()
 
         return True
     except Exception as e:

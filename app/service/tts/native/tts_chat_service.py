@@ -13,6 +13,7 @@ from app.domain.gemini_models import GeminiRequest
 from app.log.logger import get_gemini_logger
 from app.service.chat.gemini_chat_service import GeminiChatService
 from app.service.tts.native.tts_response_handler import TTSResponseHandler
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_gemini_logger()
 
@@ -35,7 +36,7 @@ class TTSGeminiChatService(GeminiChatService):
         )
 
     async def generate_content(
-        self, model: str, request: GeminiRequest, api_key: str
+        self, model: str, request: GeminiRequest, api_key: str, session: AsyncSession
     ) -> Dict[str, Any]:
         """
         Generate content, with TTS support
@@ -49,7 +50,9 @@ class TTSGeminiChatService(GeminiChatService):
             if "tts" in model.lower():
                 logger.info("Detected TTS model, applying TTS-specific processing")
                 # For TTS models, we need to ensure the correct fields are passed
-                response = await self._handle_tts_request(model, request, api_key)
+                response = await self._handle_tts_request(
+                    model, request, api_key, session
+                )
                 return response
             else:
                 # For non-TTS models, use the parent class's method
@@ -60,7 +63,11 @@ class TTSGeminiChatService(GeminiChatService):
             raise
 
     async def _handle_tts_request(
-        self, model: str, request: GeminiRequest, api_key: str
+        self,
+        model: str,
+        request: GeminiRequest,
+        api_key: str,
+        session: AsyncSession,
     ) -> Dict[str, Any]:
         """
         Handle TTS-specific requests, including full logging functionality
@@ -142,6 +149,7 @@ class TTSGeminiChatService(GeminiChatService):
 
             # Add an error log
             await add_error_log(
+                session,
                 gemini_key=api_key,
                 model_name=model,
                 error_type="tts-api-error",
@@ -163,6 +171,7 @@ class TTSGeminiChatService(GeminiChatService):
             latency_ms = int((end_time - start_time) * 1000)
 
             await add_request_log(
+                session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,

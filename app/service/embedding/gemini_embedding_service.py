@@ -72,7 +72,10 @@ class GeminiEmbeddingService:
             error_log_msg = e.args[1]
             logger.error(f"Single embedding API call failed: {error_log_msg}")
 
-            await add_error_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
                 gemini_key=api_key,
                 model_name=model,
                 error_type="gemini-embed-single",
@@ -85,7 +88,10 @@ class GeminiEmbeddingService:
         finally:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
-            await add_request_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,
@@ -118,7 +124,10 @@ class GeminiEmbeddingService:
             error_log_msg = e.args[1]
             logger.error(f"Batch embedding API call failed: {error_log_msg}")
 
-            await add_error_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
                 gemini_key=api_key,
                 model_name=model,
                 error_type="gemini-embed-batch",
@@ -131,7 +140,10 @@ class GeminiEmbeddingService:
         finally:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
-            await add_request_log(
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,

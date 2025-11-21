@@ -150,33 +150,36 @@ class FileUploadHandler:
                                     )
                                     state_enum = FileState.PROCESSING
 
-                                await db_services.create_file_record(
-                                    name=real_file_name,
-                                    mime_type=file_data.get(
-                                        "mimeType", session_info["mime_type"]
-                                    ),
-                                    size_bytes=int(
-                                        file_data.get(
-                                            "sizeBytes", session_info["size_bytes"]
-                                        )
-                                    ),
-                                    api_key=session_info["api_key"],
-                                    uri=file_data.get(
-                                        "uri", f"{settings.BASE_URL}/{real_file_name}"
-                                    ),
-                                    create_time=now,
-                                    update_time=now,
-                                    expiration_time=datetime.fromisoformat(
-                                        expiration_time_str
-                                    ),
-                                    state=state_enum,
-                                    display_name=file_data.get(
-                                        "displayName",
-                                        session_info.get("display_name", ""),
-                                    ),
-                                    sha256_hash=file_data.get("sha256Hash"),
-                                    user_token=session_info["user_token"],
-                                )
+                                from app.database.connection import AsyncSessionLocal
+                                async with AsyncSessionLocal() as session:
+                                    await db_services.create_file_record(
+                                        session,
+                                        name=real_file_name,
+                                        mime_type=file_data.get(
+                                            "mimeType", session_info["mime_type"]
+                                        ),
+                                        size_bytes=int(
+                                            file_data.get(
+                                                "sizeBytes", session_info["size_bytes"]
+                                            )
+                                        ),
+                                        api_key=session_info["api_key"],
+                                        uri=file_data.get(
+                                            "uri", f"{settings.BASE_URL}/{real_file_name}"
+                                        ),
+                                        create_time=now,
+                                        update_time=now,
+                                        expiration_time=datetime.fromisoformat(
+                                            expiration_time_str
+                                        ),
+                                        state=state_enum,
+                                        display_name=file_data.get(
+                                            "displayName",
+                                            session_info.get("display_name", ""),
+                                        ),
+                                        sha256_hash=file_data.get("sha256Hash"),
+                                        user_token=session_info["user_token"],
+                                    )
                                 logger.info(
                                     f"Created file record: name={real_file_name}, api_key={redact_key_for_logging(session_info['api_key'])}"
                                 )

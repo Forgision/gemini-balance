@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette import status
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import verify_auth_token
+from app.database.connection import get_db
 from app.service.stats.stats_service import StatsService
 from app.log.logger import get_stats_logger
 from app.utils.helpers import redact_key_for_logging
@@ -29,12 +31,13 @@ stats_service = StatsService()
     summary="Get the number of model calls for a specified key in the last 24 hours",
     description="Returns the number of times each model has been called in the last 24 hours for the provided API key.",
 )
-async def get_key_usage_details(key: str):
+async def get_key_usage_details(key: str, session: AsyncSession = Depends(get_db)):
     """
     Retrieves the model usage count for a specific API key within the last 24 hours.
 
     Args:
         key: The API key to get usage details for.
+        session: Database session
 
     Returns:
         A dictionary with model names as keys and their call counts as values.
@@ -44,7 +47,7 @@ async def get_key_usage_details(key: str):
         HTTPException: If an error occurs during data retrieval.
     """
     try:
-        usage_details = await stats_service.get_key_usage_details_last_24h(key)
+        usage_details = await stats_service.get_key_usage_details_last_24h(session, key)
         if usage_details is None:
             return {}
         return usage_details

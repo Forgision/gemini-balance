@@ -14,7 +14,6 @@ pymysql
 sqlalchemy
 aiomysql
 aiosqlite
-databases
 python-dotenv
 apscheduler
 packaging

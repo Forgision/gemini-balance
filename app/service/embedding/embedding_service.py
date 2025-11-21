@@ -5,6 +5,7 @@ from typing import List, Union
 import openai
 from openai import APIStatusError
 from openai.types import CreateEmbeddingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.config import settings
 from app.database.services import add_error_log, add_request_log
@@ -15,9 +16,13 @@ logger = get_embeddings_logger()
 
 class EmbeddingService:
     async def create_embedding(
-        self, input_text: Union[str, List[str]], model: str, api_key: str
+        self,
+        input_text: Union[str, List[str]],
+        model: str,
+        api_key: str,
+        session: AsyncSession,
     ) -> CreateEmbeddingResponse:
-        """Create embeddings using OpenAI API with database logging"""
+        """Create embeddings using OpenAI API with database logging."""
         start_time = time.perf_counter()
         request_datetime = datetime.datetime.now()
         is_success = False
@@ -63,6 +68,7 @@ class EmbeddingService:
             latency_ms = int((end_time - start_time) * 1000)
             if not is_success:
                 await add_error_log(
+                    session,
                     gemini_key=api_key,
                     model_name=model,
                     error_type="openai-embedding",
@@ -76,6 +82,7 @@ class EmbeddingService:
                     request_datetime=request_datetime,
                 )
             await add_request_log(
+                session,
                 model_name=model,
                 api_key=api_key,
                 is_success=is_success,

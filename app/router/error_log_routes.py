@@ -18,10 +18,13 @@ from fastapi import (
 )
 from pydantic import BaseModel
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.security import verify_auth_token
-from app.service.error_log.error_log_service import ErrorLogListResponse, ErrorLogListItem
+from app.service.error_log.error_log_service import ErrorLogListResponse
 from app.dependencies import get_error_log_service
 from app.log.logger import get_log_routes_logger
+from app.database.connection import get_db
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 
@@ -53,6 +56,7 @@ async def get_error_logs_api(
     ),
     sort_order: str = Query("desc", description="Sort order ('asc' or 'desc')"),
     error_log_service = Depends(get_error_log_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Get a list of error logs (returns error codes), supports filtering and sorting
@@ -88,6 +92,7 @@ async def get_error_logs_api(
             end_date=end_date,
             sort_by=sort_by,
             sort_order=sort_order,
+            session=session,
         )
         return result
     except Exception as e:
@@ -115,6 +120,7 @@ async def get_error_log_detail_api(
     request: Request,
     log_id: int = Path(..., ge=1),
     error_log_service=Depends(get_error_log_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Get detailed information of an error log (including error_log and request_msg) by log ID
@@ -128,7 +134,7 @@ async def get_error_log_detail_api(
 
     try:
         log_details = await error_log_service.process_get_error_log_details(
-            log_id=log_id
+            log_id=log_id, session=session
         )
         if not log_details:
             raise HTTPException(status_code=404, detail="Error log not found")
@@ -156,6 +162,7 @@ async def lookup_error_log_by_info(
         100, ge=1, le=300, description="Time window (seconds), default 100 seconds"
     ),
     error_log_service=Depends(get_error_log_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Find the best matching error log details through key / error code / time window.
@@ -171,6 +178,7 @@ async def lookup_error_log_by_info(
             timestamp=timestamp,
             status_code=status_code,
             window_seconds=window_seconds,
+            session=session,
         )
         if not detail:
             raise HTTPException(status_code=404, detail="No matching error log found")
@@ -190,6 +198,7 @@ async def delete_error_logs_bulk_api(
     request: Request,
     payload: Dict[str, List[int]] = Body(...),
     error_log_service=Depends(get_error_log_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Batch delete error logs (asynchronous)
@@ -205,7 +214,7 @@ async def delete_error_logs_bulk_api(
 
     try:
         deleted_count = await error_log_service.process_delete_error_logs_by_ids(
-            log_ids
+            log_ids, session=session
         )
         # Note: The asynchronous function returns the number of attempted deletions, which may not be an exact value
         logger.info(
@@ -224,7 +233,9 @@ async def delete_error_logs_bulk_api(
 
 @router.delete("/errors/all", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_all_error_logs_api(
-    request: Request, error_log_service=Depends(get_error_log_service)
+    request: Request,
+    error_log_service=Depends(get_error_log_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Delete all error logs (asynchronous)
@@ -235,7 +246,7 @@ async def delete_all_error_logs_api(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        await error_log_service.process_delete_all_error_logs()
+        await error_log_service.process_delete_all_error_logs(session=session)
         logger.info("Successfully deleted all error logs.")
         # No body needed for 204 response
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -254,6 +265,7 @@ async def delete_error_log_api(
     request: Request,
     log_id: int = Path(..., ge=1),
     error_log_service=Depends(get_error_log_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Delete a single error log (asynchronous)
@@ -264,7 +276,9 @@ async def delete_error_log_api(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        success = await error_log_service.process_delete_error_log_by_id(log_id)
+        success = await error_log_service.process_delete_error_log_by_id(
+            log_id, session=session
+        )
         if not success:
             # The service layer now returns False when not found, which we convert to 404 here
             raise HTTPException(

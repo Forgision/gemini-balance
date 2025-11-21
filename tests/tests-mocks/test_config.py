@@ -17,9 +17,37 @@ def test_settings_initialization_with_custom_source(mock_env_vars):
 @pytest.mark.asyncio
 async def test_sync_initial_settings(mock_env_vars):
     """Test the sync_initial_settings function."""
-    with patch("app.database.connection.database", new_callable=AsyncMock) as mock_database:
-        mock_database.is_connected = True
-        mock_database.fetch_all.return_value = [{"key": "API_KEYS", "value": '["key4","key5"]'}]
+    # Mock AsyncSessionLocal to return a mock session
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    # Mock the query result - returns rows with key and value
+    mock_row = MagicMock()
+    mock_row._mapping = {"key": "API_KEYS", "value": '["key4","key5"]'}
+    mock_result.scalars.return_value.all.return_value = [mock_row]
+    
+    # Mock all execute calls to return the initial result for the first call,
+    # and empty results for subsequent calls (sync-back queries)
+    execute_call_count = [0]
+    async def mock_execute(query):
+        execute_call_count[0] += 1
+        if execute_call_count[0] == 1:
+            # First call: initial select query
+            return mock_result
+        # Subsequent calls: return empty result for description queries and inserts/updates
+        empty_result = MagicMock()
+        empty_result.fetchall.return_value = []
+        return empty_result
+    
+    mock_session.execute = AsyncMock(side_effect=mock_execute)
+    mock_session.begin.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.begin.return_value.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_context_manager = AsyncMock()
+    mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+    
+    # Fix: Patch where AsyncSessionLocal is actually defined
+    with patch("app.database.connection.AsyncSessionLocal", return_value=mock_context_manager):
         await sync_initial_settings()
         from app.config.config import settings
         assert settings.API_KEYS == ["key4", "key5"]

@@ -18,7 +18,7 @@ from fastapi import HTTPException
 from app.log.logger import get_files_logger
 from app.utils.helpers import redact_key_for_logging
 from app.service.client.api_client import GeminiApiClient
-from app.service.key.key_manager import KeyManager
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = get_files_logger()
 
@@ -258,7 +258,9 @@ class FilesService:
             logger.debug(f"No session found for key: {redact_key_for_logging(key)}")
             return None
 
-    async def get_file(self, file_name: str, user_token: str) -> FileMetadata:
+    async def get_file(
+        self, file_name: str, user_token: str, *, session: AsyncSession
+    ) -> FileMetadata:
         """
         Get file information
 
@@ -271,7 +273,7 @@ class FilesService:
         """
         try:
             # Query the file record
-            file_record = await db_services.get_file_record_by_name(file_name)
+            file_record = await db_services.get_file_record_by_name(session, file_name)
 
             if not file_record:
                 raise HTTPException(status_code=404, detail="File not found")
@@ -306,23 +308,23 @@ class FilesService:
 
                 # Check and update the file state
                 google_state = file_data.get("state", "PROCESSING")
-                if (
-                    google_state != file_record.get("state", "").value
-                    if file_record.get("state")
-                    else None
-                ):
+                record_state = file_record.get("state")
+                record_state_value = record_state.value if record_state else None
+                if google_state != record_state_value:
                     logger.info(
                         f"File state changed from {file_record.get('state')} to {google_state}"
                     )
                     # Update the state in the database
                     if google_state == "ACTIVE":
                         await db_services.update_file_record_state(
+                            session,
                             file_name=file_name,
                             state=FileState.ACTIVE,
                             update_time=datetime.now(timezone.utc),
                         )
                     elif google_state == "FAILED":
                         await db_services.update_file_record_state(
+                            session,
                             file_name=file_name,
                             state=FileState.FAILED,
                             update_time=datetime.now(timezone.utc),
@@ -350,6 +352,8 @@ class FilesService:
 
     async def list_files(
         self,
+        *,
+        session: AsyncSession,
         page_size: int = 10,
         page_token: Optional[str] = None,
         user_token: Optional[str] = None,
@@ -372,7 +376,10 @@ class FilesService:
 
             # Get the file list from the database
             files, next_page_token = await db_services.list_file_records(
-                user_token=user_token, page_size=page_size, page_token=page_token
+                session,
+                user_token=user_token,
+                page_size=page_size,
+                page_token=page_token,
             )
 
             logger.debug(
@@ -411,7 +418,9 @@ class FilesService:
             logger.error(f"Failed to list files: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
-    async def delete_file(self, file_name: str, user_token: str) -> bool:
+    async def delete_file(
+        self, file_name: str, user_token: str, *, session: AsyncSession
+    ) -> bool:
         """
         Delete a file
 
@@ -424,7 +433,7 @@ class FilesService:
         """
         try:
             # Query the file record
-            file_record = await db_services.get_file_record_by_name(file_name)
+            file_record = await db_services.get_file_record_by_name(session, file_name)
 
             if not file_record:
                 raise HTTPException(status_code=404, detail="File not found")
@@ -448,14 +457,14 @@ class FilesService:
                     if expiration_time.tzinfo is None:
                         expiration_time = expiration_time.replace(tzinfo=timezone.utc)
                     if expiration_time <= datetime.now(timezone.utc):
-                        await db_services.delete_file_record(file_name)
+                        await db_services.delete_file_record(session, file_name)
                         return True
                     raise HTTPException(
                         status_code=response.status_code, detail="Failed to delete file"
                     )
 
             # Delete the database record
-            await db_services.delete_file_record(file_name)
+            await db_services.delete_file_record(session, file_name)
             return True
 
         except HTTPException:
@@ -464,7 +473,9 @@ class FilesService:
             logger.error(f"Failed to delete file {file_name}: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
-    async def check_file_state(self, file_name: str, api_key: str) -> str:
+    async def check_file_state(
+        self, file_name: str, api_key: str, *, session: AsyncSession
+    ) -> str:
         """
         Check and update the file state
 
@@ -491,12 +502,14 @@ class FilesService:
                 # Update the database state
                 if google_state == "ACTIVE":
                     await db_services.update_file_record_state(
+                        session,
                         file_name=file_name,
                         state=FileState.ACTIVE,
                         update_time=datetime.now(timezone.utc),
                     )
                 elif google_state == "FAILED":
                     await db_services.update_file_record_state(
+                        session,
                         file_name=file_name,
                         state=FileState.FAILED,
                         update_time=datetime.now(timezone.utc),
@@ -517,7 +530,9 @@ class FilesService:
         """
         try:
             # Get expired files
-            expired_files = await db_services.delete_expired_file_records()
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                expired_files = await db_services.delete_expired_file_records(session)
 
             if not expired_files:
                 return 0

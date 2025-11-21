@@ -326,12 +326,15 @@ class GeminiChatService:
         if "usageMetadata" in response:
             token_count = response["usageMetadata"].get("totalTokenCount", 0)
 
-        await update_usage_stats(
-            api_key=api_key,
-            model_name=model_name,
-            token_count=token_count,
-            tpm=token_count,
-        )
+        from app.database.connection import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await update_usage_stats(
+                session,
+                api_key=api_key,
+                model_name=model_name,
+                token_count=token_count,
+                tpm=token_count,
+            )
 
     def _extract_text_from_response(self, response: Dict[str, Any]) -> str:
         """Extract text content from the response."""
@@ -365,7 +368,9 @@ class GeminiChatService:
         file_names = _extract_file_references(request.model_dump().get("contents", []))
         if file_names:
             logger.info(f"Request contains file references: {file_names}")
-            file_api_key = await get_file_api_key(file_names[0])
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                file_api_key = await get_file_api_key(session, file_names[0])
             if file_api_key:
                 logger.info(
                     f"Found API key for file {file_names[0]}: {redact_key_for_logging(file_api_key)}"
@@ -393,32 +398,40 @@ class GeminiChatService:
             is_success = False
             status_code = e.args[0] if e.args else 500
             if status_code == 429:
-                await set_key_exhausted_status(api_key, model, True)
+                from app.database.connection import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    await set_key_exhausted_status(session, api_key, model, True)
             error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
             logger.error(
                 f"Normal API call failed with error: {error_log_msg}", exc_info=True
             )
 
-            await add_error_log(
-                gemini_key=api_key,
-                model_name=model,
-                error_type="gemini-chat-non-stream",
-                error_log=error_log_msg,
-                error_code=status_code,
-                request_msg=payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None,
-                request_datetime=request_datetime,
-            )
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
+                    gemini_key=api_key,
+                    model_name=model,
+                    error_type="gemini-chat-non-stream",
+                    error_log=error_log_msg,
+                    error_code=status_code,
+                    request_msg=payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None,
+                    request_datetime=request_datetime,
+                )
             raise e
         finally:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
-            await add_request_log(
-                model_name=model,
-                api_key=api_key,
-                is_success=is_success,
-                status_code=status_code,
-                latency_ms=latency_ms,
-                request_time=request_datetime,
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
+                    model_name=model,
+                    api_key=api_key,
+                    is_success=is_success,
+                    status_code=status_code,
+                    latency_ms=latency_ms,
+                    request_time=request_datetime,
             )
 
     async def count_tokens(
@@ -449,26 +462,32 @@ class GeminiChatService:
                 exc_info=True,
             )
 
-            await add_error_log(
-                gemini_key=api_key,
-                model_name=model,
-                error_type="gemini-count-tokens",
-                error_log=error_log_msg,
-                error_code=status_code,
-                request_msg=payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None,
-            )
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_error_log(
+                    session,
+                    gemini_key=api_key,
+                    model_name=model,
+                    error_type="gemini-count-tokens",
+                    error_log=error_log_msg,
+                    error_code=status_code,
+                    request_msg=payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None,
+                )
             raise e
         finally:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
-            await add_request_log(
-                model_name=model,
-                api_key=api_key,
-                is_success=is_success,
-                status_code=status_code,
-                latency_ms=latency_ms,
-                request_time=request_datetime,
-            )
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                await add_request_log(
+                    session,
+                    model_name=model,
+                    api_key=api_key,
+                    is_success=is_success,
+                    status_code=status_code,
+                    latency_ms=latency_ms,
+                    request_time=request_datetime,
+                )
 
     async def stream_generate_content(
         self, model: str, request: GeminiRequest, api_key: str
@@ -478,7 +497,9 @@ class GeminiChatService:
         file_names = _extract_file_references(request.model_dump().get("contents", []))
         if file_names:
             logger.info(f"Request contains file references: {file_names}")
-            file_api_key = await get_file_api_key(file_names[0])
+            from app.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as session:
+                file_api_key = await get_file_api_key(session, file_names[0])
             if file_api_key:
                 logger.info(
                     f"Found API key for file {file_names[0]}: {redact_key_for_logging(file_api_key)}"
@@ -556,17 +577,20 @@ class GeminiChatService:
                     f"Streaming API call failed with error: {error_log_msg}. Attempt {retries} of {max_retries}"
                 )
 
-                await add_error_log(
-                    gemini_key=current_attempt_key,
-                    model_name=model,
-                    error_type="gemini-chat-stream",
-                    error_log=error_log_msg,
-                    error_code=status_code,
-                    request_msg=(
-                        payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None
-                    ),
-                    request_datetime=request_datetime,
-                )
+                from app.database.connection import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    await add_error_log(
+                        session,
+                        gemini_key=current_attempt_key,
+                        model_name=model,
+                        error_type="gemini-chat-stream",
+                        error_log=error_log_msg,
+                        error_code=status_code,
+                        request_msg=(
+                            payload if settings.ERROR_LOG_RECORD_REQUEST_BODY else None
+                        ),
+                        request_datetime=request_datetime,
+                    )
 
                 api_key = await self.key_manager.handle_api_failure(
                     current_attempt_key, model, retries, status_code=status_code
@@ -591,11 +615,14 @@ class GeminiChatService:
             finally:
                 end_time = time.perf_counter()
                 latency_ms = int((end_time - start_time) * 1000)
-                await add_request_log(
-                    model_name=model,
-                    api_key=final_api_key,
-                    is_success=is_success,
-                    status_code=status_code,
-                    latency_ms=latency_ms,
-                    request_time=request_datetime,
-                )
+                from app.database.connection import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    await add_request_log(
+                        session,
+                        model_name=model,
+                        api_key=final_api_key,
+                        is_success=is_success,
+                        status_code=status_code,
+                        latency_ms=latency_ms,
+                        request_time=request_datetime,
+                    )

@@ -13,7 +13,8 @@ from app.log.logger import get_application_logger, setup_access_logging
 from app.middleware.middleware import setup_middlewares
 from app.router.routes import setup_routers
 from app.scheduler.scheduled_tasks import start_scheduler, stop_scheduler, set_app_reference
-from app.service.key.key_manager import KeyManager, AsyncSessionLocal
+from app.service.key.key_manager import KeyManager
+from app.database.connection import AsyncSessionLocal
 from app.service.update.update_service import check_for_updates
 from app.utils.helpers import get_current_version
 
@@ -39,7 +40,7 @@ def update_template_globals(app: FastAPI, update_info: dict):
 # --- Helper functions for lifespan ---
 async def _setup_database_and_config(app: FastAPI, app_settings):
     """Initializes database, syncs settings, and initializes KeyManager."""
-    initialize_database()
+    await initialize_database()
     logger.info("Database initialized successfully")
     await connect_to_db()
     await sync_initial_settings()

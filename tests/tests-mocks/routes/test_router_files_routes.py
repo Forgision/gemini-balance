@@ -1,4 +1,4 @@
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, ANY
 import pytest
 from fastapi import HTTPException, Response
 from app.dependencies import get_files_service
@@ -35,7 +35,12 @@ async def test_list_files_success(route_client, route_mock_key_manager):
     response = route_client.get("/v1beta/files", headers={"x-goog-api-key": "test_auth_token"})
     assert response.status_code == 200
     assert response.json() == {"files": [], "nextPageToken": None}
-    mock_files_service.list_files.assert_called_once()
+    mock_files_service.list_files.assert_awaited_once()
+    list_call_kwargs = mock_files_service.list_files.await_args.kwargs
+    assert list_call_kwargs["page_size"] == 10
+    assert list_call_kwargs["page_token"] is None
+    assert list_call_kwargs["user_token"] == "test_auth_token"
+    assert "session" in list_call_kwargs
 
 
 def test_list_files_unauthorized(route_client):
@@ -62,10 +67,16 @@ async def test_get_file_success(route_client, route_mock_key_manager):
     )
     route_client.app.dependency_overrides[get_files_service] = lambda: mock_files_service
 
-    response = route_client.get("/v1beta/files/test_file", headers={"x-goog-api-key": "test_auth_token"})
+    response = route_client.get(
+        "/v1beta/files/test_file", headers={"x-goog-api-key": "test_auth_token"}
+    )
     assert response.status_code == 200
     assert response.json()["name"] == "files/test_file"
-    mock_files_service.get_file.assert_called_once_with("files/test_file", "test_auth_token")
+    mock_files_service.get_file.assert_awaited_once()
+    get_kwargs = mock_files_service.get_file.await_args.kwargs
+    assert get_kwargs["file_name"] == "files/test_file"
+    assert get_kwargs["user_token"] == "test_auth_token"
+    assert "session" in get_kwargs
 
 
 def test_get_file_unauthorized(route_client):
@@ -81,10 +92,16 @@ async def test_delete_file_success(route_client, route_mock_key_manager):
     mock_files_service.delete_file.return_value = True
     route_client.app.dependency_overrides[get_files_service] = lambda: mock_files_service
 
-    response = route_client.delete("/v1beta/files/test_file", headers={"x-goog-api-key": "test_auth_token"})
+    response = route_client.delete(
+        "/v1beta/files/test_file", headers={"x-goog-api-key": "test_auth_token"}
+    )
     assert response.status_code == 200
     assert response.json()["success"] is True
-    mock_files_service.delete_file.assert_called_once_with("files/test_file", "test_auth_token")
+    mock_files_service.delete_file.assert_awaited_once()
+    delete_kwargs = mock_files_service.delete_file.await_args.kwargs
+    assert delete_kwargs["file_name"] == "files/test_file"
+    assert delete_kwargs["user_token"] == "test_auth_token"
+    assert "session" in delete_kwargs
 
 
 def test_delete_file_unauthorized(route_client):

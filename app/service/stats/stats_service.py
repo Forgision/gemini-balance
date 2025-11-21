@@ -4,8 +4,8 @@ import datetime
 from typing import Union
 
 from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.connection import database
 from app.database.models import RequestLog
 from app.log.logger import get_stats_logger
 
@@ -15,7 +15,7 @@ logger = get_stats_logger()
 class StatsService:
     """Service class for handling statistics related operations."""
 
-    async def get_calls_in_last_seconds(self, seconds: int) -> dict[str, int]:
+    async def get_calls_in_last_seconds(self, session: AsyncSession, seconds: int) -> dict[str, int]:
         """Get the number of calls in the last N seconds (total, success, failure)."""
         try:
             cutoff_time = datetime.datetime.now() - datetime.timedelta(seconds=seconds)
@@ -47,12 +47,13 @@ class StatsService:
                     )
                 ).label("failure"),
             ).where(RequestLog.request_time >= cutoff_time)
-            result = await database.fetch_one(query)
-            if result:
+            result = await session.execute(query)
+            row = result.first()
+            if row:
                 return {
-                    "total": result["total"] or 0,
-                    "success": result["success"] or 0,
-                    "failure": result["failure"] or 0,
+                    "total": row[0] or 0,
+                    "success": row[1] or 0,
+                    "failure": row[2] or 0,
                 }
             return {"total": 0, "success": 0, "failure": 0}
         except Exception as e:
@@ -61,15 +62,15 @@ class StatsService:
             )
             return {"total": 0, "success": 0, "failure": 0}
 
-    async def get_calls_in_last_minutes(self, minutes: int) -> dict[str, int]:
+    async def get_calls_in_last_minutes(self, session: AsyncSession, minutes: int) -> dict[str, int]:
         """Get the number of calls in the last N minutes (total, success, failure)."""
-        return await self.get_calls_in_last_seconds(minutes * 60)
+        return await self.get_calls_in_last_seconds(session, minutes * 60)
 
-    async def get_calls_in_last_hours(self, hours: int) -> dict[str, int]:
+    async def get_calls_in_last_hours(self, session: AsyncSession, hours: int) -> dict[str, int]:
         """Get the number of calls in the last N hours (total, success, failure)."""
-        return await self.get_calls_in_last_seconds(hours * 3600)
+        return await self.get_calls_in_last_seconds(session, hours * 3600)
 
-    async def get_calls_in_current_month(self) -> dict[str, int]:
+    async def get_calls_in_current_month(self, session: AsyncSession) -> dict[str, int]:
         """Get the number of calls in the current calendar month (total, success, failure)."""
         try:
             now = datetime.datetime.now()
@@ -104,12 +105,13 @@ class StatsService:
                     )
                 ).label("failure"),
             ).where(RequestLog.request_time >= start_of_month)
-            result = await database.fetch_one(query)
-            if result:
+            result = await session.execute(query)
+            row = result.first()
+            if row:
                 return {
-                    "total": result["total"] or 0,
-                    "success": result["success"] or 0,
-                    "failure": result["failure"] or 0,
+                    "total": row[0] or 0,
+                    "success": row[1] or 0,
+                    "failure": row[2] or 0,
                 }
             return {"total": 0, "success": 0, "failure": 0}
         except Exception as e:
@@ -118,13 +120,13 @@ class StatsService:
             )
             return {"total": 0, "success": 0, "failure": 0}
 
-    async def get_api_usage_stats(self) -> dict:
+    async def get_api_usage_stats(self, session: AsyncSession) -> dict:
         """Get all required API usage statistics (total, success, failure)."""
         try:
-            stats_1m = await self.get_calls_in_last_minutes(1)
-            stats_1h = await self.get_calls_in_last_hours(1)
-            stats_24h = await self.get_calls_in_last_hours(24)
-            stats_month = await self.get_calls_in_current_month()
+            stats_1m = await self.get_calls_in_last_minutes(session, 1)
+            stats_1h = await self.get_calls_in_last_hours(session, 1)
+            stats_24h = await self.get_calls_in_last_hours(session, 24)
+            stats_month = await self.get_calls_in_current_month(session)
 
             return {
                 "calls_1m": stats_1m,
@@ -142,7 +144,7 @@ class StatsService:
                 "calls_month": default_stat.copy(),
             }
 
-    async def get_api_call_details(self, period: str) -> list[dict]:
+    async def get_api_call_details(self, session: AsyncSession, period: str) -> list[dict]:
         """
         Get API call details for the specified period.
 
@@ -180,21 +182,23 @@ class StatsService:
                 .order_by(RequestLog.request_time.desc())
             )
 
-            results = await database.fetch_all(query)
+            result = await session.execute(query)
+            rows = result.fetchall()
 
             details: list[dict] = []
-            for row in results:
+            for row in rows:
+                row_dict = dict(row._mapping)
                 status = "failure"
-                if row["status_code"] is not None:
-                    status = "success" if 200 <= row["status_code"] < 300 else "failure"
+                if row_dict["status_code"] is not None:
+                    status = "success" if 200 <= row_dict["status_code"] < 300 else "failure"
 
                 record = {
-                    "timestamp": row["timestamp"].isoformat(),
-                    "key": row["key"],
-                    "model": row["model"],
+                    "timestamp": row_dict["timestamp"].isoformat(),
+                    "key": row_dict["key"],
+                    "model": row_dict["model"],
                     "status": status,
-                    "status_code": row["status_code"],
-                    "latency_ms": row["latency_ms"],
+                    "status_code": row_dict["status_code"],
+                    "latency_ms": row_dict["latency_ms"],
                 }
 
                 details.append(record)
@@ -211,7 +215,7 @@ class StatsService:
             )
             raise
 
-    async def get_key_call_details(self, key: str, period: str) -> list[dict]:
+    async def get_key_call_details(self, session: AsyncSession, key: str, period: str) -> list[dict]:
         """Get call details for the specified key and period (same structure as get_api_call_details)."""
         now = datetime.datetime.now()
         if period == "1m":
@@ -238,21 +242,23 @@ class StatsService:
                 .order_by(RequestLog.request_time.desc())
             )
 
-            results = await database.fetch_all(query)
+            result = await session.execute(query)
+            rows = result.fetchall()
 
             details: list[dict] = []
-            for row in results:
+            for row in rows:
+                row_dict = dict(row._mapping)
                 status = "failure"
-                if row["status_code"] is not None:
-                    status = "success" if 200 <= row["status_code"] < 300 else "failure"
+                if row_dict["status_code"] is not None:
+                    status = "success" if 200 <= row_dict["status_code"] < 300 else "failure"
 
                 record = {
-                    "timestamp": row["timestamp"].isoformat(),
-                    "key": row["key"],
-                    "model": row["model"],
+                    "timestamp": row_dict["timestamp"].isoformat(),
+                    "key": row_dict["key"],
+                    "model": row_dict["model"],
                     "status": status,
-                    "status_code": row["status_code"],
-                    "latency_ms": row["latency_ms"],
+                    "status_code": row_dict["status_code"],
+                    "latency_ms": row_dict["latency_ms"],
                 }
 
                 details.append(record)
@@ -269,7 +275,7 @@ class StatsService:
             raise
 
     async def get_attention_keys_last_24h(
-        self, include_keys: set[str], limit: int = 20, status_code: int = 429
+        self, session: AsyncSession, include_keys: set[str], limit: int = 20, status_code: int = 429
     ) -> list[dict]:
         """Returns the list of keys with the most specified status codes (default 429) in the last 24 hours, including only the keys in include_keys.
 
@@ -295,11 +301,12 @@ class StatsService:
                 .order_by(func.count(RequestLog.id).desc())
                 .limit(limit)
             )
-            rows = await database.fetch_all(query)
+            result = await session.execute(query)
+            rows = result.fetchall()
             return [
-                {"key": row["key"], "count": row["count"], "status_code": status_code}
+                {"key": dict(row._mapping)["key"], "count": dict(row._mapping)["count"], "status_code": status_code}
                 for row in rows
-                if row["key"]
+                if dict(row._mapping)["key"]
             ]
         except Exception as e:
             logger.error(
@@ -308,7 +315,7 @@ class StatsService:
             )
             return []
 
-    async def get_key_usage_details_last_24h(self, key: str) -> Union[dict, None]:
+    async def get_key_usage_details_last_24h(self, session: AsyncSession, key: str) -> Union[dict, None]:
         """
         Get the number of calls for the specified API key in the last 24 hours, grouped by model.
 
@@ -339,15 +346,16 @@ class StatsService:
                 .order_by(func.count(RequestLog.id).desc())
             )
 
-            results = await database.fetch_all(query)
+            result = await session.execute(query)
+            rows = result.fetchall()
 
-            if not results:
+            if not rows:
                 logger.info(
                     f"No usage details found for key ending in ...{key[-4:]} in the last 24h."
                 )
                 return {}
 
-            usage_details = {row["model_name"]: row["call_count"] for row in results}
+            usage_details = {dict(row._mapping)["model_name"]: dict(row._mapping)["call_count"] for row in rows}
             logger.info(
                 f"Successfully fetched usage details for key ending in ...{key[-4:]}: {usage_details}"
             )

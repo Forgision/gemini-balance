@@ -4,6 +4,8 @@ Integration tests for configuration routes.
 
 import pytest
 
+from app.database import connection as db_connection
+
 
 @pytest.mark.asyncio
 async def test_get_config(test_client, auth_token):
@@ -16,17 +18,18 @@ async def test_get_config(test_client, auth_token):
     assert isinstance(data, dict)
 
 
-@pytest.mark.asyncio
-async def test_update_config(test_client, auth_token):
+def test_update_config(test_client, auth_token):
     """Test updating configuration."""
     cookies = {"auth_token": auth_token}
     config_data = {
         "LOG_LEVEL": "INFO"
     }
+
+    print(f"[DEBUG] test_update_config engine id={id(db_connection.engine)} session_factory id={id(db_connection.AsyncSessionLocal)}")
     
     response = test_client.put("/api/config", json=config_data, cookies=cookies)
     
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
     data = response.json()
     assert isinstance(data, dict)
 

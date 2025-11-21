@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.config import settings
 from app.core.constants import API_VERSION
@@ -28,6 +29,7 @@ from app.dependencies import get_key_manager
 from app.service.model.model_service import ModelService
 from app.service.tts.native.tts_routes import get_tts_chat_service
 from app.utils.helpers import redact_key_for_logging
+from app.database.connection import get_db
 
 router = APIRouter(prefix=f"/gemini/{API_VERSION}")
 router_v1beta = APIRouter(prefix=f"/{API_VERSION}")
@@ -130,6 +132,7 @@ async def generate_content(
     api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
     chat_service: GeminiChatService = Depends(get_chat_service),
+    session: AsyncSession = Depends(get_db),
 ):
     """Handles Gemini non-streaming content generation requests."""
     operation_name = "gemini_generate_content"
@@ -169,7 +172,10 @@ async def generate_content(
                 logger.info("Using native TTS enhanced service")
                 tts_service = await get_tts_chat_service(key_manager)
                 response = await tts_service.generate_content(
-                    model=model_name, request=request, api_key=api_key
+                    model=model_name,
+                    request=request,
+                    api_key=api_key,
+                    session=session,
                 )
                 return response
             except Exception as e:

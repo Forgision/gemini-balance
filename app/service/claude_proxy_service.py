@@ -13,19 +13,16 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 
+from fastapi import Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.config.config import settings
 from app.exception.api_exceptions import ApiClientException
 from app.log.logger import get_gemini_logger
 from app.service.client.api_client import GeminiApiClient
 from app.database.services import add_error_log, add_request_log, update_usage_stats
 from app.handler.response_handler import GeminiResponseHandler
-from app.domain.gemini_models import (
-    GeminiRequest,
-    GeminiContent,
-    SystemInstruction,
-    GenerationConfig,
-)
-from fastapi import Request
+
 
 logger = get_gemini_logger()
 
@@ -235,10 +232,6 @@ class ClaudeProxyService:
         Returns:
             tuple: (model_name, payload_dict)
         """
-        from app.service.chat.gemini_chat_service import (
-            _build_payload,
-            _get_safety_settings,
-        )
         from app.core.constants import GEMINI_2_FLASH_EXP_SAFETY_SETTINGS
 
         # Get the actual Gemini model name
@@ -279,7 +272,7 @@ class ClaudeProxyService:
                         if isinstance(response_content, (list, dict)):
                             try:
                                 response_content = json.dumps(response_content)
-                            except:
+                            except Exception:
                                 response_content = str(response_content)
                         parts.append(
                             {
@@ -544,12 +537,12 @@ class ClaudeProxyService:
                     else:
                         try:
                             result += json.dumps(item) + "\n"
-                        except:
+                        except Exception:
                             result += str(item) + "\n"
                 else:
                     try:
                         result += str(item) + "\n"
-                    except:
+                    except Exception:
                         result += "Unparseable content\n"
             return result.strip()
 
@@ -558,13 +551,13 @@ class ClaudeProxyService:
                 return content.get("text", "")
             try:
                 return json.dumps(content)
-            except:
+            except Exception:
                 return str(content)
 
         # Fallback for any other type
         try:
             return str(content)
-        except:
+        except Exception:
             return "Unparseable content"
 
     def _from_gemini_to_anthropic(
@@ -893,15 +886,6 @@ class ClaudeProxyService:
                             if arguments:
                                 tool_blocks[tool_index]["arguments"] += arguments
 
-                                # Try to parse accumulated arguments as JSON
-                                try:
-                                    parsed_args = json.loads(
-                                        tool_blocks[tool_index]["arguments"]
-                                    )
-                                except json.JSONDecodeError:
-                                    # If not complete JSON yet, send as partial
-                                    parsed_args = None
-
                                 # Send delta for tool input
                                 anthropic_tool_index = tool_blocks[tool_index][
                                     "anthropic_index"
@@ -1143,7 +1127,11 @@ class ClaudeProxyService:
         return litellm_request
 
     async def count_tokens(
-        self, request: TokenCountRequest, fastapi_request: Optional[Request] = None
+        self,
+        request: TokenCountRequest,
+        fastapi_request: Optional[Request] = None,
+        *,
+        session: AsyncSession,
     ) -> TokenCountResponse:
         """Count tokens for the given request using appropriate API client."""
         if not fastapi_request or not hasattr(fastapi_request.app.state, "key_manager"):
@@ -1253,6 +1241,7 @@ class ClaudeProxyService:
             )
 
             await add_error_log(
+                session,
                 gemini_key=api_key_info,
                 model_name=request.model,
                 error_type="claude-proxy-count-tokens",
@@ -1281,6 +1270,7 @@ class ClaudeProxyService:
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
             await add_request_log(
+                session,
                 model_name=request.model,
                 api_key=api_key_info,
                 is_success=is_success,
@@ -1290,7 +1280,11 @@ class ClaudeProxyService:
             )
 
     async def create_message(
-        self, request: MessagesRequest, fastapi_request: Optional[Request] = None
+        self,
+        request: MessagesRequest,
+        fastapi_request: Optional[Request] = None,
+        *,
+        session: AsyncSession,
     ):
         """Create a message using the Claude proxy."""
         if not fastapi_request or not hasattr(fastapi_request.app.state, "key_manager"):
@@ -1403,6 +1397,7 @@ class ClaudeProxyService:
                     # Update usage stats
                     if "usageMetadata" in gemini_response:
                         await update_usage_stats(
+                            session,
                             api_key=api_key_info,
                             model_name=request.model,
                             token_count=gemini_response["usageMetadata"].get(
@@ -1458,6 +1453,7 @@ class ClaudeProxyService:
             logger.error(f"Error calling litellm: {error_log_msg}", exc_info=True)
 
             await add_error_log(
+                session,
                 gemini_key=api_key_info,
                 model_name=request.model,
                 error_type="claude-proxy-messages",
@@ -1488,6 +1484,7 @@ class ClaudeProxyService:
                 end_time = time.perf_counter()
                 latency_ms = int((end_time - start_time) * 1000)
                 await add_request_log(
+                    session,
                     model_name=request.model,
                     api_key=api_key_info,
                     is_success=is_success,

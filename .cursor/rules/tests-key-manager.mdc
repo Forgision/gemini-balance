@@ -1,9 +1,0 @@
----
-globs: tests/tests-mocks/services/test_service_key_key_manager.py,tests/tests-mocks/services/test_service_key_key_manager_v2.py, app/service/key/key_manager.py, app/service/key/key_manager_v2.py
-alwaysApply: false
----
-- tests at @tests/tests-mocks/services/test_service_key_key_manager.py file are for @app/service/key/key_manager.py
-- tests at @tests/tests-mocks/services/test_service_key_key_manager_v2.py are for @app/service/key/key_manager_v2.py
-- Don't mix tests, while creating tests for any of file, put them in their respective file.
-- While modify in any file, only modify their respective test file only
-e.g. if any modification done in @app/service/key/key_manager_v2.py, you have to only modify tests in @tests/tests-mocks/services/test_service_key_key_manager_v2.py test file only, or vice versa

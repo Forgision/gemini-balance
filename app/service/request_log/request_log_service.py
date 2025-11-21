@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete
 
 from app.config.config import settings
-from app.database.connection import database
+from app.database.connection import AsyncSessionLocal
 from app.database.models import RequestLog
 from app.log.logger import get_request_log_logger
 
@@ -34,14 +34,12 @@ async def delete_old_request_logs_task():
 
         query = delete(RequestLog).where(RequestLog.request_time < cutoff_date)
 
-        if not database.is_connected:
-            logger.info("Connecting to database for request log deletion.")
-            await database.connect()
-
-        result = await database.execute(query)
-        logger.info(
-            f"Request logs older than {cutoff_date} potentially deleted. Rows affected: {result}"
-        )
+        async with AsyncSessionLocal() as session:
+            await session.execute(query)
+            await session.commit()
+            logger.info(
+                f"Request logs older than {cutoff_date} potentially deleted."
+            )
 
     except Exception as e:
         logger.error(

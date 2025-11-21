@@ -51,8 +51,13 @@ def mock_fastapi_request(mock_key_manager):
     return request
 
 
+@pytest.fixture
+def mock_db_session():
+    return AsyncMock()
+
+
 @pytest.mark.asyncio
-async def test_create_message_gemini_model(mock_fastapi_request):
+async def test_create_message_gemini_model(mock_fastapi_request, mock_db_session):
     """Test create_message with Gemini model."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -77,7 +82,9 @@ async def test_create_message_gemini_model(mock_fastapi_request):
         "app.service.claude_proxy_service.GeminiApiClient"
     ) as MockGeminiClient, patch.object(
         service.gemini_response_handler, "handle_response"
-    ) as mock_handle_response:
+    ) as mock_handle_response, patch(
+        "app.service.claude_proxy_service.update_usage_stats", new_callable=AsyncMock
+    ) as mock_update_usage:
         mock_client_instance = MagicMock()
         mock_client_instance.generate_content = AsyncMock(return_value=mock_response)
         MockGeminiClient.return_value = mock_client_instance
@@ -92,15 +99,18 @@ async def test_create_message_gemini_model(mock_fastapi_request):
             "id": "msg_test123"
         }
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, MessagesResponse)
         assert response.content[0].text == "Hi there!"
         mock_client_instance.generate_content.assert_awaited_once()
+        mock_update_usage.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_create_message_gemini_streaming(mock_fastapi_request):
+async def test_create_message_gemini_streaming(mock_fastapi_request, mock_db_session):
     """Test create_message with streaming for Gemini model."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -133,7 +143,9 @@ async def test_create_message_gemini_streaming(mock_fastapi_request):
             }]
         }
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
         
         assert isinstance(response, StreamingResponse)
         # Verify GeminiApiClient was instantiated
@@ -149,7 +161,7 @@ async def test_create_message_gemini_streaming(mock_fastapi_request):
 
 
 @pytest.mark.asyncio
-async def test_create_message_litellm_model(mock_fastapi_request):
+async def test_create_message_litellm_model(mock_fastapi_request, mock_db_session):
     """Test create_message with OpenAI/Anthropic model via LiteLLM."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -173,7 +185,9 @@ async def test_create_message_litellm_model(mock_fastapi_request):
     with patch("app.service.claude_proxy_service.litellm.acompletion") as mock_litellm:
         mock_litellm.return_value = mock_litellm_response
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, MessagesResponse)
         assert response.content[0].text == "Hello from OpenAI!"
@@ -181,7 +195,7 @@ async def test_create_message_litellm_model(mock_fastapi_request):
 
 
 @pytest.mark.asyncio
-async def test_count_tokens_gemini_model(mock_fastapi_request):
+async def test_count_tokens_gemini_model(mock_fastapi_request, mock_db_session):
     """Test count_tokens with Gemini model."""
     service = ClaudeProxyService()
     request_obj = TokenCountRequest(
@@ -193,12 +207,16 @@ async def test_count_tokens_gemini_model(mock_fastapi_request):
 
     with patch(
         "app.service.claude_proxy_service.GeminiApiClient"
-    ) as MockGeminiClient:
+    ) as MockGeminiClient, patch(
+        "app.service.claude_proxy_service.update_usage_stats", new_callable=AsyncMock
+    ) as mock_update_usage:
         mock_client_instance = MagicMock()
         mock_client_instance.count_tokens = AsyncMock(return_value=mock_response)
         MockGeminiClient.return_value = mock_client_instance
 
-        response = await service.count_tokens(request_obj, mock_fastapi_request)
+        response = await service.count_tokens(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, TokenCountResponse)
         assert response.input_tokens == 8
@@ -206,7 +224,7 @@ async def test_count_tokens_gemini_model(mock_fastapi_request):
 
 
 @pytest.mark.asyncio
-async def test_count_tokens_litellm_model(mock_fastapi_request):
+async def test_count_tokens_litellm_model(mock_fastapi_request, mock_db_session):
     """Test count_tokens with OpenAI/Anthropic model via LiteLLM."""
     service = ClaudeProxyService()
     request_obj = TokenCountRequest(
@@ -219,7 +237,9 @@ async def test_count_tokens_litellm_model(mock_fastapi_request):
     ) as mock_token_counter:
         mock_token_counter.return_value = 10
 
-        response = await service.count_tokens(request_obj, mock_fastapi_request)
+        response = await service.count_tokens(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, TokenCountResponse)
         assert response.input_tokens == 10
@@ -227,7 +247,7 @@ async def test_count_tokens_litellm_model(mock_fastapi_request):
 
 
 @pytest.mark.asyncio
-async def test_create_message_no_key_manager():
+async def test_create_message_no_key_manager(mock_db_session):
     """Test create_message raises error when KeyManager is not available."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -247,11 +267,13 @@ async def test_create_message_no_key_manager():
     # Don't set key_manager - this test verifies the error when it's missing
 
     with pytest.raises(RuntimeError, match="KeyManager not initialized"):
-        await service.create_message(request_obj, mock_request)
+        await service.create_message(
+            request_obj, mock_request, session=mock_db_session
+        )
 
 
 @pytest.mark.asyncio
-async def test_create_message_no_api_key(mock_key_manager):
+async def test_create_message_no_api_key(mock_key_manager, mock_db_session):
     """Test create_message raises error when no API key is available."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -267,14 +289,16 @@ async def test_create_message_no_api_key(mock_key_manager):
     mock_request.app.state.key_manager = mock_key_manager
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.create_message(request_obj, mock_request)
+        await service.create_message(
+            request_obj, mock_request, session=mock_db_session
+        )
 
     assert exc_info.value.status_code == 429
     assert "exhausted" in exc_info.value.detail.lower()
 
 
 @pytest.mark.asyncio
-async def test_create_message_with_tools(mock_fastapi_request):
+async def test_create_message_with_tools(mock_fastapi_request, mock_db_session):
     """Test create_message with tools."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -307,12 +331,16 @@ async def test_create_message_with_tools(mock_fastapi_request):
 
     with patch(
         "app.service.claude_proxy_service.GeminiApiClient"
-    ) as MockGeminiClient:
+    ) as MockGeminiClient, patch(
+        "app.service.claude_proxy_service.update_usage_stats", new_callable=AsyncMock
+    ) as mock_update_usage:
         mock_client_instance = MagicMock()
         mock_client_instance.generate_content = AsyncMock(return_value=mock_response)
         MockGeminiClient.return_value = mock_client_instance
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, MessagesResponse)
         # Verify tools were included in the payload
@@ -320,10 +348,11 @@ async def test_create_message_with_tools(mock_fastapi_request):
         assert call_args is not None
         payload = call_args[0][0]  # First positional argument is payload (generate_content(payload, model, api_key))
         assert "tools" in payload
+        mock_update_usage.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_create_message_with_system(mock_fastapi_request):
+async def test_create_message_with_system(mock_fastapi_request, mock_db_session):
     """Test create_message with system instruction."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -347,12 +376,16 @@ async def test_create_message_with_system(mock_fastapi_request):
 
     with patch(
         "app.service.claude_proxy_service.GeminiApiClient"
-    ) as MockGeminiClient:
+    ) as MockGeminiClient, patch(
+        "app.service.claude_proxy_service.update_usage_stats", new_callable=AsyncMock
+    ) as mock_update_usage:
         mock_client_instance = MagicMock()
         mock_client_instance.generate_content = AsyncMock(return_value=mock_response)
         MockGeminiClient.return_value = mock_client_instance
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, MessagesResponse)
         # Verify system instruction was included in the payload
@@ -360,10 +393,11 @@ async def test_create_message_with_system(mock_fastapi_request):
         assert call_args is not None
         payload = call_args[0][0]  # First positional argument is payload (generate_content(payload, model, api_key))
         assert "systemInstruction" in payload
+        mock_update_usage.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_create_message_with_image(mock_fastapi_request):
+async def test_create_message_with_image(mock_fastapi_request, mock_db_session):
     """Test create_message with image content."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -401,12 +435,16 @@ async def test_create_message_with_image(mock_fastapi_request):
 
     with patch(
         "app.service.claude_proxy_service.GeminiApiClient"
-    ) as MockGeminiClient:
+    ) as MockGeminiClient, patch(
+        "app.service.claude_proxy_service.update_usage_stats", new_callable=AsyncMock
+    ) as mock_update_usage:
         mock_client_instance = MagicMock()
         mock_client_instance.generate_content = AsyncMock(return_value=mock_response)
         MockGeminiClient.return_value = mock_client_instance
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, MessagesResponse)
         # Verify image was converted properly in payload
@@ -422,10 +460,11 @@ async def test_create_message_with_image(mock_fastapi_request):
             for part in content.get("parts", [])
         )
         assert has_image
+        mock_update_usage.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_create_message_with_tool_use(mock_fastapi_request):
+async def test_create_message_with_tool_use(mock_fastapi_request, mock_db_session):
     """Test create_message with tool use in messages."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -470,12 +509,16 @@ async def test_create_message_with_tool_use(mock_fastapi_request):
 
     with patch(
         "app.service.claude_proxy_service.GeminiApiClient"
-    ) as MockGeminiClient:
+    ) as MockGeminiClient, patch(
+        "app.service.claude_proxy_service.update_usage_stats", new_callable=AsyncMock
+    ) as mock_update_usage:
         mock_client_instance = MagicMock()
         mock_client_instance.generate_content = AsyncMock(return_value=mock_response)
         MockGeminiClient.return_value = mock_client_instance
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, MessagesResponse)
         # Verify tool use and tool result were converted properly
@@ -495,10 +538,12 @@ async def test_create_message_with_tool_use(mock_fastapi_request):
             for part in content.get("parts", [])
         )
         assert has_function_call or has_function_response
+        mock_update_usage.assert_awaited_once()
+        mock_update_usage.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_create_message_error_handling(mock_fastapi_request):
+async def test_create_message_error_handling(mock_fastapi_request, mock_db_session):
     """Test create_message error handling."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -522,7 +567,9 @@ async def test_create_message_error_handling(mock_fastapi_request):
         MockGeminiClient.return_value = mock_client_instance
 
         with pytest.raises(HTTPException) as exc_info:
-            await service.create_message(request_obj, mock_fastapi_request)
+            await service.create_message(
+                request_obj, mock_fastapi_request, session=mock_db_session
+            )
 
         assert exc_info.value.status_code == 500
         mock_add_error_log.assert_awaited_once()
@@ -530,7 +577,7 @@ async def test_create_message_error_handling(mock_fastapi_request):
 
 
 @pytest.mark.asyncio
-async def test_count_tokens_error_handling(mock_fastapi_request):
+async def test_count_tokens_error_handling(mock_fastapi_request, mock_db_session):
     """Test count_tokens error handling."""
     service = ClaudeProxyService()
     request_obj = TokenCountRequest(
@@ -552,7 +599,9 @@ async def test_count_tokens_error_handling(mock_fastapi_request):
         MockGeminiClient.return_value = mock_client_instance
 
         with pytest.raises(HTTPException) as exc_info:
-            await service.count_tokens(request_obj, mock_fastapi_request)
+            await service.count_tokens(
+                request_obj, mock_fastapi_request, session=mock_db_session
+            )
 
         assert exc_info.value.status_code == 500
         mock_add_error_log.assert_awaited_once()
@@ -560,7 +609,7 @@ async def test_count_tokens_error_handling(mock_fastapi_request):
 
 
 @pytest.mark.asyncio
-async def test_count_tokens_unsupported_model(mock_fastapi_request):
+async def test_count_tokens_unsupported_model(mock_fastapi_request, mock_db_session):
     """Test count_tokens with unsupported model prefix."""
     service = ClaudeProxyService()
     request_obj = TokenCountRequest(
@@ -569,7 +618,9 @@ async def test_count_tokens_unsupported_model(mock_fastapi_request):
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        await service.count_tokens(request_obj, mock_fastapi_request)
+        await service.count_tokens(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
     assert exc_info.value.status_code == 400
     assert "Unsupported model prefix" in exc_info.value.detail
@@ -615,7 +666,7 @@ def test_model_mapping_with_prefix():
 
 
 @pytest.mark.asyncio
-async def test_streaming_handler_tool_calls(mock_fastapi_request):
+async def test_streaming_handler_tool_calls(mock_fastapi_request, mock_db_session):
     """Test streaming handler correctly processes tool calls."""
     service = ClaudeProxyService()
     request_obj = MessagesRequest(
@@ -662,7 +713,9 @@ async def test_streaming_handler_tool_calls(mock_fastapi_request):
             ],
         }
 
-        response = await service.create_message(request_obj, mock_fastapi_request)
+        response = await service.create_message(
+            request_obj, mock_fastapi_request, session=mock_db_session
+        )
 
         assert isinstance(response, StreamingResponse)
         # Verify GeminiApiClient was instantiated

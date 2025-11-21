@@ -2,9 +2,14 @@
 Claude Proxy Routes
 """
 
-from fastapi import APIRouter, Depends, Request, HTTPException
-from starlette.requests import Request
-from app.service.claude_proxy_service import ClaudeProxyService, MessagesRequest, TokenCountRequest
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.service.claude_proxy_service import (
+    ClaudeProxyService,
+    MessagesRequest,
+    TokenCountRequest,
+)
 from app.core.security import SecurityService
 from app.dependencies import get_key_manager
 from app.handler.error_handler import handle_route_errors
@@ -12,6 +17,7 @@ from app.handler.retry_handler import RetryHandler
 from app.log.logger import get_gemini_logger
 from app.service.key.key_manager import KeyManager
 from app.utils.helpers import redact_key_for_logging
+from app.database.connection import get_db
 
 logger = get_gemini_logger()
 
@@ -47,6 +53,7 @@ async def create_message(
     api_key: str = Depends(get_next_working_key),
     key_manager: KeyManager = Depends(get_key_manager),
     service: ClaudeProxyService = Depends(ClaudeProxyService),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Handle chat completions using the Claude proxy.
@@ -59,7 +66,9 @@ async def create_message(
         logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
         logger.info(f"Using allowed token: {allowed_token}")
         logger.info(f"Using API key: {redact_key_for_logging(api_key)}")
-        return await service.create_message(request, fastapi_request)
+        return await service.create_message(
+            request, fastapi_request, session=session
+        )
 
 
 @router.post("/messages/count_tokens")
@@ -71,6 +80,7 @@ async def count_tokens(
     api_key: str = Depends(get_next_working_key_for_token_count),
     key_manager: KeyManager = Depends(get_key_manager),
     service: ClaudeProxyService = Depends(ClaudeProxyService),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Count tokens for the given messages using the Claude proxy.
@@ -83,4 +93,6 @@ async def count_tokens(
         logger.debug(f"Request: \n{request.model_dump_json(indent=2)}")
         logger.info(f"Using allowed token: {allowed_token}")
         logger.info(f"Using API key: {redact_key_for_logging(api_key)}")
-        return await service.count_tokens(request, fastapi_request)
+        return await service.count_tokens(
+            request, fastapi_request, session=session
+        )

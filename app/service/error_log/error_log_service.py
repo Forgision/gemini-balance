@@ -2,12 +2,13 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete
 from fastapi import BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.config import settings
 from app.database import services as db_services
-from app.database.connection import database
+from app.database.connection import AsyncSessionLocal
 from app.database.models import ErrorLog
 from app.log.logger import get_error_log_logger
 
@@ -51,27 +52,27 @@ async def delete_old_error_logs():
     )
 
     try:
-        if not database.is_connected:
-            await database.connect()
-            logger.info("Database connection established for deleting error logs.")
-
-        # First, count how many logs will be deleted (optional, for logging)
-        count_query = select(func.count(ErrorLog.id)).where(
-            ErrorLog.request_time < cutoff_date
-        )
-        num_logs_to_delete = await database.fetch_val(count_query)
-
-        if num_logs_to_delete == 0:
-            logger.info(
-                "No error logs found older than the specified period. No deletion needed."
+        async with AsyncSessionLocal() as session:
+            # First, count how many logs will be deleted (optional, for logging)
+            from sqlalchemy import select, func
+            count_query = select(func.count(ErrorLog.id)).where(
+                ErrorLog.request_time < cutoff_date
             )
-            return
+            result = await session.execute(count_query)
+            num_logs_to_delete = result.scalar_one()
 
-        logger.info(f"Found {num_logs_to_delete} error logs to delete.")
+            if num_logs_to_delete == 0:
+                logger.info(
+                    "No error logs found older than the specified period. No deletion needed."
+                )
+                return
 
-        # Perform the deletion
-        query = delete(ErrorLog).where(ErrorLog.request_time < cutoff_date)
-        await database.execute(query)
+            logger.info(f"Found {num_logs_to_delete} error logs to delete.")
+
+            # Perform the deletion
+            query = delete(ErrorLog).where(ErrorLog.request_time < cutoff_date)
+            await session.execute(query)
+            await session.commit()
         logger.info(
             f"Successfully deleted {num_logs_to_delete} error logs older than {days_to_keep} days."
         )
@@ -92,6 +93,7 @@ async def process_get_error_logs(
     end_date: Optional[datetime],
     sort_by: str,
     sort_order: str,
+    session: AsyncSession,
     background_tasks: Optional[BackgroundTasks] = None,
 ) -> ErrorLogListResponse:
     """
@@ -99,6 +101,7 @@ async def process_get_error_logs(
     """
     try:
         logs_data = await db_services.get_error_logs(
+            session,
             limit=limit,
             offset=offset,
             key_search=key_search,
@@ -110,6 +113,7 @@ async def process_get_error_logs(
             sort_order=sort_order,
         )
         total_count = await db_services.get_error_logs_count(
+            session,
             key_search=key_search,
             error_search=error_search,
             error_code_search=error_code_search,
@@ -136,10 +140,14 @@ async def process_get_error_logs(
                     f"Failed to validate log: {str(e)}, scheduling deletion", exc_info=True
                 )
                 if background_tasks:
-                    background_tasks.add_task(db_services.delete_error_log_by_id, log["id"])
+                    async def delete_with_session(log_id: int):
+                        async with AsyncSessionLocal() as sess:
+                            await db_services.delete_error_log_by_id(sess, log_id)
+                    background_tasks.add_task(delete_with_session, log["id"])
                 else:
                     # Fallback to synchronous deletion if no background_tasks provided
-                    await db_services.delete_error_log_by_id(log["id"])
+                    async with AsyncSessionLocal() as sess:
+                        await db_services.delete_error_log_by_id(sess, log["id"])
                 continue
             
         return ErrorLogListResponse(logs=validated_logs, total=total_count)
@@ -148,13 +156,15 @@ async def process_get_error_logs(
         raise
 
 
-async def process_get_error_log_details(log_id: int) -> Optional[Dict[str, Any]]:
+async def process_get_error_log_details(
+    log_id: int, session: AsyncSession
+) -> Optional[Dict[str, Any]]:
     """
     Processes the retrieval of specific error log details.
     Returns None if not found.
     """
     try:
-        log_details = await db_services.get_error_log_details(log_id=log_id)
+        log_details = await db_services.get_error_log_details(session, log_id=log_id)
         return log_details
     except Exception as e:
         logger.error(
@@ -169,12 +179,15 @@ async def process_find_error_log_by_info(
     timestamp: datetime,
     status_code: Optional[int] = None,
     window_seconds: int = 100,
+    *,
+    session: AsyncSession,
 ) -> Optional[Dict[str, Any]]:
     """
     Finds the best matching error log based on key/status code/time window, returns None if not found.
     """
     try:
         return await db_services.find_error_log_by_info(
+            session,
             gemini_key=gemini_key,
             timestamp=timestamp,
             status_code=status_code,
@@ -188,7 +201,9 @@ async def process_find_error_log_by_info(
         raise
 
 
-async def process_delete_error_logs_by_ids(log_ids: List[int]) -> int:
+async def process_delete_error_logs_by_ids(
+    log_ids: List[int], session: AsyncSession
+) -> int:
     """
     Deletes error logs in bulk by ID.
     Returns the number of logs attempted to be deleted.
@@ -196,7 +211,7 @@ async def process_delete_error_logs_by_ids(log_ids: List[int]) -> int:
     if not log_ids:
         return 0
     try:
-        deleted_count = await db_services.delete_error_logs_by_ids(log_ids)
+        deleted_count = await db_services.delete_error_logs_by_ids(session, log_ids)
         return deleted_count
     except Exception as e:
         logger.error(
@@ -206,13 +221,15 @@ async def process_delete_error_logs_by_ids(log_ids: List[int]) -> int:
         raise
 
 
-async def process_delete_error_log_by_id(log_id: int) -> bool:
+async def process_delete_error_log_by_id(
+    log_id: int, session: AsyncSession
+) -> bool:
     """
     Deletes a single error log by ID.
     Returns True if deletion was successful (or if the log was found and deletion was attempted), otherwise False.
     """
     try:
-        success = await db_services.delete_error_log_by_id(log_id)
+        success = await db_services.delete_error_log_by_id(session, log_id)
         return success
     except Exception as e:
         logger.error(
@@ -222,17 +239,13 @@ async def process_delete_error_log_by_id(log_id: int) -> bool:
         raise
 
 
-async def process_delete_all_error_logs() -> int:
+async def process_delete_all_error_logs(session: AsyncSession) -> int:
     """
     Handles the request to delete all error logs.
     Returns the number of deleted logs.
     """
     try:
-        if not database.is_connected:
-            await database.connect()
-            logger.info("Database connection established for deleting all error logs.")
-
-        deleted_count = await db_services.delete_all_error_logs()
+        deleted_count = await db_services.delete_all_error_logs(session)
         logger.info(
             f"Successfully processed request to delete all error logs. Count: {deleted_count}"
         )

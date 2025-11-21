@@ -70,7 +70,6 @@ class Settings(BaseSettings):
     MYSQL_PASSWORD: str = ""
     MYSQL_DATABASE: str = ""
     MYSQL_SOCKET: str = ""
-    KEY_MATRIX_DB_URL: str = "sqlite+aiosqlite:///data/key_matrix.db"
 
     # Validate MySQL Configuration
     @field_validator(
@@ -299,11 +298,11 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
         elif origin_type is dict:
             # Handle Dict[str, str]
             if args and args == (str, str):
-                parsed_dict = {}
+                parsed_dict_str = {}
                 try:
                     parsed = json.loads(db_value)
                     if isinstance(parsed, dict):
-                        parsed_dict = {str(k): str(v) for k, v in parsed.items()}
+                        parsed_dict_str = {str(k): str(v) for k, v in parsed.items()}
                     else:
                         logger.warning(
                             f"Parsed DB value for key '{key}' is not a dictionary type. Value: {db_value}"
@@ -312,14 +311,15 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                     logger.error(
                         f"Could not parse '{db_value}' as Dict[str, str] for key '{key}'. Returning empty dict."
                     )
-                return parsed_dict
+                return parsed_dict_str
             # Handle Dict[str, float]
             elif args and args == (str, float):
-                parsed_dict = {}
+                parsed_dict_float: Dict[str, float] = {}
                 try:
                     parsed = json.loads(db_value)
                     if isinstance(parsed, dict):
-                        parsed_dict = {str(k): float(v) for k, v in parsed.items()}
+                        # Explicitly build dict with proper types to satisfy mypy
+                        parsed_dict_float = {str(k): float(v) for k, v in parsed.items()}  # type: ignore[dict-item]
                     else:
                         logger.warning(
                             f"Parsed DB value for key '{key}' is not a dictionary type. Value: {db_value}"
@@ -333,8 +333,9 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                             corrected_db_value = db_value.replace("'", '"')
                             parsed = json.loads(corrected_db_value)
                             if isinstance(parsed, dict):
-                                parsed_dict = {
-                                    str(k): float(v) for k, v in parsed.items()
+                                # Explicitly build dict with proper types to satisfy mypy
+                                parsed_dict_float = {
+                                    str(k): float(v) for k, v in parsed.items()  # type: ignore[dict-item]
                                 }
                             else:
                                 logger.warning(
@@ -348,7 +349,7 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                         logger.error(
                             f"Could not parse '{db_value}' as Dict[str, float] for key '{key}': {e1}. Returning empty dict."
                         )
-                return parsed_dict
+                return parsed_dict_float
         # Handle bool
         elif target_type is bool:
             return db_value.lower() in ("true", "1", "yes", "on")
@@ -405,215 +406,211 @@ async def sync_initial_settings():
 
     logger = get_config_logger()
     # Deferred import to avoid circular dependencies and ensure the database connection is initialized
-    from app.database.connection import database
+    from app.database.connection import AsyncSessionLocal
     from app.database.models import Settings as SettingsModel
 
     global settings
     logger.info("Starting initial settings synchronization...")
 
-    if not database.is_connected:
-        try:
-            await database.connect()
-            logger.info("Database connection established for initial sync.")
-        except Exception as e:
-            logger.error(
-                f"Failed to connect to database for initial settings sync: {e}. Skipping sync."
-            )
-            return
-
     try:
-        # 1. Load settings from the database
-        db_settings_raw: List[Dict[str, Any]] = []
-        try:
-            query = select(SettingsModel.key, SettingsModel.value)
-            results = await database.fetch_all(query)
-            db_settings_raw = [
-                {"key": row["key"], "value": row["value"]} for row in results
-            ]
-            logger.info(f"Fetched {len(db_settings_raw)} settings from database.")
-        except Exception as e:
-            logger.error(
-                f"Failed to fetch settings from database: {e}. Proceeding with environment/dotenv settings."
-            )
-            # Continue even if database read fails, to ensure env/dotenv-based config can be synced to the DB
-
-        db_settings_map: Dict[str, str] = {
-            s["key"]: s["value"] for s in db_settings_raw
-        }
-
-        # 2. Merge database settings into memory settings (database takes precedence)
-        updated_in_memory = False
-
-        for key, db_value in db_settings_map.items():
-            if key == "DATABASE_TYPE":
-                logger.debug(
-                    f"Skipping update of '{key}' in memory from database. "
-                    "This setting is controlled by environment/dotenv."
-                )
-                continue
-            if hasattr(settings, key):
-                target_type = Settings.__annotations__.get(key)
-                if target_type:
-                    try:
-                        parsed_db_value = _parse_db_value(key, db_value, target_type)
-                        memory_value = getattr(settings, key)
-
-                        # Compare the parsed value with the value in memory
-                        # Note: For complex types like lists, direct comparison may not be robust, but it's simplified here
-                        if parsed_db_value != memory_value:
-                            # Check if types match, in case the parse function returned an incompatible type
-                            type_match = False
-                            origin_type = get_origin(target_type)
-                            if origin_type:  # It's a generic type
-                                if isinstance(parsed_db_value, origin_type):
-                                    type_match = True
-                            # It's a non-generic type, or a specific generic we want to handle
-                            elif isinstance(parsed_db_value, target_type):
-                                type_match = True
-
-                            if type_match:
-                                setattr(settings, key, parsed_db_value)
-                                logger.debug(
-                                    f"Updated setting '{key}' in memory from database value ({target_type})."
-                                )
-                                updated_in_memory = True
-                            else:
-                                logger.warning(
-                                    f"Parsed DB value type mismatch for key '{key}'. Expected {target_type}, got {type(parsed_db_value)}. Skipping update."
-                                )
-
-                    except Exception as e:
-                        logger.error(
-                            f"Error processing database setting for key '{key}': {e}"
-                        )
-            else:
-                logger.warning(
-                    f"Database setting '{key}' not found in Settings model definition. Ignoring."
-                )
-
-        # If there were updates in memory, re-validate the Pydantic model (optional but recommended)
-        if updated_in_memory:
+        async with AsyncSessionLocal() as session:
+            # 1. Load settings from the database
+            db_settings_raw: List[Dict[str, Any]] = []
             try:
-                # Reload to ensure type conversion and validation
-                settings = Settings(**settings.model_dump())
-                logger.info(
-                    "Settings object re-validated after merging database values."
-                )
-            except ValidationError as e:
-                logger.error(
-                    f"Validation error after merging database settings: {e}. Settings might be inconsistent."
-                )
-
-        # 3. Synchronize the final memory settings back to the database
-        final_memory_settings = settings.model_dump()
-        settings_to_update: List[Dict[str, Any]] = []
-        settings_to_insert: List[Dict[str, Any]] = []
-        now = datetime.datetime.now(datetime.timezone.utc)
-
-        existing_db_keys = set(db_settings_map.keys())
-
-        for key, value in final_memory_settings.items():
-            if key == "DATABASE_TYPE":
-                logger.debug(
-                    f"Skipping synchronization of '{key}' to database. "
-                    "This setting is controlled by environment/dotenv."
-                )
-                continue
-
-            # Serialize values to string or JSON string
-            if isinstance(value, (list, dict)):
-                db_value = json.dumps(value, ensure_ascii=False)
-            elif isinstance(value, bool):
-                db_value = str(value).lower()
-            elif value is None:
-                db_value = ""
-            else:
-                db_value = str(value)
-
-            data = {
-                "key": key,
-                "value": db_value,
-                "description": f"{key} configuration setting",
-                "updated_at": now,
-            }
-
-            if key in existing_db_keys:
-                # Only update if the value is different from the one in the database
-                if db_settings_map[key] != db_value:
-                    settings_to_update.append(data)
-            else:
-                # Insert if the key is not in the database
-                data["created_at"] = now
-                settings_to_insert.append(data)
-
-        # Execute bulk insert and update in a transaction
-        if settings_to_insert or settings_to_update:
-            try:
-                async with database.transaction():
-                    if settings_to_insert:
-                        # Get existing descriptions to avoid overwriting
-                        query_existing = select(
-                            SettingsModel.key, SettingsModel.description
-                        ).where(
-                            SettingsModel.key.in_(
-                                [s["key"] for s in settings_to_insert]
-                            )
-                        )
-                        existing_desc = {
-                            row["key"]: row["description"]
-                            for row in await database.fetch_all(query_existing)
-                        }
-                        for item in settings_to_insert:
-                            item["description"] = existing_desc.get(
-                                item["key"], item["description"]
-                            )
-
-                        query_insert = insert(SettingsModel).values(settings_to_insert)
-                        await database.execute(query=query_insert)
-                        logger.info(
-                            f"Synced (inserted) {len(settings_to_insert)} settings to database."
-                        )
-
-                    if settings_to_update:
-                        # Get existing descriptions to avoid overwriting
-                        query_existing = select(
-                            SettingsModel.key, SettingsModel.description
-                        ).where(
-                            SettingsModel.key.in_(
-                                [s["key"] for s in settings_to_update]
-                            )
-                        )
-                        existing_desc = {
-                            row["key"]: row["description"]
-                            for row in await database.fetch_all(query_existing)
-                        }
-
-                        for setting_data in settings_to_update:
-                            setting_data["description"] = existing_desc.get(
-                                setting_data["key"], setting_data["description"]
-                            )
-                            query_update = (
-                                update(SettingsModel)
-                                .where(SettingsModel.key == setting_data["key"])
-                                .values(
-                                    value=setting_data["value"],
-                                    description=setting_data["description"],
-                                    updated_at=setting_data["updated_at"],
-                                )
-                            )
-                            await database.execute(query=query_update)
-                        logger.info(
-                            f"Synced (updated) {len(settings_to_update)} settings to database."
-                        )
+                query = select(SettingsModel.key, SettingsModel.value)
+                result = await session.execute(query)
+                rows = result.scalars().all()
+                db_settings_raw = [
+                    {"key": dict(row._mapping)["key"], "value": dict(row._mapping)["value"]} for row in rows  # type: ignore[misc]
+                ]
+                logger.info(f"Fetched {len(db_settings_raw)} settings from database.")
             except Exception as e:
                 logger.error(
-                    f"Failed to sync settings to database during startup: {str(e)}",
-                    exc_info=True,
+                    f"Failed to fetch settings from database: {e}. Proceeding with environment/dotenv settings."
                 )
-        else:
-            logger.info(
-                "No setting changes detected between memory and database during initial sync."
-            )
+                # Continue even if database read fails, to ensure env/dotenv-based config can be synced to the DB
+
+            db_settings_map: Dict[str, str] = {
+                s["key"]: s["value"] for s in db_settings_raw  # type: ignore[misc]
+            }
+
+            # 2. Merge database settings into memory settings (database takes precedence)
+            updated_in_memory = False
+
+            for key, db_value in db_settings_map.items():
+                if key == "DATABASE_TYPE":
+                    logger.debug(
+                        f"Skipping update of '{key}' in memory from database. "
+                        "This setting is controlled by environment/dotenv."
+                    )
+                    continue
+                if hasattr(settings, key):
+                    target_type = Settings.__annotations__.get(key)
+                    if target_type:
+                        try:
+                            parsed_db_value = _parse_db_value(key, db_value, target_type)
+                            memory_value = getattr(settings, key)
+
+                            # Compare the parsed value with the value in memory
+                            # Note: For complex types like lists, direct comparison may not be robust, but it's simplified here
+                            if parsed_db_value != memory_value:
+                                # Check if types match, in case the parse function returned an incompatible type
+                                type_match = False
+                                origin_type = get_origin(target_type)
+                                if origin_type:  # It's a generic type
+                                    if isinstance(parsed_db_value, origin_type):
+                                        type_match = True
+                                # It's a non-generic type, or a specific generic we want to handle
+                                elif isinstance(parsed_db_value, target_type):
+                                    type_match = True
+
+                                if type_match:
+                                    setattr(settings, key, parsed_db_value)
+                                    logger.debug(
+                                        f"Updated setting '{key}' in memory from database value ({target_type})."
+                                    )
+                                    updated_in_memory = True
+                                else:
+                                    logger.warning(
+                                        f"Parsed DB value type mismatch for key '{key}'. Expected {target_type}, got {type(parsed_db_value)}. Skipping update."
+                                    )
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing database setting for key '{key}': {e}"
+                            )
+                else:
+                    logger.warning(
+                        f"Database setting '{key}' not found in Settings model definition. Ignoring."
+                    )
+
+            # If there were updates in memory, re-validate the Pydantic model (optional but recommended)
+            if updated_in_memory:
+                try:
+                    # Reload to ensure type conversion and validation
+                    settings = Settings(**settings.model_dump())
+                    logger.info(
+                        "Settings object re-validated after merging database values."
+                    )
+                except ValidationError as e:
+                    logger.error(
+                        f"Validation error after merging database settings: {e}. Settings might be inconsistent."
+                    )
+
+            # 3. Synchronize the final memory settings back to the database
+            final_memory_settings = settings.model_dump()
+            settings_to_update: List[Dict[str, Any]] = []  # type: ignore[misc]
+            settings_to_insert: List[Dict[str, Any]] = []  # type: ignore[misc]
+            now = datetime.datetime.now(datetime.timezone.utc)
+
+            existing_db_keys = set(db_settings_map.keys())
+
+            for key, value in final_memory_settings.items():
+                if key == "DATABASE_TYPE":
+                    logger.debug(
+                        f"Skipping synchronization of '{key}' to database. "
+                        "This setting is controlled by environment/dotenv."
+                    )
+                    continue
+
+                # Serialize values to string or JSON string
+                if isinstance(value, (list, dict)):
+                    db_value = json.dumps(value, ensure_ascii=False)
+                elif isinstance(value, bool):
+                    db_value = str(value).lower()
+                elif value is None:
+                    db_value = ""
+                else:
+                    db_value = str(value)
+
+                data = {
+                    "key": key,
+                    "value": db_value,
+                    "description": f"{key} configuration setting",
+                    "updated_at": now,
+                }
+
+                if key in existing_db_keys:
+                    # Only update if the value is different from the one in the database
+                    if db_settings_map[key] != db_value:
+                        settings_to_update.append(data)
+                else:
+                    # Insert if the key is not in the database
+                    data["created_at"] = now
+                    settings_to_insert.append(data)
+
+            # Execute bulk insert and update in a transaction (after the for loop)
+            if settings_to_insert or settings_to_update:
+                try:
+                    async with session.begin():
+                        if settings_to_insert:
+                            # Get existing descriptions to avoid overwriting
+                            query_existing = select(
+                                SettingsModel.key, SettingsModel.description
+                            ).where(
+                                SettingsModel.key.in_(
+                                    [s["key"] for s in settings_to_insert]
+                                )
+                            )
+                            result_existing = await session.execute(query_existing)
+                            rows_existing = result_existing.fetchall()
+                            existing_desc = {
+                                dict(row._mapping)["key"]: dict(row._mapping)["description"]
+                                for row in rows_existing
+                            }
+                            for item in settings_to_insert:
+                                item["description"] = existing_desc.get(
+                                    item["key"], item["description"]
+                                )
+
+                            query_insert = insert(SettingsModel).values(settings_to_insert)
+                            await session.execute(query_insert)
+                            logger.info(
+                                f"Synced (inserted) {len(settings_to_insert)} settings to database."
+                            )
+
+                        if settings_to_update:
+                            # Get existing descriptions to avoid overwriting
+                            query_existing = select(
+                                SettingsModel.key, SettingsModel.description
+                            ).where(
+                                SettingsModel.key.in_(
+                                    [s["key"] for s in settings_to_update]
+                                )
+                            )
+                            result_existing = await session.execute(query_existing)
+                            rows_existing = result_existing.fetchall()
+                            existing_desc = {
+                                dict(row._mapping)["key"]: dict(row._mapping)["description"]
+                                for row in rows_existing
+                            }
+
+                            for setting_data in settings_to_update:
+                                setting_data["description"] = existing_desc.get(
+                                    setting_data["key"], setting_data["description"]
+                                )
+                                query_update = (
+                                    update(SettingsModel)
+                                    .where(SettingsModel.key == setting_data["key"])
+                                    .values(
+                                        value=setting_data["value"],
+                                        description=setting_data["description"],
+                                        updated_at=setting_data["updated_at"],
+                                    )
+                                )
+                                await session.execute(query_update)
+                            logger.info(
+                                f"Synced (updated) {len(settings_to_update)} settings to database."
+                            )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to sync settings to database during startup: {str(e)}",
+                        exc_info=True,
+                    )
+            else:
+                logger.info(
+                    "No setting changes detected between memory and database during initial sync."
+                )
 
         # Refresh log levels
         log_level = final_memory_settings.get("LOG_LEVEL")
@@ -625,14 +622,5 @@ async def sync_initial_settings():
             f"An unexpected error occurred during initial settings sync: {e}",
             exc_info=True,
         )
-    finally:
-        if database.is_connected:
-            try:
-                pass
-            except Exception as e:
-                logger.error(
-                    f"Error disconnecting database after initial sync: {e}",
-                    exc_info=True,
-                )
 
     logger.info("Initial settings synchronization finished.")

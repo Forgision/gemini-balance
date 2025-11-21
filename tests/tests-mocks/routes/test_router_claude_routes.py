@@ -54,6 +54,8 @@ def test_create_message_success(mock_verify_auth_token, route_client):
     assert result["id"] == "msg_test123"
     assert result["content"][0]["text"] == "Hi there!"
     mock_service.create_message.assert_awaited_once()
+    create_kwargs = mock_service.create_message.await_args.kwargs
+    assert "session" in create_kwargs
 
     # Clean up
     del app.dependency_overrides[ServiceClass]
@@ -125,6 +127,8 @@ def test_count_tokens_success(mock_verify_auth_token, route_client):
     result = response.json()
     assert result["input_tokens"] == 8
     mock_service.count_tokens.assert_awaited_once()
+    count_kwargs = mock_service.count_tokens.await_args.kwargs
+    assert "session" in count_kwargs
 
     # Clean up
     del app.dependency_overrides[ServiceClass]

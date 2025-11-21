@@ -16,6 +16,10 @@ async def fully_reset_key_manager(monkeypatch):
     monkeypatch.setattr(key_manager_module, "_preserved_next_key_in_cycle", None)
     monkeypatch.setattr(key_manager_module, "_preserved_vertex_next_key_in_cycle", None)
     monkeypatch.setattr(key_manager_module, "_singleton_instance", None)
+    
+    # Mock database functions to avoid actual database calls
+    mock_set_exhausted = AsyncMock(return_value=None)
+    monkeypatch.setattr("app.service.key.key_manager_v1.set_key_exhausted_status", mock_set_exhausted)
 
 @pytest_asyncio.fixture(scope="function")
 async def key_manager():
