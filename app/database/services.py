@@ -16,7 +16,7 @@ from app.database.models import (
     FileState,
     RequestLog,
     Settings,
-    UsageStats,
+    UsageMatrix,
 )
 from app.log.logger import get_database_logger
 from app.utils.helpers import redact_key_for_logging
@@ -132,9 +132,9 @@ async def get_usage_stats_by_key_and_model(
         Optional[Dict[str, Any]]: The usage statistics, or None if not found.
     """
     try:
-        query = select(UsageStats).where(
-            UsageStats.api_key == api_key,
-            UsageStats.model_name == model_name,
+        query = select(UsageMatrix).where(
+            UsageMatrix.api_key == api_key,
+            UsageMatrix.model_name == model_name,
         )
         result = await session.execute(query)
         row = result.scalar_one_or_none()
@@ -146,8 +146,8 @@ async def get_usage_stats_by_key_and_model(
 
         # Check if RPM and TPM need to be reset
         if (
-            record["rpm_timestamp"]
-            and (now - record["rpm_timestamp"]).total_seconds() > 60
+            record["minute_reset_time"]
+            and (now - record["minute_reset_time"]).total_seconds() > 60
         ):
             record["rpm"] = 0
             record["tpm"] = 0
@@ -155,8 +155,8 @@ async def get_usage_stats_by_key_and_model(
         # Check if RPD needs to be reset (Pacific Time)
         pacific_tz = timezone(timedelta(hours=-7))
         if (
-            record["rpd_timestamp"]
-            and record["rpd_timestamp"].astimezone(pacific_tz).date()
+            record["day_reset_time"]
+            and record["day_reset_time"].astimezone(pacific_tz).date()
             < now.astimezone(pacific_tz).date()
         ):
             record["rpd"] = 0
@@ -178,7 +178,7 @@ async def get_all_usage_stats(session: AsyncSession) -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: A list of usage statistics.
     """
     try:
-        query = select(UsageStats)
+        query = select(UsageMatrix)
         result = await session.execute(query)
         rows = result.scalars().all()
         return [dict(row.__dict__) for row in rows]

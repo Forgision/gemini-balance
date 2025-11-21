@@ -13,6 +13,7 @@ from sqlalchemy import (
     Boolean,
     BigInteger,
     Enum,
+    UniqueConstraint,
 )
 import enum
 
@@ -182,38 +183,46 @@ class FileRecord(Base):
         return datetime.datetime.now(datetime.timezone.utc) > expiration_time
 
 
-class UsageStats(Base):
+class UsageMatrix(Base):
     """
     Usage statistics table
     """
 
-    __tablename__ = "t_usage_stats"
+    __tablename__ = "t_usage_matrix"
+    __table_args__ = (
+        UniqueConstraint(
+            "api_key", "model_name", "vertex_key", name="uq_usage_stats_key"
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     api_key = Column(String(100), nullable=False, index=True)
     model_name = Column(String(100), nullable=False, index=True)
-    token_count = Column(Integer, nullable=False, default=0)
     rpm = Column(Integer, nullable=False, default=0)
-    rpd = Column(Integer, nullable=False, default=0)
     tpm = Column(Integer, nullable=False, default=0)
-    exhausted = Column(Boolean, nullable=False, default=False)
-    rpm_timestamp = Column(DateTime, nullable=True)
-    tpm_timestamp = Column(DateTime, nullable=True)
-    rpd_timestamp = Column(DateTime, nullable=True)
-    timestamp = Column(
+    rpd = Column(Integer, nullable=False, default=0)
+    total_token_count = Column(Integer, nullable=False, default=0)
+    minute_reset_time = Column(DateTime, nullable=True)
+    day_reset_time = Column(DateTime, nullable=True)
+    vertex_key = Column(Boolean, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    is_exhausted = Column(Boolean, nullable=False, default=False)
+    last_used = Column(
         DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now
     )
 
     def __repr__(self):
         return (
-            f"<UsageStats(api_key='{self.api_key}', "
+            f"<UsageMatrix(api_key='{self.api_key}', "
             f"model_name='{self.model_name}', "
-            f"token_count='{self.token_count}'"
             f"rpm='{self.rpm}', "
-            f"rpm_timestamp='{self.rpm_timestamp}', "
-            f"rpd='{self.rpd}', "
-            f"rpd_timestamp='{self.rpd_timestamp}', "
             f"tpm='{self.tpm}', "
-            f"tpm_timestamp='{self.tpm_timestamp}', "
-            f"exhausted='{self.exhausted}')>"
+            f"rpd='{self.rpd}', "
+            f"total_token_count='{self.total_token_count}', "
+            f"minute_reset_time='{self.minute_reset_time}', "
+            f"day_reset_time='{self.day_reset_time}', "
+            f"vertex_key='{self.vertex_key}', "
+            f"is_active='{self.is_active}', "
+            f"is_exhausted='{self.is_exhausted}', "
+            f"last_used='{self.last_used}')>"
         )

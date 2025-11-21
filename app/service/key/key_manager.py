@@ -7,12 +7,6 @@ import pytz
 from datetime import datetime, timedelta
 from sqlalchemy import (
     select,
-    Column,
-    Integer,
-    String,
-    DateTime,
-    Boolean,
-    UniqueConstraint,
     update as sa_update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -21,7 +15,7 @@ from app.log.logger import get_key_manager_logger
 from app.service.key.rate_limits import scrape_gemini_rate_limits
 from app.config.config import settings
 from app.utils.read_write_lock import ReadWriteLock
-from app.database.connection import Base
+from app.database.models import UsageMatrix
 
 
 GEMINI_RATE_LIMIT_URL = (
@@ -31,47 +25,6 @@ GEMINI_RATE_LIMIT_URL = (
 # Configure logging
 logger = get_key_manager_logger()
 logger.setLevel(logging.DEBUG)
-
-
-class UsageMatrix(Base):
-    """
-    Usage statistics table
-    """
-
-    __tablename__ = "t_usage_matrix"
-    __table_args__ = (
-        UniqueConstraint(
-            "api_key", "model_name", "vertex_key", name="uq_usage_stats_key"
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    api_key = Column(String(100), nullable=False, index=True)
-    model_name = Column(String(100), nullable=False, index=True)
-    rpm = Column(Integer, nullable=False, default=0)
-    tpm = Column(Integer, nullable=False, default=0)
-    rpd = Column(Integer, nullable=False, default=0)
-    minute_reset_time = Column(DateTime, nullable=True)
-    day_reset_time = Column(DateTime, nullable=True)
-    vertex_key = Column(Boolean, nullable=False)
-    is_active = Column(Boolean, nullable=False, default=True)
-    is_exhausted = Column(Boolean, nullable=False, default=False)
-    last_used = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-
-    def __repr__(self):
-        return (
-            f"<UsageStats(api_key='{self.api_key}', "
-            f"model_name='{self.model_name}', "
-            f"rpm='{self.rpm}', "
-            f"tpm='{self.tpm}', "
-            f"rpd='{self.rpd}', "
-            f"minute_reset_time='{self.minute_reset_time}', "
-            f"day_reset_time='{self.day_reset_time}', "
-            f"vertex_key='{self.vertex_key}', "
-            f"is_active='{self.is_active}', "
-            f"is_exhausted='{self.is_exhausted}', "
-            f"last_used='{self.last_used}')>"
-        )
 
 
 # TODO: handle model name such as gemini-2.5-flash-search while get max rate limits
@@ -355,6 +308,7 @@ class KeyManager:
                         "rpm": item.rpm,
                         "rpd": item.rpd,
                         "tpm": item.tpm,
+                        "total_token_count": item.total_token_count,
                         "minute_reset_time": item.minute_reset_time,
                         "day_reset_time": item.day_reset_time,
                         "last_used": item.last_used,
@@ -769,6 +723,9 @@ class KeyManager:
                     self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
                     self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
                     self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
+                    self.df.loc[idx, "total_token_count"] = (
+                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
+                    )
                     self.df.loc[idx, "last_used"] = now
 
                     if error:
@@ -792,6 +749,7 @@ class KeyManager:
                         "max_tpm": 999999999,  # Unlimited
                         "rpd": 1,
                         "max_rpd": 99999,  # Unlimited
+                        "total_token_count": tokens_used,
                         "minute_reset_time": self.now_minute(),
                         "day_reset_time": self.now_day(),
                         "last_used": self.now() - timedelta(2),
@@ -889,6 +847,7 @@ class KeyManager:
                             "rpm": int(row["rpm"]),
                             "tpm": int(row["tpm"]),
                             "rpd": int(row["rpd"]),
+                            "total_token_count": int(row.get("total_token_count", 0)),
                             "minute_reset_time": self.last_minute_reset_ts,
                             "day_reset_time": self.last_day_reset_ts,
                             "vertex_key": bool(is_vertex_key),
@@ -917,6 +876,7 @@ class KeyManager:
                             "rpm": int(row["rpm"]),
                             "tpm": int(row["tpm"]),
                             "rpd": int(row["rpd"]),
+                            "total_token_count": int(row.get("total_token_count", 0)),
                             "minute_reset_time": self.last_minute_reset_ts,
                             "day_reset_time": self.last_day_reset_ts,
                             "is_exhausted": bool(row["is_exhausted"]),
@@ -940,6 +900,7 @@ class KeyManager:
                                 rpm=values["rpm"],
                                 tpm=values["tpm"],
                                 rpd=values["rpd"],
+                                total_token_count=values["total_token_count"],
                                 minute_reset_time=values["minute_reset_time"],
                                 day_reset_time=values["day_reset_time"],
                                 vertex_key=bool(is_vertex_key),
