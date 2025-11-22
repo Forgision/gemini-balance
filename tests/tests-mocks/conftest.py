@@ -12,11 +12,10 @@ load_dotenv(dotenv_path=PROJECT_ROOT / ".env.test", override=True)
 
 # Only load truly global fixtures that are used across all test modules
 # Module-specific fixtures should be in their respective conftest.py files
-pytest_plugins = [
-    "tests.tests-mocks.fixtures.mocks",  # Mock fixtures used everywhere
-    "tests.tests-mocks.fixtures.auth",   # Auth fixtures used everywhere
-    # Note: database fixtures are in tests/database/conftest.py
-    # Note: app fixtures are in tests/fixtures/app.py (for non-route tests)
-    # Note: route fixtures are in tests/routes/conftest.py
-]
-
+# pytest_plugins removed to fix deprecation warning.
+# Plugins should be loaded in the root conftest.py or via pytest.ini if needed globally.
+# However, the fixtures mentioned (mocks, auth) seem to be local to this directory structure
+# or should be imported directly if they are modules.
+# Checking if they are actually needed or if they are automatically discovered.
+# If they are in tests/tests-mocks/fixtures, they might need to be imported in this conftest
+# or the root conftest.

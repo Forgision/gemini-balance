@@ -22,11 +22,9 @@ from unittest.mock import patch
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.service.key.key_manager import (
-    KeyManager,
-    UsageMatrix,
-    Base,
-)
+from app.service.key.key_manager import KeyManager
+from app.database.models import UsageMatrix
+from app.database.connection import Base
 from app.database.connection import get_db
 
 
@@ -45,12 +43,12 @@ async def test_engine():
         poolclass=StaticPool,
         pool_pre_ping=False,  # Disable pre-ping for faster tests
     )
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     yield engine
-    
+
     # Properly dispose of the engine and close all connections
     await engine.dispose(close=True)
     # Give aiosqlite threads time to finish cleanup
@@ -104,7 +102,7 @@ async def key_manager(
         return_value={"Free Tier": mock_rate_limit_data},
     )
     patcher.start()
-    
+
     try:
         km = KeyManager(
             api_keys=sample_api_keys,
@@ -113,19 +111,19 @@ async def key_manager(
             rate_limit_data=mock_rate_limit_data,
             minute_reset_interval=60,  # 60 seconds - long enough to not trigger during tests
         )
-        
+
         await km.init()
-        
+
         # Wait a tiny bit to ensure initialization is complete
         await asyncio.sleep(0.01)
-        
+
         yield km
-        
+
         # Cleanup - shutdown should handle background task cleanup
         try:
             # Signal shutdown first
             km._stop_event.set()
-            
+
             # Wait for background task to finish (with timeout)
             if km._background_task and not km._background_task.done():
                 try:
@@ -137,13 +135,14 @@ async def key_manager(
                         await km._background_task
                     except asyncio.CancelledError:
                         pass
-            
+
             await km.shutdown()
         except Exception as e:
             # Log but don't fail if shutdown has issues
             import logging
+
             logging.warning(f"Error during KeyManager shutdown: {e}")
-        
+
         # Give aiosqlite threads minimal time to finish
         await asyncio.sleep(0.05)
     finally:
@@ -161,7 +160,7 @@ async def test_init_database(test_engine):
     async with test_engine.begin() as conn:
         # Verify tables are created
         result = await conn.run_sync(
-            lambda sync_conn: sync_conn.dialect.has_table(sync_conn, "t_usage_stats")
+            lambda sync_conn: sync_conn.dialect.has_table(sync_conn, "t_usage_matrix")
         )
         assert result is True
 
@@ -195,16 +194,16 @@ async def test_key_manager_initialization(
             async_session_maker=test_session_maker,
             rate_limit_data=mock_rate_limit_data,
         )
-        
+
         result = await km.init()
-        
+
         assert result is True
         assert km.is_ready is True
         assert isinstance(km.df, pd.DataFrame)
         assert not km.df.empty
         assert km.api_keys == sample_api_keys
         assert km.vertex_api_keys == sample_vertex_keys
-        
+
         await km.shutdown()
 
 
@@ -224,11 +223,11 @@ async def test_key_manager_initialization_no_api_keys(
             async_session_maker=test_session_maker,
             rate_limit_data=mock_rate_limit_data,
         )
-        
+
         # Expecting RuntimeError to be raised because if no api keys are provided, the KeyManager.load_default will raise ValueError, on base of that KeyManager.init will raise RuntimeError.
         with pytest.raises(RuntimeError):
             result = await km.init()
-            
+
             assert result is False
             assert km.is_ready is False
 
@@ -237,17 +236,26 @@ async def test_key_manager_initialization_no_api_keys(
 async def test_key_manager_dataframe_structure(key_manager):
     """Test that the DataFrame has the expected structure."""
     df = key_manager.df
-    
+
     # Check index levels
     assert df.index.names == ["model_name", "is_vertex_key", "api_key"]
-    
+
     # Check columns
     expected_columns = [
-        "rpm", "tpm", "rpd",
-        "max_rpm", "max_tpm", "max_rpd",
-        "minute_reset_time", "day_reset_time",
-        "is_active", "is_exhausted", "last_used",
-        "rpm_left", "tpm_left", "rpd_left",
+        "rpm",
+        "tpm",
+        "rpd",
+        "max_rpm",
+        "max_tpm",
+        "max_rpd",
+        "minute_reset_time",
+        "day_reset_time",
+        "is_active",
+        "is_exhausted",
+        "last_used",
+        "rpm_left",
+        "tpm_left",
+        "rpd_left",
     ]
     for col in expected_columns:
         assert col in df.columns
@@ -257,12 +265,12 @@ async def test_key_manager_dataframe_structure(key_manager):
 async def test_load_default_creates_entries_for_all_keys(key_manager):
     """Test that _load_default creates entries for all keys and models."""
     df = key_manager.df
-    
+
     # Should have entries for all combinations of keys and models
     num_models = len(key_manager.rate_limit_data)
     num_keys = len(key_manager.api_keys) + len(key_manager.vertex_api_keys)
     expected_rows = num_models * num_keys
-    
+
     assert len(df) == expected_rows
 
 
@@ -306,7 +314,7 @@ async def test_model_normalization_invalid_input(key_manager):
     """Test model normalization with invalid input."""
     with pytest.raises(TypeError):
         key_manager._model_normalization("")
-    
+
     with pytest.raises(TypeError):
         key_manager._model_normalization(None)
 
@@ -317,11 +325,13 @@ async def test_model_normalization_invalid_input(key_manager):
 
 
 @pytest.mark.asyncio
-async def test_get_key_returns_valid_key(key_manager, ):
+async def test_get_key_returns_valid_key(
+    key_manager,
+):
     """Test that get_key returns a valid API key."""
     # Ensure the KeyManager is ready before calling get_key
     assert key_manager.is_ready is True
-    
+
     await key_manager.update_usage(
         model_name="gemini-1.5-flash",
         key_value="test_key_1",
@@ -334,14 +344,14 @@ async def test_get_key_returns_valid_key(key_manager, ):
         is_vertex_key=False,
         tokens_used=1000,
     )
-    
-    
+
     key = await asyncio.wait_for(
-        key_manager.get_key("gemini-1.5-flash", is_vertex_key=False),
-        timeout=5.0
+        key_manager.get_key("gemini-1.5-flash", is_vertex_key=False), timeout=5.0
     )
     assert key in key_manager.api_keys
-    assert key == "test_key_3"  # test_key_3 is the first key in the list as test_key_1 and test_key_2 are already used
+    assert (
+        key == "test_key_3"
+    )  # test_key_3 is the first key in the list as test_key_1 and test_key_2 are already used
 
 
 @pytest.mark.asyncio
@@ -355,7 +365,7 @@ async def test_get_key_returns_vertex_key(key_manager):
 async def test_get_key_prefers_most_available(key_manager):
     """Test that get_key prefers keys with most TPM left."""
     model = "gemini-1.5-flash"
-    
+
     # Use key_1 heavily
     await key_manager.update_usage(
         model_name=model,
@@ -363,7 +373,7 @@ async def test_get_key_prefers_most_available(key_manager):
         is_vertex_key=False,
         tokens_used=500000,
     )
-    
+
     # Use key_2 lightly
     await key_manager.update_usage(
         model_name=model,
@@ -371,7 +381,7 @@ async def test_get_key_prefers_most_available(key_manager):
         is_vertex_key=False,
         tokens_used=1000,
     )
-    
+
     # Should prefer key_3 (unused) or key_2 (lightly used)
     key = await key_manager.get_key(model, is_vertex_key=False)
     assert key in ["test_key_2", "test_key_3"]
@@ -381,7 +391,7 @@ async def test_get_key_prefers_most_available(key_manager):
 async def test_get_key_skips_exhausted_keys(key_manager):
     """Test that get_key skips exhausted keys."""
     model = "gemini-1.5-flash"
-    
+
     # Exhaust key_1 by marking it
     await key_manager.update_usage(
         model_name=model,
@@ -391,7 +401,7 @@ async def test_get_key_skips_exhausted_keys(key_manager):
         error=True,
         error_type="429",
     )
-    
+
     # Get key should not return key_1
     for _ in range(10):
         key = await key_manager.get_key(model, is_vertex_key=False)
@@ -402,7 +412,7 @@ async def test_get_key_skips_exhausted_keys(key_manager):
 async def test_get_key_skips_inactive_keys(key_manager):
     """Test that get_key skips inactive keys."""
     model = "gemini-1.5-flash"
-    
+
     # Deactivate key_1
     await key_manager.update_usage(
         model_name=model,
@@ -412,7 +422,7 @@ async def test_get_key_skips_inactive_keys(key_manager):
         error=True,
         error_type="permanent",
     )
-    
+
     # Get key should not return key_1
     for _ in range(10):
         key = await key_manager.get_key(model, is_vertex_key=False)
@@ -430,7 +440,7 @@ async def test_get_key_unknown_model_fallback(key_manager):
 async def test_get_key_no_available_keys_raises_exception(key_manager):
     """Test that get_key raises exception when no keys are available."""
     model = "gemini-1.5-flash"
-    
+
     # Exhaust all keys by setting them as exhausted
     async with key_manager.lock.write_lock():
         for key_val in key_manager.api_keys:
@@ -438,7 +448,7 @@ async def test_get_key_no_available_keys_raises_exception(key_manager):
             key_manager.df.loc[idx, "is_exhausted"] = True
         # Update available usage to ensure left values are correct
         await key_manager._set_available_usage()
-    
+
     key = await key_manager.get_key(model, is_vertex_key=False)
     assert key == ""
 
@@ -453,14 +463,14 @@ async def test_update_usage_increments_counters(key_manager):
     """Test that update_usage correctly increments usage counters."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Get initial values
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         initial_rpm = int(key_manager.df.loc[idx, "rpm"])
         initial_tpm = int(key_manager.df.loc[idx, "tpm"])
         initial_rpd = int(key_manager.df.loc[idx, "rpd"])
-    
+
     # Update usage
     tokens = 1000
     await key_manager.update_usage(
@@ -469,13 +479,13 @@ async def test_update_usage_increments_counters(key_manager):
         is_vertex_key=False,
         tokens_used=tokens,
     )
-    
+
     # Check updated values
     async with key_manager.lock.read_lock():
         new_rpm = int(key_manager.df.loc[idx, "rpm"])
         new_tpm = int(key_manager.df.loc[idx, "tpm"])
         new_rpd = int(key_manager.df.loc[idx, "rpd"])
-    
+
     assert new_rpm == initial_rpm + 1
     assert new_tpm == initial_tpm + tokens
     assert new_rpd == initial_rpd + 1
@@ -486,15 +496,15 @@ async def test_update_usage_updates_last_used(key_manager):
     """Test that update_usage updates the last_used timestamp."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Get initial timestamp
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         initial_last_used = key_manager.df.loc[idx, "last_used"]
-    
+
     # Wait a bit
     await asyncio.sleep(0.1)
-    
+
     # Update usage
     await key_manager.update_usage(
         model_name=model,
@@ -502,11 +512,11 @@ async def test_update_usage_updates_last_used(key_manager):
         is_vertex_key=False,
         tokens_used=100,
     )
-    
+
     # Check updated timestamp
     async with key_manager.lock.read_lock():
         new_last_used = key_manager.df.loc[idx, "last_used"]
-    
+
     assert new_last_used > initial_last_used
 
 
@@ -515,7 +525,7 @@ async def test_update_usage_with_permanent_error_deactivates_key(key_manager):
     """Test that permanent errors deactivate the key for all models."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Trigger permanent error
     await key_manager.update_usage(
         model_name=model,
@@ -525,7 +535,7 @@ async def test_update_usage_with_permanent_error_deactivates_key(key_manager):
         error=True,
         error_type="permanent",
     )
-    
+
     # Check that key is deactivated for ALL models
     async with key_manager.lock.read_lock():
         for model_name in key_manager.rate_limit_data.keys():
@@ -538,7 +548,7 @@ async def test_update_usage_with_429_error_exhausts_model(key_manager):
     """Test that 429 errors exhaust only the specific model."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Trigger 429 error
     await key_manager.update_usage(
         model_name=model,
@@ -548,12 +558,12 @@ async def test_update_usage_with_429_error_exhausts_model(key_manager):
         error=True,
         error_type="429",
     )
-    
+
     # Check that only this model is exhausted
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         assert bool(key_manager.df.loc[idx, "is_exhausted"]) is True
-        
+
         # Other models should not be exhausted
         for other_model in key_manager.rate_limit_data.keys():
             if other_model != model:
@@ -584,7 +594,7 @@ async def test_reset_usage_clears_minute_metrics(key_manager):
     """Test that reset_usage clears minute-level metrics."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Add some usage
     await key_manager.update_usage(
         model_name=model,
@@ -592,15 +602,17 @@ async def test_reset_usage_clears_minute_metrics(key_manager):
         is_vertex_key=False,
         tokens_used=1000,
     )
-    
+
     # Force a minute reset by manipulating timestamps
     async with key_manager.lock.write_lock():
-        key_manager.last_minute_reset_ts = key_manager.now_minute() - timedelta(minutes=2)
-    
+        key_manager.last_minute_reset_ts = key_manager.now_minute() - timedelta(
+            minutes=2
+        )
+
     # Run reset
     result = await key_manager.reset_usage()
     assert result is True
-    
+
     # Check that rpm and tpm are reset
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
@@ -614,7 +626,7 @@ async def test_reset_usage_clears_day_metrics(key_manager):
     """Test that reset_usage clears day-level metrics."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Add some usage
     await key_manager.update_usage(
         model_name=model,
@@ -622,15 +634,15 @@ async def test_reset_usage_clears_day_metrics(key_manager):
         is_vertex_key=False,
         tokens_used=1000,
     )
-    
+
     # Force a day reset
     async with key_manager.lock.write_lock():
         key_manager.last_day_reset_ts = key_manager.now_day() - timedelta(days=2)
-    
+
     # Run reset
     result = await key_manager.reset_usage()
     assert result is True
-    
+
     # Check that rpd is reset
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
@@ -642,7 +654,7 @@ async def test_reset_usage_does_not_reset_prematurely(key_manager):
     """Test that reset_usage doesn't reset before the interval."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Add some usage
     await key_manager.update_usage(
         model_name=model,
@@ -650,17 +662,17 @@ async def test_reset_usage_does_not_reset_prematurely(key_manager):
         is_vertex_key=False,
         tokens_used=1000,
     )
-    
+
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         rpm_before = int(key_manager.df.loc[idx, "rpm"])
-    
+
     # Run reset immediately (should not reset)
     await key_manager.reset_usage()
-    
+
     async with key_manager.lock.read_lock():
         rpm_after = int(key_manager.df.loc[idx, "rpm"])
-    
+
     # Values should be unchanged
     assert rpm_after == rpm_before
 
@@ -675,12 +687,12 @@ async def test_exhaustion_when_rpm_limit_reached(key_manager):
     """Test that keys are marked exhausted when RPM limit is reached."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Get max RPM
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         max_rpm = int(key_manager.df.loc[idx, "max_rpm"])
-    
+
     # Use up to the limit
     for _ in range(max_rpm):
         await key_manager.update_usage(
@@ -689,7 +701,7 @@ async def test_exhaustion_when_rpm_limit_reached(key_manager):
             is_vertex_key=False,
             tokens_used=100,
         )
-    
+
     # Check exhaustion
     async with key_manager.lock.read_lock():
         assert bool(key_manager.df.loc[idx, "is_exhausted"]) is True
@@ -700,12 +712,12 @@ async def test_exhaustion_when_tpm_limit_reached(key_manager):
     """Test that keys are marked exhausted when TPM limit is reached."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Get max TPM
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         max_tpm = int(key_manager.df.loc[idx, "max_tpm"])
-    
+
     # Use up to the limit in one call
     await key_manager.update_usage(
         model_name=model,
@@ -713,7 +725,7 @@ async def test_exhaustion_when_tpm_limit_reached(key_manager):
         is_vertex_key=False,
         tokens_used=max_tpm,
     )
-    
+
     # Check exhaustion
     async with key_manager.lock.read_lock():
         assert bool(key_manager.df.loc[idx, "is_exhausted"]) is True
@@ -724,12 +736,12 @@ async def test_exhaustion_when_rpd_limit_reached(key_manager):
     """Test that keys are marked exhausted when RPD limit is reached."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Get max RPD
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         max_rpd = int(key_manager.df.loc[idx, "max_rpd"])
-    
+
     # Use up to the limit
     for _ in range(max_rpd):
         await key_manager.update_usage(
@@ -738,7 +750,7 @@ async def test_exhaustion_when_rpd_limit_reached(key_manager):
             is_vertex_key=False,
             tokens_used=100,
         )
-    
+
     # Check exhaustion
     async with key_manager.lock.read_lock():
         assert bool(key_manager.df.loc[idx, "is_exhausted"]) is True
@@ -754,7 +766,7 @@ async def test_commit_to_db_saves_state(key_manager):
     """Test that _commit_to_db saves state to database."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Add some usage
     await key_manager.update_usage(
         model_name=model,
@@ -762,7 +774,7 @@ async def test_commit_to_db_saves_state(key_manager):
         is_vertex_key=False,
         tokens_used=5000,
     )
-    
+
     # Verify DataFrame has the updated values before committing
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
@@ -772,17 +784,18 @@ async def test_commit_to_db_saves_state(key_manager):
         assert df_rpm >= 1, f"DataFrame rpm should be >= 1, got {df_rpm}"
         assert df_tpm >= 5000, f"DataFrame tpm should be >= 5000, got {df_tpm}"
         assert df_rpd >= 1, f"DataFrame rpd should be >= 1, got {df_rpd}"
-    
+
     # Commit to DB - this should save the DataFrame values
     await key_manager._commit_to_db()
-    
+
     # Wait a bit longer to ensure commit completes and background task doesn't interfere
     # The background task runs every 1 second, so we wait 1.5 seconds to be safe
     await asyncio.sleep(1.5)
-    
+
     # Query database directly with a fresh session
     async with key_manager.db_maker() as session:
         from sqlalchemy import select
+
         stmt = select(UsageMatrix).where(
             UsageMatrix.api_key == key,
             UsageMatrix.model_name == model,
@@ -790,7 +803,7 @@ async def test_commit_to_db_saves_state(key_manager):
         )
         result = await session.execute(stmt)
         record = result.scalars().first()
-        
+
         assert record is not None
         # Verify the values were actually saved
         assert int(record.rpm) >= 1, f"Expected rpm >= 1, got {record.rpm}"
@@ -818,25 +831,25 @@ async def test_load_from_db_restores_state(
             rate_limit_data=mock_rate_limit_data,
         )
         await km1.init()
-        
+
         model = "gemini-1.5-flash"
         key = "test_key_1"
-        
+
         await km1.update_usage(
             model_name=model,
             key_value=key,
             is_vertex_key=False,
             tokens_used=5000,
         )
-        
+
         # Get usage values
         async with km1.lock.read_lock():
             idx = (model, False, key)
-            rpm_saved = int(km1.df.loc[idx, "rpm"]) # type: ignore
-            tpm_saved = int(km1.df.loc[idx, "tpm"]) # type: ignore
-        
+            rpm_saved = int(km1.df.loc[idx, "rpm"])  # type: ignore
+            tpm_saved = int(km1.df.loc[idx, "tpm"])  # type: ignore
+
         await km1.shutdown()
-    
+
     # Create new instance - should load from DB
     with patch(
         "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
@@ -849,16 +862,16 @@ async def test_load_from_db_restores_state(
             rate_limit_data=mock_rate_limit_data,
         )
         await km2.init()
-        
+
         # Check restored values
         async with km2.lock.read_lock():
             idx = (model, False, key)
-            rpm_loaded = int(km2.df.loc[idx, "rpm"])    # type: ignore
-            tpm_loaded = int(km2.df.loc[idx, "tpm"])    # type: ignore
-        
+            rpm_loaded = int(km2.df.loc[idx, "rpm"])  # type: ignore
+            tpm_loaded = int(km2.df.loc[idx, "tpm"])  # type: ignore
+
         assert rpm_loaded == rpm_saved
         assert tpm_loaded == tpm_saved
-        
+
         await km2.shutdown()
 
 
@@ -886,10 +899,10 @@ async def test_background_task_starts_on_init(
             rate_limit_data=mock_rate_limit_data,
         )
         await km.init()
-        
+
         assert km._background_task is not None
         assert not km._background_task.done()
-        
+
         await km.shutdown()
         assert km._background_task.done()
 
@@ -899,7 +912,7 @@ async def test_background_task_performs_resets(key_manager):
     """Test that background task performs periodic resets."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Add usage
     await key_manager.update_usage(
         model_name=model,
@@ -907,22 +920,24 @@ async def test_background_task_performs_resets(key_manager):
         is_vertex_key=False,
         tokens_used=1000,
     )
-    
+
     # Force a reset by manipulating timestamp
     async with key_manager.lock.write_lock():
         idx = (model, False, key)
         rpm_before = int(key_manager.df.loc[idx, "rpm"])
-        key_manager.last_minute_reset_ts = key_manager.now_minute() - timedelta(minutes=2)
-    
+        key_manager.last_minute_reset_ts = key_manager.now_minute() - timedelta(
+            minutes=2
+        )
+
     assert rpm_before > 0
-    
+
     # Wait for background task to run
     await asyncio.sleep(2)
-    
+
     # Check that reset happened
     async with key_manager.lock.read_lock():
         rpm_after = int(key_manager.df.loc[idx, "rpm"])
-    
+
     assert rpm_after == 0
 
 
@@ -936,9 +951,9 @@ async def test_shutdown_stops_background_task(key_manager):
     """Test that shutdown stops the background task."""
     assert key_manager._background_task is not None
     assert not key_manager._background_task.done()
-    
+
     await key_manager.shutdown()
-    
+
     assert key_manager._background_task.done()
     assert key_manager._stop_event.is_set()
     assert key_manager.is_ready is False
@@ -949,7 +964,7 @@ async def test_shutdown_commits_to_db(key_manager):
     """Test that shutdown performs a final DB commit."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Add usage
     await key_manager.update_usage(
         model_name=model,
@@ -957,20 +972,21 @@ async def test_shutdown_commits_to_db(key_manager):
         is_vertex_key=False,
         tokens_used=7500,
     )
-    
+
     # Shutdown
     await key_manager.shutdown()
-    
+
     # Verify data is in DB
     async with key_manager.db_maker() as session:
         from sqlalchemy import select
+
         stmt = select(UsageMatrix).where(
             UsageMatrix.api_key == key,
             UsageMatrix.model_name == model,
         )
         result = await session.execute(stmt)
         record = result.scalars().first()
-        
+
         assert record is not None
         assert record.tpm >= 7500
 
@@ -993,14 +1009,14 @@ async def test_shutdown_idempotent(key_manager):
 async def test_concurrent_get_key_calls(key_manager):
     """Test concurrent get_key calls are thread-safe."""
     model = "gemini-1.5-flash"
-    
+
     async def get_key_task():
         return await key_manager.get_key(model, is_vertex_key=False)
-    
+
     # Run multiple concurrent get_key calls
     tasks = [get_key_task() for _ in range(10)]
     keys = await asyncio.gather(*tasks)
-    
+
     # All should return valid keys
     assert all(k in key_manager.api_keys for k in keys)
 
@@ -1010,7 +1026,7 @@ async def test_concurrent_update_usage_calls(key_manager):
     """Test concurrent update_usage calls are thread-safe."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     async def update_task():
         return await key_manager.update_usage(
             model_name=model,
@@ -1018,19 +1034,19 @@ async def test_concurrent_update_usage_calls(key_manager):
             is_vertex_key=False,
             tokens_used=100,
         )
-    
+
     # Run multiple concurrent updates
     tasks = [update_task() for _ in range(20)]
     results = await asyncio.gather(*tasks)
-    
+
     # All should succeed
     assert all(results)
-    
+
     # RPM should be exactly 20
     async with key_manager.lock.read_lock():
         idx = (model, False, key)
         rpm = int(key_manager.df.loc[idx, "rpm"])
-    
+
     assert rpm == 20
 
 
@@ -1039,11 +1055,11 @@ async def test_check_ready_validates_dataframe(key_manager):
     """Test that _check_ready validates DataFrame structure."""
     # Should pass when properly initialized
     assert await key_manager._check_ready()
-    
+
     # Break the DataFrame
     async with key_manager.lock.write_lock():
         key_manager.df = pd.DataFrame()
-    
+
     # Should fail
     with pytest.raises(Exception):
         await key_manager._check_ready()
@@ -1054,7 +1070,7 @@ async def test_ensure_numeric_columns(key_manager):
     """Test that _ensure_numeric_columns converts types properly."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Corrupt data types and fix within the same lock
     async with key_manager.lock.write_lock():
         idx = (model, False, key)
@@ -1064,6 +1080,7 @@ async def test_ensure_numeric_columns(key_manager):
         rpm = key_manager.df.loc[idx, "rpm"]
         # Check for both Python and numpy numeric types
         import numpy as np
+
         assert isinstance(rpm, (int, float, np.integer, np.floating))
 
 
@@ -1072,7 +1089,7 @@ async def test_set_available_usage_clips_negative_values(key_manager):
     """Test that available usage never goes negative."""
     model = "gemini-1.5-flash"
     key = "test_key_1"
-    
+
     # Manually set usage above max and recalculate within the same lock
     async with key_manager.lock.write_lock():
         idx = (model, False, key)
@@ -1110,9 +1127,9 @@ async def test_full_lifecycle_integration(
             rate_limit_data=mock_rate_limit_data,
         )
         await km1.init()
-        
+
         model = "gemini-1.5-flash"
-        
+
         # Get and use keys
         for _ in range(5):
             key = await km1.get_key(model, is_vertex_key=False)
@@ -1122,16 +1139,16 @@ async def test_full_lifecycle_integration(
                 is_vertex_key=False,
                 tokens_used=1000,
             )
-        
+
         # Verify usage - need to filter by model and is_vertex_key
         async with km1.lock.read_lock():
             model_df = km1.df.xs(model, level="model_name")
             non_vertex_df = model_df.xs(False, level="is_vertex_key")
             total_rpm = non_vertex_df["rpm"].sum()
             assert total_rpm == 5
-        
+
         await km1.shutdown()
-        
+
         # Phase 2: Reload from database
         km2 = KeyManager(
             api_keys=sample_api_keys,
@@ -1140,14 +1157,14 @@ async def test_full_lifecycle_integration(
             rate_limit_data=mock_rate_limit_data,
         )
         await km2.init()
-        
+
         # Verify state was restored
         async with km2.lock.read_lock():
             model_df = km2.df.xs(model, level="model_name")
             non_vertex_df = model_df.xs(False, level="is_vertex_key")
             total_rpm = non_vertex_df["rpm"].sum()
             assert total_rpm == 5
-        
+
         await km2.shutdown()
 
 
@@ -1155,15 +1172,15 @@ async def test_full_lifecycle_integration(
 async def test_rate_limiting_behavior(key_manager):
     """Test that rate limiting prevents over-usage."""
     model = "gemini-1.5-flash"
-    
+
     # Get max RPM for this model
     async with key_manager.lock.read_lock():
         sample_idx = (model, False, key_manager.api_keys[0])
         max_rpm = int(key_manager.df.loc[sample_idx, "max_rpm"])
-    
+
     total_keys = len(key_manager.api_keys)
     total_available_requests = max_rpm * total_keys
-    
+
     # Try to make more requests than available
     successful_requests = 0
     for _ in range(total_available_requests + 10):
@@ -1182,7 +1199,6 @@ async def test_rate_limiting_behavior(key_manager):
         except Exception:
             # Expected to fail when exhausted
             break
-    
+
     # Should have made exactly the available number of requests
     assert successful_requests == total_available_requests
-

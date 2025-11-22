@@ -152,7 +152,7 @@ def in_memory_db_engine(patch_database_settings, monkeypatch_session):
 @pytest.fixture(scope="session")
 def key_manager_async_engine(patch_database_settings):
     """Session-scoped fixture to create in-memory async SQLite engine for KeyManager."""
-    from app.service.key.key_manager import Base
+    from app.database.connection import Base
 
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -783,6 +783,47 @@ async def test_app(
     original_verify_auth_token = security_module.verify_auth_token
     security_module.verify_auth_token = mock_verify_auth_token_func
 
+    # Also patch the function in the middleware module where it's imported
+    import app.middleware.middleware as middleware_module
+
+    middleware_module.verify_auth_token = mock_verify_auth_token_func
+
+    # Also patch the function in all router modules where it's imported
+    try:
+        import app.router.error_log_routes as error_log_routes_module
+
+        error_log_routes_module.verify_auth_token = mock_verify_auth_token_func
+    except ImportError:
+        pass
+
+    try:
+        import app.router.config_routes as config_routes_module
+
+        config_routes_module.verify_auth_token = mock_verify_auth_token_func
+    except ImportError:
+        pass
+
+    try:
+        import app.router.key_routes as key_routes_module
+
+        key_routes_module.verify_auth_token = mock_verify_auth_token_func
+    except ImportError:
+        pass
+
+    try:
+        import app.router.scheduler_routes as scheduler_routes_module
+
+        scheduler_routes_module.verify_auth_token = mock_verify_auth_token_func
+    except ImportError:
+        pass
+
+    try:
+        import app.router.stats_routes as stats_routes_module
+
+        stats_routes_module.verify_auth_token = mock_verify_auth_token_func
+    except ImportError:
+        pass
+
     async def mock_verify_key_or_goog_api_key(key=None, x_goog_api_key=None):
         """Mock verify_key_or_goog_api_key to accept TEST_AUTH_TOKEN and TEST_ALLOWED_TOKENS."""
         # If key in URL is provided and valid, return it
@@ -847,13 +888,43 @@ async def test_app(
         mock_verify_authorization
     )
 
+    # Override openai_routes verify_auth_token (used by /v1/keys/list endpoint)
+    app.dependency_overrides[openai_routes.security_service.verify_auth_token] = (
+        mock_verify_auth_token_header
+    )
+
     app.dependency_overrides[
         openai_compatible_routes.security_service.verify_authorization
     ] = mock_verify_authorization
 
+    # Override openai_compatible_routes verify_auth_token (used by /hf/v1/keys/list endpoint)
+    app.dependency_overrides[
+        openai_compatible_routes.security_service.verify_auth_token
+    ] = mock_verify_auth_token_header
+
     app.dependency_overrides[claude_routes.security_service.verify_auth_token] = (
         mock_verify_auth_token_header
     )
+
+    # Override files_routes SecurityService methods
+    try:
+        from app.router import files_routes
+
+        app.dependency_overrides[
+            files_routes.security_service.verify_key_or_goog_api_key
+        ] = mock_verify_key_or_goog_api_key
+    except ImportError:
+        pass
+
+    # Override vertex_express_routes SecurityService methods
+    try:
+        from app.router import vertex_express_routes
+
+        app.dependency_overrides[
+            vertex_express_routes.security_service.verify_key_or_goog_api_key
+        ] = mock_verify_key_or_goog_api_key
+    except ImportError:
+        pass
 
     # Override verify_token dependencies for scheduler and stats routes
     if hasattr(scheduler_routes, "verify_token"):
