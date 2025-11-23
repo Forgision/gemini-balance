@@ -197,7 +197,7 @@ def scrape_gemini_rate_limits(
         model_idx = _find_col_index(
             ["model", "model name", "model/version", "api model"], cols_norm
         )
-        tier_idx = _find_col_index(["tier", "usage tier", "plan"], cols_norm)
+        
         rpm_idx = _find_col_index(
             ["rpm", "requests per minute", "requests/minute", "requests/min"], cols_norm
         )
@@ -229,9 +229,6 @@ def scrape_gemini_rate_limits(
             )
 
             if model and isinstance(model, str):
-                rec: dict[str, str | int | float | None] = {
-                    "model": model,
-                }
 
                 rpm = (
                     _text_to_number(row[rpm_idx])

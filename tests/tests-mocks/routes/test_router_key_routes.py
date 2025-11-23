@@ -1,6 +1,30 @@
 import pytest
 
-def test_get_keys_paginated_success(mock_verify_auth_token, route_client, route_mock_key_manager):
+
+# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+from app.config.config import settings
+
+
+# @pytest.fixture(autouse=True)
+# def mock_auth_token(request):
+#     """
+#     Fixture to mock auth token verification across all tests in this module.
+#     Skips mocking if 'no_mock_auth' marker is present (for unauthorized tests).
+#     Note: gemini_routes uses security_service.verify_key_or_goog_api_key
+#     which is already mocked in conftest.py route_test_app fixture.
+#     """
+#     if "no_mock_auth" in request.keywords:
+#         yield
+#         return
+
+#     with (
+#         patch("app.core.security.verify_auth_token", return_value=True),
+#         patch("app.middleware.middleware.verify_auth_token", return_value=True),
+#     ):
+#         yield
+
+
+def test_get_keys_paginated_success(route_client, route_mock_key_manager):
     """Test successful retrieval of paginated keys with default parameters."""
     setattr(
         route_mock_key_manager.get_all_keys_with_fail_count,
@@ -16,7 +40,7 @@ def test_get_keys_paginated_success(mock_verify_auth_token, route_client, route_
 
     response = route_client.get(
         "/api/keys",
-        cookies={"auth_token": "test_auth_token"},
+        cookies={"auth_token": settings.AUTH_TOKEN},
     )
 
     assert response.status_code == 200
@@ -34,7 +58,7 @@ def test_get_keys_paginated_unauthorized(route_client, route_mock_key_manager):
     assert response.status_code == 401
 
 
-def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, route_client, route_mock_key_manager):
+def test_get_keys_paginated_filter_by_status(route_client, route_mock_key_manager):
     """Test filtering keys by status (valid/invalid)."""
     route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"valid_key": {"status": "active", "exhausted": False}},
@@ -64,7 +88,7 @@ def test_get_keys_paginated_filter_by_status(mock_verify_auth_token, route_clien
     assert "valid_key" not in data_invalid["keys"]
 
 
-def test_get_keys_paginated_search(mock_verify_auth_token, route_client, route_mock_key_manager):
+def test_get_keys_paginated_search(route_client, route_mock_key_manager):
     """Test searching for a specific key."""
     route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {
@@ -86,7 +110,7 @@ def test_get_keys_paginated_search(mock_verify_auth_token, route_client, route_m
     assert "another_key" not in data["keys"]
 
 
-def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, route_client, route_mock_key_manager):
+def test_get_keys_paginated_fail_count_threshold(route_client, route_mock_key_manager):
     """Test filtering by fail count threshold."""
     route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {"key_low_fail": {"status": "active", "exhausted": False}},
@@ -107,7 +131,7 @@ def test_get_keys_paginated_fail_count_threshold(mock_verify_auth_token, route_c
     assert "key_low_fail" not in data["keys"]
 
 
-def test_get_keys_paginated_pagination(mock_verify_auth_token, route_client, route_mock_key_manager):
+def test_get_keys_paginated_pagination(route_client, route_mock_key_manager):
     """Test the pagination logic."""
     keys = {f"key_{i}": {"status": "active", "exhausted": False} for i in range(20)}
     route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
@@ -135,7 +159,7 @@ def test_get_keys_paginated_pagination(mock_verify_auth_token, route_client, rou
 
 
 # Tests for get_all_keys
-def test_get_all_keys_success(mock_verify_auth_token, route_client, route_mock_key_manager):
+def test_get_all_keys_success(route_client, route_mock_key_manager):
     """Test successful retrieval of all keys for bulk operations."""
     route_mock_key_manager.get_all_keys_with_fail_count.return_value = {  # type: ignore
         "valid_keys": {

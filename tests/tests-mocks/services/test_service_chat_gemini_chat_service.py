@@ -1,6 +1,6 @@
 import pytest
 import os
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 from app.service.chat.gemini_chat_service import (
     GeminiChatService,
     _has_image_parts,

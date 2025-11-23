@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch, MagicMock
 from app.utils.uploader import ImageUploaderFactory, SmMsUploader, PicGoUploader, AliyunOSSUploader, CloudFlareImgBedUploader
 

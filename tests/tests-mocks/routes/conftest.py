@@ -16,7 +16,6 @@ from app.router import (
     vertex_express_routes,
     openai_compatible_routes,
     key_routes,
-    claude_routes,
 )
 
 
@@ -44,9 +43,13 @@ def route_db_engine(route_monkeypatch):
 
     # Create a separate engine for tests without reloading the module
     from app.database.connection import Base
-    
+
     # Create a new engine instance for testing
-    test_engine = create_engine("sqlite:///:memory:", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
 
     # Create tables
     Base.metadata.create_all(bind=test_engine)
@@ -67,28 +70,28 @@ def route_async_db_engine(route_monkeypatch):
     """
     # Create a separate async engine for tests without reloading the module
     from app.database.connection import Base
-    
+
     # Create a new async engine instance for testing
     test_async_engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         poolclass=StaticPool,
-        connect_args={"check_same_thread": False}
+        connect_args={"check_same_thread": False},
     )
-    
+
     # Create tables in the async database
     async def create_tables():
         async with test_async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-    
+
     # Run the async table creation
     asyncio.run(create_tables())
-    
+
     yield test_async_engine
-    
+
     # Cleanup: dispose of the engine
     async def dispose_engine():
         await test_async_engine.dispose(close=True)
-    
+
     asyncio.run(dispose_engine())
 
 
@@ -99,13 +102,15 @@ def route_mock_key_manager():
     Provides better performance by sharing the mock across route tests.
     """
     from unittest.mock import MagicMock, AsyncMock
-    
+
     mock = MagicMock()
     mock.get_random_valid_key = AsyncMock(return_value="test_api_key")
     mock.get_next_working_key = AsyncMock(return_value="test_api_key_for_model")
     mock.get_paid_key = AsyncMock(return_value="test_paid_api_key")
     mock.get_key = AsyncMock(return_value="test_api_key_for_model")
-    mock.get_all_keys_with_fail_count = AsyncMock(return_value={"valid_keys": {}, "invalid_keys": {}})
+    mock.get_all_keys_with_fail_count = AsyncMock(
+        return_value={"valid_keys": {}, "invalid_keys": {}}
+    )
     mock.handle_api_failure = AsyncMock(return_value=None)
     return mock
 
@@ -117,7 +122,7 @@ def route_mock_error_log_service():
     Provides better performance by sharing the mock across route tests.
     """
     from unittest.mock import AsyncMock
-    
+
     mock = AsyncMock()
     mock.process_get_error_logs.return_value = {"logs": [], "total": 0}
     mock.process_get_error_log_details.return_value = {}
@@ -135,9 +140,13 @@ def route_mock_chat_service():
     Provides better performance by sharing the mock across route tests.
     """
     from unittest.mock import MagicMock, AsyncMock
-    
+
     mock = MagicMock()
-    mock.generate_content = AsyncMock(return_value={"candidates": [{"content": {"parts": [{"text": "Hello, world!"}]}}]})
+    mock.generate_content = AsyncMock(
+        return_value={
+            "candidates": [{"content": {"parts": [{"text": "Hello, world!"}]}}]
+        }
+    )
     mock.count_tokens = AsyncMock(return_value={"totalTokens": 123})
     return mock
 
@@ -149,9 +158,11 @@ def route_mock_embedding_service():
     Provides better performance by sharing the mock across route tests.
     """
     from unittest.mock import MagicMock, AsyncMock
-    
+
     mock = MagicMock()
-    mock.embed_content = AsyncMock(return_value={"embedding": {"values": [0.1, 0.2, 0.3]}})
+    mock.embed_content = AsyncMock(
+        return_value={"embedding": {"values": [0.1, 0.2, 0.3]}}
+    )
     return mock
 
 
@@ -162,13 +173,15 @@ def route_mock_config_service():
     Provides better performance by sharing the mock across route tests.
     """
     from unittest.mock import MagicMock, AsyncMock
-    
+
     mock = MagicMock()
     mock.get_config = AsyncMock(return_value={"LOG_LEVEL": "INFO", "API_KEYS": []})
     mock.update_config = AsyncMock(return_value={"status": "updated"})
     mock.reset_config = AsyncMock(return_value={"status": "reset"})
     mock.delete_key = AsyncMock(return_value={"success": True})
-    mock.delete_selected_keys = AsyncMock(return_value={"success": True, "deleted_count": 0})
+    mock.delete_selected_keys = AsyncMock(
+        return_value={"success": True, "deleted_count": 0}
+    )
     mock.fetch_ui_models = AsyncMock(return_value={"models": []})
     return mock
 
@@ -181,15 +194,17 @@ def route_mock_proxy_check_service():
     """
     from unittest.mock import MagicMock, AsyncMock
     import time
-    
+
     mock = MagicMock()
-    mock.check_single_proxy = AsyncMock(return_value={
-        "proxy": "proxy1",
-        "is_available": True,
-        "response_time": 0.5,
-        "error_message": None,
-        "checked_at": time.time(),
-    })
+    mock.check_single_proxy = AsyncMock(
+        return_value={
+            "proxy": "proxy1",
+            "is_available": True,
+            "response_time": 0.5,
+            "error_message": None,
+            "checked_at": time.time(),
+        }
+    )
     mock.check_multiple_proxies = AsyncMock(return_value=[])
     mock.get_cache_stats = MagicMock(return_value={"hits": 0, "misses": 0})
     mock.clear_cache = MagicMock(return_value=None)
@@ -215,39 +230,56 @@ def reset_route_mocks(
     route_mock_key_manager.get_next_working_key.return_value = "test_api_key_for_model"
     route_mock_key_manager.get_paid_key.return_value = "test_paid_api_key"
     route_mock_key_manager.get_key.return_value = "test_api_key_for_model"
-    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {"valid_keys": {}, "invalid_keys": {}}
+    route_mock_key_manager.get_all_keys_with_fail_count.return_value = {
+        "valid_keys": {},
+        "invalid_keys": {},
+    }
     route_mock_key_manager.handle_api_failure.return_value = None
-    
+
     # Reset error_log_service mock
     route_mock_error_log_service.reset_mock()
-    route_mock_error_log_service.process_get_error_logs.return_value = {"logs": [], "total": 0}
+    route_mock_error_log_service.process_get_error_logs.return_value = {
+        "logs": [],
+        "total": 0,
+    }
     route_mock_error_log_service.process_get_error_log_details.return_value = {}
     route_mock_error_log_service.process_find_error_log_by_info.return_value = {}
     route_mock_error_log_service.process_delete_error_logs_by_ids.return_value = 1
     route_mock_error_log_service.process_delete_all_error_logs.return_value = None
     route_mock_error_log_service.process_delete_error_log_by_id.return_value = True
-    
+
     # Reset chat_service mock
     route_mock_chat_service.reset_mock()
-    route_mock_chat_service.generate_content.return_value = {"candidates": [{"content": {"parts": [{"text": "Hello, world!"}]}}]}
+    route_mock_chat_service.generate_content.return_value = {
+        "candidates": [{"content": {"parts": [{"text": "Hello, world!"}]}}]
+    }
     route_mock_chat_service.count_tokens.return_value = {"totalTokens": 123}
-    
+
     # Reset embedding_service mock
     route_mock_embedding_service.reset_mock()
-    route_mock_embedding_service.embed_content.return_value = {"embedding": {"values": [0.1, 0.2, 0.3]}}
-    
+    route_mock_embedding_service.embed_content.return_value = {
+        "embedding": {"values": [0.1, 0.2, 0.3]}
+    }
+
     # Reset config_service mock
     route_mock_config_service.reset_mock()
-    route_mock_config_service.get_config.return_value = {"LOG_LEVEL": "INFO", "API_KEYS": []}
+    route_mock_config_service.get_config.return_value = {
+        "LOG_LEVEL": "INFO",
+        "API_KEYS": [],
+    }
     route_mock_config_service.update_config.return_value = {"status": "updated"}
     route_mock_config_service.reset_config.return_value = {"status": "reset"}
     route_mock_config_service.delete_key.return_value = {"success": True}
-    route_mock_config_service.delete_selected_keys.return_value = {"success": True, "deleted_count": 0}
+    route_mock_config_service.delete_selected_keys.return_value = {
+        "success": True,
+        "deleted_count": 0,
+    }
     route_mock_config_service.fetch_ui_models.return_value = {"models": []}
-    
+
     # Reset proxy_check_service mock
     route_mock_proxy_check_service.reset_mock()
     import time
+
     route_mock_proxy_check_service.check_single_proxy.return_value = {
         "proxy": "proxy1",
         "is_available": True,
@@ -256,7 +288,10 @@ def reset_route_mocks(
         "checked_at": time.time(),
     }
     route_mock_proxy_check_service.check_multiple_proxies.return_value = []
-    route_mock_proxy_check_service.get_cache_stats.return_value = {"hits": 0, "misses": 0}
+    route_mock_proxy_check_service.get_cache_stats.return_value = {
+        "hits": 0,
+        "misses": 0,
+    }
     route_mock_proxy_check_service.clear_cache.return_value = None
 
 
@@ -283,42 +318,48 @@ def route_test_app(
     original_overrides = dict(app.dependency_overrides)
 
     try:
+
         async def override_get_key_manager():
             return route_mock_key_manager
 
-        app.dependency_overrides[gemini_routes.get_key_manager] = override_get_key_manager
-        app.dependency_overrides[openai_routes.get_key_manager] = override_get_key_manager
-        app.dependency_overrides[
-            vertex_express_routes.get_key_manager
-        ] = override_get_key_manager
-        app.dependency_overrides[
-            openai_compatible_routes.get_key_manager
-        ] = override_get_key_manager
+        app.dependency_overrides[gemini_routes.get_key_manager] = (
+            override_get_key_manager
+        )
+        app.dependency_overrides[openai_routes.get_key_manager] = (
+            override_get_key_manager
+        )
+        app.dependency_overrides[vertex_express_routes.get_key_manager] = (
+            override_get_key_manager
+        )
+        app.dependency_overrides[openai_compatible_routes.get_key_manager] = (
+            override_get_key_manager
+        )
         app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
 
         async def override_get_error_log_service_dep():
             return route_mock_error_log_service
 
-        app.dependency_overrides[
-            get_error_log_service
-        ] = override_get_error_log_service_dep
+        app.dependency_overrides[get_error_log_service] = (
+            override_get_error_log_service_dep
+        )
 
         async def override_get_chat_service():
             return route_mock_chat_service
 
-        app.dependency_overrides[gemini_routes.get_chat_service] = override_get_chat_service
+        app.dependency_overrides[gemini_routes.get_chat_service] = (
+            override_get_chat_service
+        )
 
         async def override_get_embedding_service():
             return route_mock_embedding_service
 
-        app.dependency_overrides[
-            gemini_routes.get_embedding_service
-        ] = override_get_embedding_service
+        app.dependency_overrides[gemini_routes.get_embedding_service] = (
+            override_get_embedding_service
+        )
 
         # Add ConfigService dependency override
         from app.dependencies import get_config_service
-        from app.router import config_routes
-        
+
         def override_get_config_service():
             return route_mock_config_service
 
@@ -326,11 +367,13 @@ def route_test_app(
 
         # Add ProxyCheckService dependency override
         from app.service.proxy.proxy_check_service import get_proxy_check_service
-        
+
         def override_get_proxy_check_service():
             return route_mock_proxy_check_service
 
-        app.dependency_overrides[get_proxy_check_service] = override_get_proxy_check_service
+        app.dependency_overrides[get_proxy_check_service] = (
+            override_get_proxy_check_service
+        )
 
         async def mock_security_dependency():
             pass
@@ -350,19 +393,27 @@ def route_test_app(
         from app.router import claude_routes
         from fastapi import Header, HTTPException
         from typing import Optional
-        
+
         app.dependency_overrides[ClaudeProxyService] = override_claude_proxy_service
-        
+
         # Conditional auth override: raise 401 if no auth header or invalid token, otherwise pass
-        async def conditional_auth_override(authorization: Optional[str] = Header(None)):
+        async def conditional_auth_override(
+            authorization: Optional[str] = Header(None),
+        ):
             if not authorization:
                 raise HTTPException(status_code=401, detail="Missing auth_token header")
-            token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
+            token = (
+                authorization.replace("Bearer ", "")
+                if authorization.startswith("Bearer ")
+                else authorization
+            )
             if token != settings.AUTH_TOKEN:
                 raise HTTPException(status_code=401, detail="Invalid auth_token")
             return token
-        
-        app.dependency_overrides[claude_routes.security_service.verify_auth_token] = conditional_auth_override
+
+        app.dependency_overrides[claude_routes.security_service.verify_auth_token] = (
+            conditional_auth_override
+        )
 
         yield app
 
@@ -382,4 +433,3 @@ def route_client(route_test_app):
     # Disable lifespan events to prevent database connection conflicts
     with TestClient(route_test_app, raise_server_exceptions=False) as test_client:
         yield test_client
-

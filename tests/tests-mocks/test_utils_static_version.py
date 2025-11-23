@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from app.utils.static_version import StaticVersionManager, get_static_url, clear_static_cache
 
 @pytest.fixture

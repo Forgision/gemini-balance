@@ -1,24 +1,19 @@
 """
 Tests for Claude Proxy Routes
 """
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from fastapi import Request
-from fastapi.testclient import TestClient
+
+from unittest.mock import AsyncMock, MagicMock
 
 from app.config.config import settings
 from app.service.claude_proxy_service import (
     ClaudeProxyService,
-    MessagesRequest,
-    TokenCountRequest,
-    Message,
     ContentBlockText,
     MessagesResponse,
     TokenCountResponse,
 )
 
 
-def test_create_message_success(mock_verify_auth_token, route_client):
+def test_create_message_success(route_client):
     """Test successful message creation via Claude proxy."""
     request_body = {
         "model": "claude-3-haiku-20240307",
@@ -61,7 +56,7 @@ def test_create_message_success(mock_verify_auth_token, route_client):
     del app.dependency_overrides[ServiceClass]
 
 
-def test_create_message_streaming(mock_verify_auth_token, route_client):
+def test_create_message_streaming(route_client):
     """Test streaming message creation via Claude proxy."""
     request_body = {
         "model": "claude-3-sonnet-20240229",
@@ -78,6 +73,7 @@ def test_create_message_streaming(mock_verify_auth_token, route_client):
 
     mock_service = MagicMock(spec=ClaudeProxyService)
     from fastapi.responses import StreamingResponse
+
     mock_service.create_message = AsyncMock(
         return_value=StreamingResponse(mock_stream(), media_type="text/event-stream")
     )
@@ -101,7 +97,7 @@ def test_create_message_streaming(mock_verify_auth_token, route_client):
     del app.dependency_overrides[ServiceClass]
 
 
-def test_count_tokens_success(mock_verify_auth_token, route_client):
+def test_count_tokens_success(route_client):
     """Test successful token counting via Claude proxy."""
     request_body = {
         "model": "claude-3-haiku-20240307",
@@ -134,7 +130,7 @@ def test_count_tokens_success(mock_verify_auth_token, route_client):
     del app.dependency_overrides[ServiceClass]
 
 
-def test_create_message_with_tools(mock_verify_auth_token, route_client):
+def test_create_message_with_tools(route_client):
     """Test message creation with tools."""
     request_body = {
         "model": "claude-3-haiku-20240307",
@@ -183,7 +179,7 @@ def test_create_message_with_tools(mock_verify_auth_token, route_client):
     del app.dependency_overrides[ServiceClass]
 
 
-def test_create_message_with_system(mock_verify_auth_token, route_client):
+def test_create_message_with_system(route_client):
     """Test message creation with system instruction."""
     request_body = {
         "model": "claude-3-haiku-20240307",
@@ -254,7 +250,7 @@ def test_count_tokens_unauthorized(route_client):
     assert response.status_code == 401
 
 
-def test_create_message_invalid_model(mock_verify_auth_token, route_client):
+def test_create_message_invalid_model(route_client):
     """Test message creation with invalid model."""
     request_body = {
         "model": "invalid-model",
@@ -265,6 +261,7 @@ def test_create_message_invalid_model(mock_verify_auth_token, route_client):
 
     mock_service = MagicMock(spec=ClaudeProxyService)
     from fastapi import HTTPException
+
     mock_service.create_message = AsyncMock(
         side_effect=HTTPException(status_code=400, detail="Invalid model")
     )
@@ -287,7 +284,7 @@ def test_create_message_invalid_model(mock_verify_auth_token, route_client):
     del app.dependency_overrides[ServiceClass]
 
 
-def test_count_tokens_invalid_request(mock_verify_auth_token, route_client):
+def test_count_tokens_invalid_request(route_client):
     """Test token counting with invalid request."""
     request_body = {
         "model": "claude-3-haiku-20240307",
@@ -303,7 +300,7 @@ def test_count_tokens_invalid_request(mock_verify_auth_token, route_client):
     assert response.status_code == 422  # Validation error
 
 
-def test_create_message_model_mapping(mock_verify_auth_token, route_client):
+def test_create_message_model_mapping(route_client):
     """Test that model names are correctly mapped (haiku -> CLAUDE_SMALL_MODEL, sonnet -> CLAUDE_BIG_MODEL)."""
     request_body = {
         "model": "claude-3-haiku-20240307",
@@ -344,4 +341,3 @@ def test_create_message_model_mapping(mock_verify_auth_token, route_client):
 
     # Clean up
     del app.dependency_overrides[ServiceClass]
-

@@ -1,6 +1,6 @@
 import pytest
 import importlib
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 from app.database import connection
 from app.config import config
 

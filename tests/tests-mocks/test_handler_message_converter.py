@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from app.handler.message_converter import (
     OpenAIMessageConverter,
     _get_mime_type_and_data,

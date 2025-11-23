@@ -1,5 +1,3 @@
-import pytest
-from unittest.mock import patch
 from app.handler.response_handler import (
     GeminiResponseHandler,
     OpenAIResponseHandler,

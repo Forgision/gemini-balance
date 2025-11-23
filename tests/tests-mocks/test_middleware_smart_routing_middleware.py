@@ -1,13 +1,8 @@
 from unittest.mock import patch
-import httpx
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from unittest.mock import patch
-import pytest
-from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse
-from httpx import AsyncClient
 
 from app.middleware.smart_routing_middleware import SmartRoutingMiddleware
 

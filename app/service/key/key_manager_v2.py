@@ -610,7 +610,7 @@ class KeyManager:
             logger.info("Performing final database commit...")
             try:
                 await self._commit_to_db()
-            except Exception as e:
+            except Exception:
                 logger.error("Error during final commit", exc_info=True)
                 
         self.is_ready = False

@@ -748,7 +748,10 @@ class ClaudeProxyService:
             )
 
     async def _handle_streaming(
-        self, response_generator: Any, original_request: MessagesRequest
+        self,
+        response_generator: Any,
+        original_request: MessagesRequest,
+        api_key: str,
     ) -> AsyncGenerator[str, None]:
         """Handle streaming responses and convert to Anthropic SSE format."""
         message_id = f"msg_{uuid.uuid4().hex[:24]}"
@@ -964,6 +967,16 @@ class ClaudeProxyService:
             yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n"
             yield "data: [DONE]\n\n"
 
+            # Update usage stats
+            # Note: For LiteLLM models, we might not get exact token counts from streaming chunks easily
+            # We use the estimated output_tokens
+            await self.key_manager.update_usage(
+                model_name=original_request.model,
+                key_value=api_key,
+                is_vertex_key=False,
+                tokens_used=output_tokens,
+            )
+
         except Exception as e:
             logger.error(f"Error in streaming handler: {e}", exc_info=True)
             # Send error event
@@ -1042,7 +1055,7 @@ class ClaudeProxyService:
             if parts:
                 contents.append({"role": msg.role, "parts": parts})
 
-        payload = {"contents": contents}
+        payload: Dict[str, Any] = {"contents": contents}
         if system_instruction:
             payload["systemInstruction"] = system_instruction
 
@@ -1150,7 +1163,6 @@ class ClaudeProxyService:
         request_datetime = datetime.datetime.now()
         is_success = False
         status_code = None
-        input_tokens = 0
 
         try:
             # Route to appropriate API client based on model prefix
@@ -1197,7 +1209,7 @@ class ClaudeProxyService:
                 litellm_request["api_key"] = api_key_info
 
                 try:
-                    from litellm import token_counter
+                    from litellm.utils import token_counter
 
                     input_tokens = token_counter(
                         model=request.model,
@@ -1230,7 +1242,7 @@ class ClaudeProxyService:
 
             if isinstance(e, ApiClientException):
                 status_code = e.status_code
-                error_log_msg = e.detail if hasattr(e, "detail") else str(e)
+                error_log_msg = e.message if hasattr(e, "message") else str(e)
             elif hasattr(e, "args") and len(e.args) > 1:
                 status_code = e.args[0] if isinstance(e.args[0], int) else 500
                 error_log_msg = e.args[1] if len(e.args) > 1 else str(e)
@@ -1379,7 +1391,9 @@ class ClaudeProxyService:
                     is_success = True
                     status_code = 200
                     return StreamingResponse(
-                        self._handle_streaming(response_generator, request),  # type: ignore
+                        self._handle_streaming(
+                            response_generator, request, api_key_info
+                        ),  # type: ignore
                         media_type="text/event-stream",
                     )
                 else:
@@ -1414,7 +1428,9 @@ class ClaudeProxyService:
                     is_success = True
                     status_code = 200
                     return StreamingResponse(
-                        self._handle_streaming(response_generator, request),  # type: ignore
+                        self._handle_streaming(
+                            response_generator, request, api_key_info
+                        ),  # type: ignore
                         media_type="text/event-stream",
                     )
                 else:
@@ -1422,6 +1438,19 @@ class ClaudeProxyService:
                     response = self._convert_litellm_to_anthropic(
                         litellm_response, request
                     )
+
+                    # Update usage stats for LiteLLM
+                    # LiteLLM usage info is in response.usage (which is a Usage object)
+                    token_count = (
+                        response.usage.input_tokens + response.usage.output_tokens
+                    )
+                    await self.key_manager.update_usage(
+                        model_name=request.model,
+                        key_value=api_key_info,
+                        is_vertex_key=False,
+                        tokens_used=token_count,
+                    )
+
                     is_success = True
                     status_code = 200
                     return response
@@ -1435,7 +1464,7 @@ class ClaudeProxyService:
 
             if isinstance(e, ApiClientException):
                 status_code = e.status_code
-                error_log_msg = e.detail if hasattr(e, "detail") else str(e)
+                error_log_msg = e.message if hasattr(e, "message") else str(e)
             elif hasattr(e, "args") and len(e.args) > 1:
                 status_code = e.args[0] if isinstance(e.args[0], int) else 500
                 error_log_msg = e.args[1] if len(e.args) > 1 else str(e)

@@ -1,5 +1,4 @@
-import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from app.router.vertex_express_routes import security_service
 

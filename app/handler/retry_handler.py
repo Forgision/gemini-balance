@@ -101,7 +101,7 @@ def RetryHandler(key_arg: str = "api_key", model_arg: str = "model_name", model_
                         # This allows key switching but may not be model-specific
                         model_name = "default"
                         logger.debug(
-                            f"Model name not found, using default for key switching."
+                            "Model name not found, using default for key switching."
                         )
 
                     # Extract status_code from exception

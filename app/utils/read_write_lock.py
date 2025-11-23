@@ -7,7 +7,6 @@ This ensures readers always get the latest data and prevents writer starvation.
 """
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Optional
 
 
 class ReadWriteLock:

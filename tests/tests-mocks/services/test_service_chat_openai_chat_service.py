@@ -1,9 +1,9 @@
 from typing import AsyncGenerator
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from app.service.chat.openai_chat_service import OpenAIChatService
-from app.domain.openai_models import ChatRequest, ImageGenerationRequest
+from app.domain.openai_models import ChatRequest
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,4 @@
-import pytest
 from unittest.mock import patch, MagicMock
-from pathlib import Path
 from app.utils.helpers import (
     extract_mime_type_and_data,
     convert_image_to_base64,

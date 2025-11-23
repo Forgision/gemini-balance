@@ -107,6 +107,7 @@ async def test_create_message_gemini_model(
         )
 
         assert isinstance(response, MessagesResponse)
+        assert isinstance(response.content[0], ContentBlockText)
         assert response.content[0].text == "Hi there!"
         mock_client_instance.generate_content.assert_awaited_once()
         mock_key_manager.update_usage.assert_awaited_once()
@@ -198,6 +199,7 @@ async def test_create_message_litellm_model(
         )
 
         assert isinstance(response, MessagesResponse)
+        assert isinstance(response.content[0], ContentBlockText)
         assert response.content[0].text == "Hello from OpenAI!"
         mock_litellm.assert_awaited_once()
 
@@ -240,9 +242,7 @@ async def test_count_tokens_litellm_model(
         messages=[Message(role="user", content="Hello")],
     )
 
-    with patch(
-        "app.service.claude_proxy_service.litellm.token_counter"
-    ) as mock_token_counter:
+    with patch("litellm.utils.token_counter") as mock_token_counter:
         mock_token_counter.return_value = 10
 
         response = await service.count_tokens(
@@ -770,6 +770,7 @@ async def test_from_gemini_to_anthropic():
         response = service._from_gemini_to_anthropic(gemini_response, request_obj)
 
         assert isinstance(response, MessagesResponse)
+        assert isinstance(response.content[0], ContentBlockText)
         assert response.content[0].text == "Hello from Gemini!"
         assert response.usage.input_tokens == 5
         assert response.usage.output_tokens == 4

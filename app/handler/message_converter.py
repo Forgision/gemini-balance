@@ -278,7 +278,7 @@ class OpenAIMessageConverter(MessageConverter):
                                 exc_info=True,
                             )
                             parts.append({"text": f"[Error processing audio: {e}]"})
-                        except Exception as e:
+                        except Exception:
                             logger.error(
                                 "Unexpected error processing audio part.",
                                 exc_info=True,
@@ -331,7 +331,7 @@ class OpenAIMessageConverter(MessageConverter):
                                 exc_info=True,
                             )
                             parts.append({"text": f"[Error processing video: {e}]"})
-                        except Exception as e:
+                        except Exception:
                             logger.error(
                                 "Unexpected error processing video part.",
                                 exc_info=True,

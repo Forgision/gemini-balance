@@ -4,7 +4,6 @@ Tests interact with the app like real users, using mocked API clients only.
 """
 
 import pytest
-import json
 
 
 @pytest.mark.asyncio
@@ -269,7 +268,7 @@ async def test_list_keys_hf_endpoint(test_client, auth_header):
 async def test_chat_completion_image_chat(test_client, auth_header):
     """Test image chat completion."""
     payload = {
-        "model": f"gemini-2.0-flash-exp-chat",
+        "model": "gemini-2.0-flash-exp-chat",
         "messages": [
             {"role": "user", "content": "What's in this image?"}
         ],

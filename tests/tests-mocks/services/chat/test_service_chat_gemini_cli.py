@@ -1,7 +1,6 @@
 # tests/services/chat/test_service_chat_gemini_cli.py
 
 import json
-import os
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch, mock_open, AsyncMock
 

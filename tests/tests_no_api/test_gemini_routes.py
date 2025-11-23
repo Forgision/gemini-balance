@@ -4,7 +4,6 @@ Tests interact with the app like real users, using mocked API clients only.
 """
 
 import pytest
-import json
 
 
 @pytest.mark.asyncio
