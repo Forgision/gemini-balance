@@ -2,7 +2,7 @@
 Database connection pool module
 """
 
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import AsyncGenerator
 import platform
 from urllib.parse import quote_plus
@@ -26,7 +26,7 @@ if settings.DATABASE_TYPE == "sqlite":
         data_dir.mkdir(exist_ok=True)
         db_path = data_dir / settings.SQLITE_DATABASE
         # Following is to avoid windows separator in windows
-        db_path_str = PureWindowsPath(db_path).as_posix()
+        db_path_str = db_path.as_posix()
         DATABASE_URL = f"sqlite+aiosqlite:///{db_path_str}"
 elif settings.DATABASE_TYPE == "mysql":
     is_windows = platform.system() == "Windows"

@@ -37,6 +37,7 @@ class CommaSeparatedListEnvSettingsSource(EnvSettingsSource):
     ) -> Any:
         if (
             get_origin(field.annotation) is list
+            and get_args(field.annotation)
             and get_args(field.annotation)[0] is str
             and isinstance(value, str)
         ):
@@ -254,13 +255,10 @@ def _parse_db_value(key: str, db_value: str, target_type: Type) -> Any:
                     if isinstance(parsed, list):
                         return [str(item) for item in parsed]
                 except json.JSONDecodeError:
-                    return [
-                        item.strip() for item in db_value.split(",") if item.strip()
-                    ]
-                logger.warning(
-                    f"Could not parse '{db_value}' as List[str] for key '{key}', falling back to comma split or empty list."
-                )
-                return [item.strip() for item in db_value.split(",") if item.strip()]
+                    logger.warning(
+                        f"Could not parse '{db_value}' as List[str] for key '{key}', falling back to comma split or empty list."
+                    )
+                    return [item.strip() for item in db_value.split(",") if item.strip()]
             # Handle List[Dict[str, str]]
             elif args and get_origin(args[0]) is dict:
                 try:
