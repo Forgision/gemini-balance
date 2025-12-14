@@ -1,5 +1,5 @@
 import logging
-import platform
+
 import re
 import sys
 from typing import Dict, Optional
@@ -15,10 +15,10 @@ COLORS = {
 
 
 # Enable ANSI support on Windows systems
-if platform.system() == "Windows":
+if sys.platform == "win32":
     import ctypes
 
-    kernel32 = ctypes.windll.kernel32
+    kernel32 = ctypes.windll.kernel32  # type: ignore
     kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 
 

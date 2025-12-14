@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import AsyncGenerator
 import platform
 from urllib.parse import quote_plus
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    async_sessionmaker,
+    AsyncSession,
+    AsyncEngine,
+)
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
 
@@ -44,18 +49,23 @@ else:
 # For MySQL, configure pool settings
 pool_kwargs: dict = {"pool_pre_ping": True}
 if settings.DATABASE_TYPE == "mysql":
-    pool_kwargs.update({
-        "pool_size": 5,
-        "max_overflow": 20,
-        "pool_recycle": 1800,  # Recycle connections after 30 minutes
-    })
+    pool_kwargs.update(
+        {
+            "pool_size": 5,
+            "max_overflow": 20,
+            "pool_recycle": 1800,  # Recycle connections after 30 minutes
+        }
+    )
 
 engine: AsyncEngine = create_async_engine(DATABASE_URL, **pool_kwargs)
+
 
 # Create base class using SQLAlchemy 2.0 style
 class Base(DeclarativeBase):
     """Base class for all database models"""
+
     pass
+
 
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(
@@ -69,7 +79,7 @@ AsyncSessionLocal = async_sessionmaker(
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency for FastAPI route handlers to get database session.
-    
+
     Yields:
         AsyncSession: Database session
     """

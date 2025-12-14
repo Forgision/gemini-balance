@@ -98,7 +98,7 @@ async def key_manager(
     """Create a KeyManager instance for testing."""
     # Create a patcher that will be active for the entire fixture lifecycle
     patcher = patch(
-        "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
+        "app.service.key.key_manager.scrape_gemini_rate_limits",
         return_value={"Free Tier": mock_rate_limit_data},
     )
     patcher.start()
@@ -185,7 +185,7 @@ async def test_key_manager_initialization(
 ):
     """Test KeyManager initialization."""
     with patch(
-        "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
+        "app.service.key.key_manager.scrape_gemini_rate_limits",
         return_value={"Free Tier": mock_rate_limit_data},
     ):
         km = KeyManager(

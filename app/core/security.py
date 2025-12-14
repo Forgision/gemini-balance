@@ -68,7 +68,7 @@ class SecurityService:
         Raises:
             HTTPException: If the authorization header is missing or the token is invalid.
         """
-        
+
         if not authorization:
             logger.error("Missing auth_token header")
             raise HTTPException(status_code=401, detail="Missing auth_token header")

@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import itertools
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, cast
 import pandas as pd
 import pytz
 from datetime import datetime, timedelta
@@ -70,7 +70,7 @@ class KeyManager:
         self.vertex_api_keys: list[str] = vertex_api_keys
         self.vertex_api_keys_cycle = itertools.cycle(vertex_api_keys)
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
-        self.rate_limit_data: dict = rate_limit_data
+        self.rate_limit_data: dict = rate_limit_data or {}
         self.rate_limit_models: list[str] = (
             list(rate_limit_data.keys()) if rate_limit_data else []
         )
@@ -463,7 +463,7 @@ class KeyManager:
             logger.info("Initializing KeyManager...")
 
             self.db_maker = async_session_maker or self.db_maker
-            self.rate_limit_data: dict = rate_limit_data or self.rate_limit_data
+            self.rate_limit_data = rate_limit_data or self.rate_limit_data
             self.minute_reset_interval_sec = (
                 minute_reset_interval or self.minute_reset_interval_sec
             )
@@ -479,9 +479,9 @@ class KeyManager:
                 if not scraped:
                     scraped = self._get_default_rate_limits()
                 if isinstance(scraped, dict) and "Free Tier" in scraped:
-                    self.rate_limit_data: dict = scraped["Free Tier"].copy()
+                    self.rate_limit_data = scraped["Free Tier"].copy()
                 else:
-                    self.rate_limit_data: dict = (
+                    self.rate_limit_data = (
                         scraped.copy() if isinstance(scraped, dict) else {}
                     )
             self.rate_limit_models = sorted(
@@ -628,7 +628,7 @@ class KeyManager:
             & (candidates["rpd_left"] >= 1)
         )
 
-        candidates = candidates.loc[mask]
+        candidates = cast(pd.DataFrame, candidates.loc[mask])
 
         # Check data is not empty
         if len(candidates) == 0:
@@ -639,7 +639,7 @@ class KeyManager:
             return ""  # Return empty string to indicate no key available
 
         # Sort by tpm_left descending
-        candidates.sort_values(by=["tpm_left"], ascending=False, inplace=True)
+        candidates = candidates.sort_values(by="tpm_left", ascending=False)
 
         # Check index level and get the best key string
         first_index = candidates.index[0]
@@ -717,7 +717,7 @@ class KeyManager:
             async with self.lock.write_lock():
                 if idx in self.df.index:
                     # Fast atomic update - direct write
-                    row = self.df.loc[idx]
+                    row = self.df.loc[idx, :]
 
                     # Update individual columns (preserves all other columns)
                     self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
@@ -921,7 +921,7 @@ class KeyManager:
                             .values(**values)
                         )
                         result = await session.execute(upd)
-                        if result.rowcount == 0:
+                        if result.rowcount == 0:  # type: ignore
                             instance = UsageMatrix(
                                 api_key=api_key,
                                 model_name=model_name,
@@ -1189,7 +1189,7 @@ class KeyManager:
         async with self.lock.read_lock():
             df_copy = self.df.copy()
 
-        state = {
+        state: Dict[str, Any] = {
             "models": {},
             "summary": {
                 "total_keys": len(self.api_keys) + len(self.vertex_api_keys),
@@ -1204,7 +1204,7 @@ class KeyManager:
             if model not in df_copy.index.get_level_values("model_name"):
                 continue
 
-            model_data = {
+            model_data: Dict[str, Any] = {
                 "model_name": model,
                 "regular_keys": {"available": [], "exhausted": [], "inactive": []},
                 "vertex_keys": {"available": [], "exhausted": [], "inactive": []},

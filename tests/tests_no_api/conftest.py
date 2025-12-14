@@ -11,6 +11,7 @@ import datetime
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
+from typing import Optional
 
 from pytest import MonkeyPatch
 from fastapi.testclient import TestClient
@@ -377,55 +378,26 @@ def patched_service_clients(monkeypatch):
 
     # Create proper mock response that can be serialized by FastAPI
     def create_embedding_side_effect(input, model):
-        # Try to use the real CreateEmbeddingResponse type if available
+        from openai.types import CreateEmbeddingResponse
+
+        num_items = len(input) if isinstance(input, list) else 1
+        # Create dict representation of Embedding items to avoid importing Embedding type which might be missing
+        embedding_data = [
+            {"object": "embedding", "index": i, "embedding": [0.1] * 768}
+            for i in range(num_items)
+        ]
+
+        # Check if we can import Usage, otherwise use dict
         try:
-            from openai.types import CreateEmbeddingResponse
-            from openai.types.embeddings import Embedding  # type: ignore
+            from openai.types.create_embedding_response import Usage
 
-            try:
-                from openai.types.embeddings import Usage  # type: ignore
-            except ImportError:
-                from openai.types import Usage
-
-            num_items = len(input) if isinstance(input, list) else 1
-            embedding_list = [
-                Embedding(object="embedding", index=i, embedding=[0.1] * 768)
-                for i in range(num_items)
-            ]
             usage_obj = Usage(prompt_tokens=10, total_tokens=10)
-            return CreateEmbeddingResponse(
-                object="list", data=embedding_list, model=model, usage=usage_obj
-            )
-        except (ImportError, AttributeError, TypeError):
-            # Fallback: create a Pydantic-like class that FastAPI can serialize
-            from pydantic import BaseModel
+        except ImportError:
+            usage_obj = {"prompt_tokens": 10, "total_tokens": 10}
 
-            class EmbeddingData(BaseModel):
-                object: str = "embedding"
-                index: int
-                embedding: list
-
-            class UsageData(BaseModel):
-                prompt_tokens: int = 10
-                total_tokens: int = 10
-
-            class CreateEmbeddingResponseModel(BaseModel):
-                object: str = "list"
-                data: list
-                model: str
-                usage: UsageData
-
-            num_items = len(input) if isinstance(input, list) else 1
-            embedding_list = [
-                EmbeddingData(index=i, embedding=[0.1] * 768) for i in range(num_items)
-            ]
-            usage_obj = UsageData()
-            return CreateEmbeddingResponseModel(
-                object="list",
-                data=[e.model_dump() for e in embedding_list],
-                model=model,
-                usage=usage_obj,
-            )
+        return CreateEmbeddingResponse(
+            object="list", data=embedding_data, model=model, usage=usage_obj
+        )
 
     mock_openai_client.embeddings.create = MagicMock(
         side_effect=create_embedding_side_effect
@@ -756,7 +728,7 @@ async def test_app(
     # FastAPI will inject Request, but we ignore it and return the test KeyManager
     from fastapi import Request as FastAPIRequest, Request
 
-    async def override_get_key_manager(request: FastAPIRequest = None):
+    async def override_get_key_manager(request=None):
         return test_key_manager
 
     app.dependency_overrides[get_key_manager] = override_get_key_manager
