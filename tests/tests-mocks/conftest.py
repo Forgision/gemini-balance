@@ -3,8 +3,10 @@ import sys
 
 
 # Add the project root to the Python path to ensure app modules can be imported
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+sys.path.append(str(FIXTURES_DIR))
 
 
 # Only load truly global fixtures that are used across all test modules
@@ -16,3 +18,4 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # Checking if they are actually needed or if they are automatically discovered.
 # If they are in tests/tests-mocks/fixtures, they might need to be imported in this conftest
 # or the root conftest.
+from fixtures.mocks import mock_key_manager  # noqa: E402, F401

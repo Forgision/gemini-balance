@@ -10,6 +10,7 @@ from app.service.claude_proxy_service import (
     ContentBlockText,
     MessagesResponse,
     TokenCountResponse,
+    Usage,
 )
 
 
@@ -29,7 +30,7 @@ def test_create_message_success(route_client):
         model="claude-3-haiku-20240307",
         content=[ContentBlockText(type="text", text="Hi there!")],
         stop_reason="end_turn",
-        usage={"input_tokens": 5, "output_tokens": 3},
+        usage=Usage(input_tokens=5, output_tokens=3),
     )
     mock_service.create_message = AsyncMock(return_value=mock_response)
 
@@ -155,7 +156,7 @@ def test_create_message_with_tools(route_client):
         model="claude-3-haiku-20240307",
         content=[ContentBlockText(type="text", text="I'll check the weather.")],
         stop_reason="end_turn",
-        usage={"input_tokens": 10, "output_tokens": 5},
+        usage=Usage(input_tokens=10, output_tokens=5),
     )
     mock_service.create_message = AsyncMock(return_value=mock_response)
 
@@ -195,7 +196,7 @@ def test_create_message_with_system(route_client):
         model="claude-3-haiku-20240307",
         content=[ContentBlockText(type="text", text="Hello! How can I help?")],
         stop_reason="end_turn",
-        usage={"input_tokens": 12, "output_tokens": 6},
+        usage=Usage(input_tokens=12, output_tokens=6),
     )
     mock_service.create_message = AsyncMock(return_value=mock_response)
 
@@ -315,7 +316,7 @@ def test_create_message_model_mapping(route_client):
         model=settings.CLAUDE_SMALL_MODEL,
         content=[ContentBlockText(type="text", text="Hello!")],
         stop_reason="end_turn",
-        usage={"input_tokens": 5, "output_tokens": 2},
+        usage=Usage(input_tokens=5, output_tokens=2),
     )
     mock_service.create_message = AsyncMock(return_value=mock_response)
 

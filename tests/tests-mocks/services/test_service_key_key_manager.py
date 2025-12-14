@@ -214,7 +214,7 @@ async def test_key_manager_initialization_no_api_keys(
 ):
     """Test KeyManager initialization fails with no API keys."""
     with patch(
-        "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
+        "app.service.key.key_manager.scrape_gemini_rate_limits",
         return_value={"Free Tier": mock_rate_limit_data},
     ):
         km = KeyManager(
@@ -821,7 +821,7 @@ async def test_load_from_db_restores_state(
     """Test that _load_from_db restores state from database."""
     # Create first instance and add usage
     with patch(
-        "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
+        "app.service.key.key_manager.scrape_gemini_rate_limits",
         return_value={"Free Tier": mock_rate_limit_data},
     ):
         km1 = KeyManager(
@@ -852,7 +852,7 @@ async def test_load_from_db_restores_state(
 
     # Create new instance - should load from DB
     with patch(
-        "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
+        "app.service.key.key_manager.scrape_gemini_rate_limits",
         return_value={"Free Tier": mock_rate_limit_data},
     ):
         km2 = KeyManager(
@@ -889,7 +889,7 @@ async def test_background_task_starts_on_init(
 ):
     """Test that background task starts on initialization."""
     with patch(
-        "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
+        "app.service.key.key_manager.scrape_gemini_rate_limits",
         return_value={"Free Tier": mock_rate_limit_data},
     ):
         km = KeyManager(
@@ -1116,7 +1116,7 @@ async def test_full_lifecycle_integration(
 ):
     """Test a full lifecycle: init -> use -> reset -> shutdown -> reload."""
     with patch(
-        "app.service.key.key_manager_v2.scrape_gemini_rate_limits",
+        "app.service.key.key_manager.scrape_gemini_rate_limits",
         return_value={"Free Tier": mock_rate_limit_data},
     ):
         # Phase 1: Initialize and use

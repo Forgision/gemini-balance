@@ -11,7 +11,6 @@ import datetime
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
-from typing import Optional
 
 from pytest import MonkeyPatch
 from fastapi.testclient import TestClient
@@ -379,21 +378,18 @@ def patched_service_clients(monkeypatch):
     # Create proper mock response that can be serialized by FastAPI
     def create_embedding_side_effect(input, model):
         from openai.types import CreateEmbeddingResponse
+        from openai.types.create_embedding_response import Usage
+        from openai.types import Embedding
 
         num_items = len(input) if isinstance(input, list) else 1
-        # Create dict representation of Embedding items to avoid importing Embedding type which might be missing
+
+        # Create Embedding objects
         embedding_data = [
-            {"object": "embedding", "index": i, "embedding": [0.1] * 768}
+            Embedding(object="embedding", index=i, embedding=[0.1] * 768)
             for i in range(num_items)
         ]
 
-        # Check if we can import Usage, otherwise use dict
-        try:
-            from openai.types.create_embedding_response import Usage
-
-            usage_obj = Usage(prompt_tokens=10, total_tokens=10)
-        except ImportError:
-            usage_obj = {"prompt_tokens": 10, "total_tokens": 10}
+        usage_obj = Usage(prompt_tokens=10, total_tokens=10)
 
         return CreateEmbeddingResponse(
             object="list", data=embedding_data, model=model, usage=usage_obj
@@ -726,7 +722,7 @@ async def test_app(
 
     # Override get_key_manager dependency
     # FastAPI will inject Request, but we ignore it and return the test KeyManager
-    from fastapi import Request as FastAPIRequest, Request
+    from fastapi import Request as FastAPIRequest
 
     async def override_get_key_manager(request=None):
         return test_key_manager
@@ -829,7 +825,7 @@ async def test_app(
         # Return TEST_AUTH_TOKEN as default for testing
         return TEST_AUTH_TOKEN
 
-    async def mock_verify_token_for_dependencies(request: Request):
+    async def mock_verify_token_for_dependencies(request: FastAPIRequest):
         """Mock verify_token function used in scheduler_routes and stats_routes."""
         # This dependency checks cookies and calls verify_auth_token
         # Since verify_auth_token is already patched to accept TEST_AUTH_TOKEN,

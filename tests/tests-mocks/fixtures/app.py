@@ -52,9 +52,10 @@ def live_server_url(test_app):
     For tests that need a database, use route_test_app from tests/routes/conftest.py
     """
     import random
+
     # Use a random port to avoid conflicts
     port = random.randint(8100, 8999)
-    
+
     config = uvicorn.Config(
         test_app, host=TEST_SERVER_HOST, port=port, log_level="error"
     )
@@ -95,20 +96,18 @@ def test_app(
 
     app.dependency_overrides[gemini_routes.get_key_manager] = override_get_key_manager
     app.dependency_overrides[openai_routes.get_key_manager] = override_get_key_manager
-    app.dependency_overrides[
-        vertex_express_routes.get_key_manager
-    ] = override_get_key_manager
-    app.dependency_overrides[
-        openai_compatible_routes.get_key_manager
-    ] = override_get_key_manager
+    app.dependency_overrides[vertex_express_routes.get_key_manager] = (
+        override_get_key_manager
+    )
+    app.dependency_overrides[openai_compatible_routes.get_key_manager] = (
+        override_get_key_manager
+    )
     app.dependency_overrides[key_routes.get_key_manager] = override_get_key_manager
 
     async def override_get_error_log_service_dep():
         return mock_error_log_service
 
-    app.dependency_overrides[
-        get_error_log_service
-    ] = override_get_error_log_service_dep
+    app.dependency_overrides[get_error_log_service] = override_get_error_log_service_dep
 
     async def override_get_chat_service():
         return mock_chat_service
@@ -118,9 +117,9 @@ def test_app(
     async def override_get_embedding_service():
         return mock_embedding_service
 
-    app.dependency_overrides[
-        gemini_routes.get_embedding_service
-    ] = override_get_embedding_service
+    app.dependency_overrides[gemini_routes.get_embedding_service] = (
+        override_get_embedding_service
+    )
 
     async def mock_security_dependency():
         pass
@@ -136,8 +135,12 @@ def test_app(
     async def override_claude_proxy_service():
         return mock_chat_service
 
-    app.dependency_overrides[claude_routes.ClaudeProxyService] = override_claude_proxy_service
-    app.dependency_overrides[claude_routes.verify_auth_token] = mock_security_dependency
+    app.dependency_overrides[claude_routes.ClaudeProxyService] = (
+        override_claude_proxy_service
+    )
+    app.dependency_overrides[claude_routes.security_service.verify_auth_token] = (
+        mock_security_dependency
+    )
 
     yield app
 
