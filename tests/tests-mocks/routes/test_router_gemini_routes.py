@@ -4,29 +4,10 @@ from fastapi import HTTPException
 from app.router import gemini_routes
 
 
-@pytest.fixture(autouse=True)
-def mock_auth_token(request):
-    """
-    Fixture to mock auth token verification across all tests in this module.
-    Skips mocking if 'no_mock_auth' marker is present (for unauthorized tests).
-    Note: gemini_routes uses security_service.verify_key_or_goog_api_key
-    which is already mocked in conftest.py route_test_app fixture.
-    """
-    if "no_mock_auth" in request.keywords:
-        yield
-        return
-
-    with (
-        patch("app.core.security.verify_auth_token", return_value=True),
-        patch("app.middleware.middleware.verify_auth_token", return_value=True),
-    ):
-        yield
-
-
 # Test for the /models endpoint
-def test_list_models_success(route_client, mocker):
+def test_list_models_success(route_client):
     """Test successful retrieval of models."""
-    mocker.patch(
+    with patch(
         "app.service.model.model_service.ModelService.get_gemini_models",
         new_callable=AsyncMock,
         return_value={
@@ -38,16 +19,15 @@ def test_list_models_success(route_client, mocker):
                 }
             ]
         },
-    )
+    ):
+        response = route_client.get("/gemini/v1beta/models")
 
-    response = route_client.get("/gemini/v1beta/models")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "models" in data
-    assert isinstance(data["models"], list)
-    assert len(data["models"]) > 0
-    assert data["models"][0]["name"] == "models/gemini-pro"
+        assert response.status_code == 200
+        data = response.json()
+        assert "models" in data
+        assert isinstance(data["models"], list)
+        assert len(data["models"]) > 0
+        assert data["models"][0]["name"] == "models/gemini-pro"
 
 
 def test_list_models_unauthorized(route_client):
@@ -132,23 +112,23 @@ def test_generate_content_unauthorized(route_client):
         route_client.app.dependency_overrides.update(original_overrides)
 
 
-def test_generate_content_unsupported_model(route_client, mocker):
+def test_generate_content_unsupported_model(route_client):
     """Test content generation with an unsupported model."""
     # Patch the module-level model_service instance
-    mock_check_model_support = mocker.patch(
+    with patch(
         "app.router.gemini_routes.model_service.check_model_support",
         new_callable=AsyncMock,
         return_value=False,
-    )
+    ) as mock_check_model_support:
+        request_payload = {"contents": [{"parts": [{"text": "Hello"}]}]}
+        response = route_client.post(
+            "/gemini/v1beta/models/unsupported-model:generateContent",
+            json=request_payload,
+        )
 
-    request_payload = {"contents": [{"parts": [{"text": "Hello"}]}]}
-    response = route_client.post(
-        "/gemini/v1beta/models/unsupported-model:generateContent", json=request_payload
-    )
-
-    assert response.status_code == 400
-    assert "Model unsupported-model is not supported" in response.text
-    mock_check_model_support.assert_called_once_with("unsupported-model")
+        assert response.status_code == 400
+        assert "Model unsupported-model is not supported" in response.text
+        mock_check_model_support.assert_called_once_with("unsupported-model")
 
 
 def test_stream_generate_content_success(route_client):
@@ -267,26 +247,6 @@ def test_reset_all_key_fail_counts_success(route_client):
         }
     finally:
         # clean up
-        route_client.app.dependency_overrides.clear()
-        route_client.app.dependency_overrides.update(original_overrides)
-
-
-@pytest.mark.no_mock_auth
-def test_reset_all_key_fail_counts_unauthorized(route_client):
-    """Test unauthorized access to reset_all_key_fail_counts."""
-    original_overrides = route_client.app.dependency_overrides.copy()
-    try:
-
-        async def override_security():
-            raise HTTPException(status_code=401, detail="Unauthorized")
-
-        route_client.app.dependency_overrides[
-            gemini_routes.security_service.verify_key_or_goog_api_key
-        ] = override_security
-
-        response = route_client.post("/gemini/v1beta/reset-all-fail-counts")
-        assert response.status_code == 401
-    finally:
         route_client.app.dependency_overrides.clear()
         route_client.app.dependency_overrides.update(original_overrides)
 

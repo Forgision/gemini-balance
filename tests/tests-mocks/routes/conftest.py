@@ -108,10 +108,14 @@ def route_mock_key_manager():
     mock.get_next_working_key = AsyncMock(return_value="test_api_key_for_model")
     mock.get_paid_key = AsyncMock(return_value="test_paid_api_key")
     mock.get_key = AsyncMock(return_value="test_api_key_for_model")
+    mock.get_keys_by_status = AsyncMock(
+        return_value={"valid_keys": {}, "invalid_keys": {}}
+    )
     mock.get_all_keys_with_fail_count = AsyncMock(
         return_value={"valid_keys": {}, "invalid_keys": {}}
     )
     mock.handle_api_failure = AsyncMock(return_value=None)
+    mock.reset_key_failure_count = AsyncMock(return_value=True)
     return mock
 
 
@@ -230,11 +234,16 @@ def reset_route_mocks(
     route_mock_key_manager.get_next_working_key.return_value = "test_api_key_for_model"
     route_mock_key_manager.get_paid_key.return_value = "test_paid_api_key"
     route_mock_key_manager.get_key.return_value = "test_api_key_for_model"
+    route_mock_key_manager.get_keys_by_status.return_value = {
+        "valid_keys": {},
+        "invalid_keys": {},
+    }
     route_mock_key_manager.get_all_keys_with_fail_count.return_value = {
         "valid_keys": {},
         "invalid_keys": {},
     }
     route_mock_key_manager.handle_api_failure.return_value = None
+    route_mock_key_manager.reset_key_failure_count.return_value = True
 
     # Reset error_log_service mock
     route_mock_error_log_service.reset_mock()

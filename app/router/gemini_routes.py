@@ -344,6 +344,7 @@ async def batch_embed_contents(
         return response
 
 
+# TODO: This method isn't used anywhere in the project. This has to be merge with
 @router.post("/reset-all-fail-counts")
 async def reset_all_key_fail_counts(
     key_type: Optional[str] = "", key_manager: KeyManager = Depends(get_key_manager)
@@ -531,7 +532,7 @@ async def verify_key(
         logger.error(f"Key verification failed: {str(e)}", exc_info=True)
         # v2 doesn't track failure counts, so just return invalid status
         error_msg = str(e)
-        if hasattr(e, 'args') and len(e.args) > 1:
+        if hasattr(e, "args") and len(e.args) > 1:
             error_msg = e.args[1]
         return JSONResponse({"status": "invalid", "error": error_msg})
 
@@ -585,14 +586,17 @@ async def verify_selected_keys(
             # v2 doesn't track failure counts, so just log the error
             error_msg = str(e)
             error_code = 500
-            if hasattr(e, 'args') and len(e.args) > 0:
+            if hasattr(e, "args") and len(e.args) > 0:
                 error_code = e.args[0] if isinstance(e.args[0], int) else 500
                 if len(e.args) > 1:
                     error_msg = e.args[1]
             logger.warning(
                 f"Bulk verification exception for key: {redact_key_for_logging(api_key)}, error: {error_msg}"
             )
-            failed_keys[api_key] = {"error_message": error_msg, "error_code": error_code}
+            failed_keys[api_key] = {
+                "error_message": error_msg,
+                "error_code": error_code,
+            }
             return api_key, "invalid", error_message
 
     tasks = [_verify_single_key(key) for key in keys_to_verify]

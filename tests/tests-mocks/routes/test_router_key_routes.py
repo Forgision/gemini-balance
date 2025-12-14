@@ -68,7 +68,7 @@ def test_get_keys_paginated_filter_by_status(route_client, route_mock_key_manage
     # Test 'valid' status
     response_valid = route_client.get(
         "/api/keys?status=valid",
-        cookies={"auth_token": "test_auth_token"},
+        cookies={"auth_token": settings.AUTH_TOKEN},
     )
     assert response_valid.status_code == 200
     data_valid = response_valid.json()
@@ -79,7 +79,7 @@ def test_get_keys_paginated_filter_by_status(route_client, route_mock_key_manage
     # Test 'invalid' status
     response_invalid = route_client.get(
         "/api/keys?status=invalid",
-        cookies={"auth_token": "test_auth_token"},
+        cookies={"auth_token": settings.AUTH_TOKEN},
     )
     assert response_invalid.status_code == 200
     data_invalid = response_invalid.json()
@@ -100,7 +100,7 @@ def test_get_keys_paginated_search(route_client, route_mock_key_manager):
 
     response = route_client.get(
         "/api/keys?search=target",
-        cookies={"auth_token": "test_auth_token"},
+        cookies={"auth_token": settings.AUTH_TOKEN},
     )
 
     assert response.status_code == 200
@@ -121,7 +121,7 @@ def test_get_keys_paginated_fail_count_threshold(route_client, route_mock_key_ma
     # So threshold=1 should only return inactive keys
     response = route_client.get(
         "/api/keys?fail_count_threshold=1",
-        cookies={"auth_token": "test_auth_token"},
+        cookies={"auth_token": settings.AUTH_TOKEN},
     )
 
     assert response.status_code == 200
@@ -142,7 +142,7 @@ def test_get_keys_paginated_pagination(route_client, route_mock_key_manager):
     # Get page 2 with a limit of 5
     response = route_client.get(
         "/api/keys?page=2&limit=5",
-        cookies={"auth_token": "test_auth_token"},
+        cookies={"auth_token": settings.AUTH_TOKEN},
     )
 
     assert response.status_code == 200
@@ -171,7 +171,7 @@ def test_get_all_keys_success(route_client, route_mock_key_manager):
 
     response = route_client.get(
         "/api/keys/all",
-        cookies={"auth_token": "test_auth_token"},
+        cookies={"auth_token": settings.AUTH_TOKEN},
     )
 
     assert response.status_code == 200

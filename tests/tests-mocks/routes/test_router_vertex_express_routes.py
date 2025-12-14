@@ -1,15 +1,17 @@
 from unittest.mock import AsyncMock
+from app.config.config import settings
 
 from app.router.vertex_express_routes import security_service
 
-def test_generate_content_success(mock_verify_auth_token, route_client):
+
+def test_generate_content_success(route_client):
     """Test successful content generation."""
     from app.domain.gemini_models import GeminiRequest, GeminiContent
 
     app = route_client.app
-    app.dependency_overrides[
-        security_service.verify_key_or_goog_api_key
-    ] = lambda: "test_token"
+    app.dependency_overrides[security_service.verify_key_or_goog_api_key] = (
+        lambda: "test_token"
+    )
 
     request_body = {
         "model": "gemini-pro",
@@ -26,19 +28,21 @@ def test_generate_content_success(mock_verify_auth_token, route_client):
     from app.router.vertex_express_routes import dep_get_next_working_vertex_key
 
     app = route_client.app
-    app.dependency_overrides[
-        get_vertex_express_chat_service
-    ] = lambda: mock_chat_service
+    app.dependency_overrides[get_vertex_express_chat_service] = (
+        lambda: mock_chat_service
+    )
     app.dependency_overrides[dep_get_next_working_vertex_key] = lambda: "test_api_key"
 
     response = route_client.post(
         "/vertex-express/v1beta/models/gemini-pro:generateContent",
         json=request_body,
-        headers={"x-goog-api-key": "test_token"},
+        headers={"x-goog-api-key": settings.AUTH_TOKEN},
     )
 
     assert response.status_code == 200
-    assert response.json()["candidates"][0]["content"]["parts"][0]["text"] == "Hi there!"
+    assert (
+        response.json()["candidates"][0]["content"]["parts"][0]["text"] == "Hi there!"
+    )
     mock_chat_service.generate_content.assert_awaited_once()
 
     # Clean up the override

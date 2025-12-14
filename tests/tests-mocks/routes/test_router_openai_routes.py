@@ -3,9 +3,7 @@ from unittest.mock import AsyncMock, patch
 from app.config.config import settings
 
 
-def test_list_models_success(
-    mock_verify_auth_token, route_client, route_mock_key_manager
-):
+def test_list_models_success(route_client, route_mock_key_manager):
     """Test the /models endpoint returns successfully."""
     with patch(
         "app.router.openai_routes.model_service.get_gemini_openai_models",
@@ -22,9 +20,7 @@ def test_list_models_success(
         mock_get_models.assert_awaited_once_with("test_api_key")
 
 
-def test_chat_completions_success(
-    mock_verify_auth_token, route_client, route_mock_key_manager
-):
+def test_chat_completions_success(route_client, route_mock_key_manager):
     """Test successful chat completion."""
     request_body = {
         "model": "gpt-3.5-turbo",
