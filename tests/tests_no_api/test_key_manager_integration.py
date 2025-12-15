@@ -4,7 +4,7 @@ Tests how KeyManager integrates with routes and handles key selection.
 """
 
 import pytest
-from tests.tests_no_api.conftest import TEST_API_KEYS, TEST_VERTEX_API_KEYS
+from tests.fixtures.fixture_consts import TEST_API_KEYS, TEST_VERTEX_API_KEYS
 
 
 @pytest.mark.asyncio
