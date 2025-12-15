@@ -6,6 +6,9 @@ from app.log.logger import Logger
 from app.service.chat.gemini_chat_service import GeminiChatService
 from app.service.error_log.error_log_service import delete_old_error_logs
 from app.service.files.files_service import get_files_service
+from app.service.request_log.request_log_service import delete_old_request_logs_task
+from app.utils.helpers import redact_key_for_logging
+
 # App reference will be set when scheduler starts
 _app_reference = None
 
@@ -13,8 +16,6 @@ def set_app_reference(app):
     """Set app reference for scheduled tasks."""
     global _app_reference
     _app_reference = app
-from app.service.request_log.request_log_service import delete_old_request_logs_task
-from app.utils.helpers import redact_key_for_logging
 
 logger = Logger.setup_logger("scheduler")
 
