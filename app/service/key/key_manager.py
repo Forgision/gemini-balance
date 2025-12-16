@@ -71,8 +71,12 @@ class KeyManager:
         self.vertex_api_keys_cycle = itertools.cycle(vertex_api_keys)
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
+        # Pre-sort models by length (descending) to ensure _model_normalization finds the longest matching prefix.
+        # This optimization reduces the complexity of _model_normalization from O(N log N) to O(N) by performing the sort once.
         self.rate_limit_models: list[str] = (
-            list(rate_limit_data.keys()) if rate_limit_data else []
+            sorted(rate_limit_data.keys(), key=len, reverse=True)
+            if rate_limit_data
+            else []
         )
         self.tz = pytz.timezone(zone="UTC")
         self.now = lambda: datetime.now(self.tz)
@@ -129,8 +133,7 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        # Optimization: rate_limit_models is pre-sorted in __init__ by length (descending).
-        # This prevents O(N log N) sorting on every call.
+        # Iterate over pre-sorted models (longest first).
         for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
