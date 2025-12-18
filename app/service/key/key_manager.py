@@ -72,7 +72,9 @@ class KeyManager:
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
         self.rate_limit_models: list[str] = (
-            list(rate_limit_data.keys()) if rate_limit_data else []
+            sorted(list(rate_limit_data.keys()), key=len, reverse=True)
+            if rate_limit_data
+            else []
         )
         self.tz = pytz.timezone(zone="UTC")
         self.now = lambda: datetime.now(self.tz)
@@ -129,7 +131,8 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
+        # self.rate_limit_models is guaranteed to be sorted by length (desc) in __init__ and init
+        for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return prefix
@@ -596,23 +599,14 @@ class KeyManager:
 
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
-            # Validate DataFrame and that 'model_name' exists at index level 0
-            if model_name not in self.df.index.get_level_values("model_name"):
-                logger.warning(
-                    f"No keys configured for model: {model_name}, falling back to cycle."
-                )
-                # return next key in cycle, model will be inserted in next update_usage call
-                if is_vertex_key:
-                    return next(self.vertex_api_keys_cycle)
-                else:
-                    return next(self.api_keys_cycle)
-
             # Filter for the specific model and vertex key type
             try:
-                model_df = self.df.xs(model_name, level="model_name", drop_level=False)
-                candidates = model_df.xs(
-                    is_vertex_key, level="is_vertex_key", drop_level=False
-                ).copy()
+                # Use loc to filter by model_name and is_vertex_key efficiently
+                # This combines filtering and copying in one step, avoiding intermediate copies
+                # and expensive index scans (like get_level_values).
+                candidates = self.df.loc[
+                    (model_name, is_vertex_key, slice(None)), :
+                ].copy()
             except KeyError:
                 logger.warning(
                     f"No keys configured for model: {model_name}, falling back to cycle."
