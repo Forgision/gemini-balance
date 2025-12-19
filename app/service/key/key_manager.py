@@ -719,26 +719,61 @@ class KeyManager:
                     # Fast atomic update - direct write
                     row = self.df.loc[idx, :]
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
+                    # Pre-calculate new values
+                    new_rpm = to_int_safe(row["rpm"]) + 1
+                    new_rpd = to_int_safe(row["rpd"]) + 1
+                    new_tpm = to_int_safe(row["tpm"]) + tokens_used
+                    new_total = (
                         to_int_safe(row.get("total_token_count", 0)) + tokens_used
                     )
-                    self.df.loc[idx, "last_used"] = now
+
+                    max_rpm = to_int_safe(row["max_rpm"])
+                    max_tpm = to_int_safe(row["max_tpm"])
+                    max_rpd = to_int_safe(row["max_rpd"])
+
+                    rpm_left = max(0, max_rpm - new_rpm)
+                    tpm_left = max(0, max_tpm - new_tpm)
+                    rpd_left = max(0, max_rpd - new_rpd)
+
+                    # Prepare update dictionary
+                    updates = {
+                        "rpm": new_rpm,
+                        "rpd": new_rpd,
+                        "tpm": new_tpm,
+                        "total_token_count": new_total,
+                        "last_used": now,
+                        "rpm_left": rpm_left,
+                        "tpm_left": tpm_left,
+                        "rpd_left": rpd_left,
+                    }
+
+                    # Update exhausted flag
+                    # If any limit reached, mark exhausted.
+                    if (
+                        (new_rpm >= max_rpm)
+                        or (new_tpm >= max_tpm)
+                        or (new_rpd >= max_rpd)
+                    ):
+                        updates["is_exhausted"] = True
 
                     if error:
                         if error_type == "permanent":
                             key_mask = (
                                 self.df.index.get_level_values("api_key") == key_value
                             )
+                            # This affects multiple rows, so we do it separately
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            updates["is_exhausted"] = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Perform single bulk update for this row
+                    self.df.loc[idx, list(updates.keys())] = list(updates.values())
+
+                    # NOTE: We skip calling _on_update_usage() here to avoid O(N) DataFrame recalculation.
+                    # We have already updated the necessary columns (rpm_left, is_exhausted, etc.) for this row inline.
+
+                    # set required db commit
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
