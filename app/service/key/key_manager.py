@@ -72,7 +72,9 @@ class KeyManager:
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
         self.rate_limit_models: list[str] = (
-            list(rate_limit_data.keys()) if rate_limit_data else []
+            sorted(list(rate_limit_data.keys()), key=len, reverse=True)
+            if rate_limit_data
+            else []
         )
         self.tz = pytz.timezone(zone="UTC")
         self.now = lambda: datetime.now(self.tz)
@@ -129,7 +131,7 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
+        for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return prefix
