@@ -716,26 +716,43 @@ class KeyManager:
         try:
             async with self.lock.write_lock():
                 if idx in self.df.index:
-                    # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Bolt Optimization: Use .at for scalar access (~5-10x faster than .loc)
+                    # We avoid creating Series copies and use direct access for existing columns.
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    # Read current values using at
+                    # These columns are guaranteed to exist by _ensure_numeric_columns/_load_default
+                    current_rpd = self.df.at[idx, "rpd"]
+                    current_rpm = self.df.at[idx, "rpm"]
+                    current_tpm = self.df.at[idx, "tpm"]
+
+                    # Update guaranteed columns using at
+                    self.df.at[idx, "rpd"] = to_int_safe(current_rpd) + 1
+                    self.df.at[idx, "rpm"] = to_int_safe(current_rpm) + 1
+                    self.df.at[idx, "tpm"] = to_int_safe(current_tpm) + tokens_used
+                    # For dates, at works fine if column is datetime
+                    self.df.at[idx, "last_used"] = now
+
+                    # Handle 'total_token_count' safely
+                    # .at raises KeyError if column is missing, so we must check or use .loc if missing
+                    if "total_token_count" in self.df.columns:
+                        current_total = self.df.at[idx, "total_token_count"]
+                        self.df.at[idx, "total_token_count"] = (
+                            to_int_safe(current_total) + tokens_used
+                        )
+                    else:
+                        # Fallback to .loc to create the column
+                        # We use 0 as default since it didn't exist
+                        self.df.loc[idx, "total_token_count"] = tokens_used
 
                     if error:
                         if error_type == "permanent":
                             key_mask = (
                                 self.df.index.get_level_values("api_key") == key_value
                             )
+                            # Using .loc for boolean masking is correct/efficient enough here
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
 
                     # Call _on_update_usage to update usage
                     await self._on_update_usage()
