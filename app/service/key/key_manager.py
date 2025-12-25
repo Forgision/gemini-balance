@@ -596,18 +596,9 @@ class KeyManager:
 
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
-            # Validate DataFrame and that 'model_name' exists at index level 0
-            if model_name not in self.df.index.get_level_values("model_name"):
-                logger.warning(
-                    f"No keys configured for model: {model_name}, falling back to cycle."
-                )
-                # return next key in cycle, model will be inserted in next update_usage call
-                if is_vertex_key:
-                    return next(self.vertex_api_keys_cycle)
-                else:
-                    return next(self.api_keys_cycle)
-
             # Filter for the specific model and vertex key type
+            # We rely on EAFP (Easier to Ask for Forgiveness than Permission)
+            # which is significantly faster than checking index level values (O(1) vs O(N))
             try:
                 model_df = self.df.xs(model_name, level="model_name", drop_level=False)
                 candidates = model_df.xs(
@@ -638,29 +629,34 @@ class KeyManager:
             # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
             return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
+        # Find best key with max tpm_left
+        # idxmax is O(N) while sort_values is O(N log N)
+        # It returns the index label of the max value
+        try:
+            best_index = candidates["tpm_left"].idxmax()
+        except Exception as e:
+            logger.error(f"Error finding best key: {e}", exc_info=True)
+            return await self.get_next_key(is_vertex_key=is_vertex_key)
 
         # Check index level and get the best key string
-        first_index = candidates.index[0]
-
-        if isinstance(first_index, tuple) or isinstance(first_index, list):
-            if len(first_index) == 3:
-                best_key_string = str(first_index[2])
-            elif len(first_index) == 2:
-                best_key_string = str(first_index[1])
-            elif len(first_index) == 1:
-                best_key_string = str(first_index[0])
+        if isinstance(best_index, tuple) or isinstance(best_index, list):
+            # The index is (model_name, is_vertex_key, api_key)
+            if len(best_index) == 3:
+                best_key_string = str(best_index[2])
+            elif len(best_index) == 2:
+                best_key_string = str(best_index[1])
+            elif len(best_index) == 1:
+                best_key_string = str(best_index[0])
             else:
                 logger.warning(
-                    f"Invalid index length: {len(first_index)}, falling back to cycle."
+                    f"Invalid index length: {len(best_index)}, falling back to cycle."
                 )
                 return await self.get_next_key(is_vertex_key=is_vertex_key)
-        elif isinstance(first_index, str):
-            best_key_string = first_index
+        elif isinstance(best_index, str):
+            best_key_string = best_index
         else:
             logger.warning(
-                f"Invalid index type: {type(first_index)}, falling back to cycle."
+                f"Invalid index type: {type(best_index)}, falling back to cycle."
             )
             return await self.get_next_key(is_vertex_key=is_vertex_key)
 
