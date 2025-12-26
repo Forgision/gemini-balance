@@ -639,28 +639,28 @@ class KeyManager:
             return ""  # Return empty string to indicate no key available
 
         # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
+        # Optimization: Use idxmax() to find the best key in O(N) instead of sorting O(N log N)
+        # This avoids creating a sorted copy of the dataframe.
+        best_idx = candidates["tpm_left"].idxmax()
 
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
-
-        if isinstance(first_index, tuple) or isinstance(first_index, list):
-            if len(first_index) == 3:
-                best_key_string = str(first_index[2])
-            elif len(first_index) == 2:
-                best_key_string = str(first_index[1])
-            elif len(first_index) == 1:
-                best_key_string = str(first_index[0])
+        # best_idx will be the MultiIndex tuple (model_name, is_vertex_key, api_key)
+        if isinstance(best_idx, tuple) or isinstance(best_idx, list):
+            if len(best_idx) == 3:
+                best_key_string = str(best_idx[2])
+            elif len(best_idx) == 2:
+                best_key_string = str(best_idx[1])
+            elif len(best_idx) == 1:
+                best_key_string = str(best_idx[0])
             else:
                 logger.warning(
-                    f"Invalid index length: {len(first_index)}, falling back to cycle."
+                    f"Invalid index length: {len(best_idx)}, falling back to cycle."
                 )
                 return await self.get_next_key(is_vertex_key=is_vertex_key)
-        elif isinstance(first_index, str):
-            best_key_string = first_index
+        elif isinstance(best_idx, str):
+            best_key_string = best_idx
         else:
             logger.warning(
-                f"Invalid index type: {type(first_index)}, falling back to cycle."
+                f"Invalid index type: {type(best_idx)}, falling back to cycle."
             )
             return await self.get_next_key(is_vertex_key=is_vertex_key)
 
@@ -716,17 +716,25 @@ class KeyManager:
         try:
             async with self.lock.write_lock():
                 if idx in self.df.index:
-                    # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Fast atomic update - direct write using at[] for O(1) access
+                    # This avoids the overhead of .loc which handles slicing and more complex indexing
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    self.df.at[idx, "rpd"] = to_int_safe(self.df.at[idx, "rpd"]) + 1
+                    self.df.at[idx, "rpm"] = to_int_safe(self.df.at[idx, "rpm"]) + 1
+                    self.df.at[idx, "tpm"] = to_int_safe(self.df.at[idx, "tpm"]) + tokens_used
+
+                    # Safe update for total_token_count
+                    current_total = 0
+                    if "total_token_count" in self.df.columns:
+                        val = self.df.at[idx, "total_token_count"]
+                        # Handle potential NaN in scalar access
+                        if pd.isna(val):
+                            current_total = 0
+                        else:
+                            current_total = to_int_safe(val)
+
+                    self.df.at[idx, "total_token_count"] = current_total + tokens_used
+                    self.df.at[idx, "last_used"] = now
 
                     if error:
                         if error_type == "permanent":
@@ -735,7 +743,7 @@ class KeyManager:
                             )
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
 
                     # Call _on_update_usage to update usage
                     await self._on_update_usage()
