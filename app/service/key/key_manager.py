@@ -72,7 +72,9 @@ class KeyManager:
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
         self.rate_limit_models: list[str] = (
-            list(rate_limit_data.keys()) if rate_limit_data else []
+            sorted(list(rate_limit_data.keys()), key=len, reverse=True)
+            if rate_limit_data
+            else []
         )
         self.tz = pytz.timezone(zone="UTC")
         self.now = lambda: datetime.now(self.tz)
@@ -129,7 +131,9 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
+        # self.rate_limit_models is already sorted by length descending in init/init()
+        # We iterate directly to avoid re-sorting on every call (O(N) vs O(N log N))
+        for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return prefix
@@ -717,16 +721,29 @@ class KeyManager:
             async with self.lock.write_lock():
                 if idx in self.df.index:
                     # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Optimization: Use .at for scalar access (O(1)) instead of .loc (series creation)
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    # Read current values using .at
+                    current_rpd = self.df.at[idx, "rpd"]
+                    current_rpm = self.df.at[idx, "rpm"]
+                    current_tpm = self.df.at[idx, "tpm"]
+
+                    # Handle optional column 'total_token_count'
+                    current_total = 0
+                    if "total_token_count" in self.df.columns:
+                        current_total = self.df.at[idx, "total_token_count"]
+
+                    # Update individual columns using .at
+                    self.df.at[idx, "rpd"] = to_int_safe(current_rpd) + 1
+                    self.df.at[idx, "rpm"] = to_int_safe(current_rpm) + 1
+                    self.df.at[idx, "tpm"] = to_int_safe(current_tpm) + tokens_used
+
+                    if "total_token_count" in self.df.columns:
+                        self.df.at[idx, "total_token_count"] = (
+                            to_int_safe(current_total) + tokens_used
+                        )
+
+                    self.df.at[idx, "last_used"] = now
 
                     if error:
                         if error_type == "permanent":
@@ -735,7 +752,7 @@ class KeyManager:
                             )
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
 
                     # Call _on_update_usage to update usage
                     await self._on_update_usage()
