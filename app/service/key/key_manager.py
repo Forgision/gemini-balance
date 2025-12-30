@@ -719,15 +719,24 @@ class KeyManager:
                     # Fast atomic update - direct write
                     row = self.df.loc[idx, :]
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    # Calculate new values
+                    current_rpd = to_int_safe(row["rpd"])
+                    current_rpm = to_int_safe(row["rpm"])
+                    current_tpm = to_int_safe(row["tpm"])
+                    current_total = to_int_safe(row.get("total_token_count", 0))
 
+                    new_rpd = current_rpd + 1
+                    new_rpm = current_rpm + 1
+                    new_tpm = current_tpm + tokens_used
+
+                    # Update usage columns using .at for O(1) access
+                    self.df.at[idx, "rpd"] = new_rpd
+                    self.df.at[idx, "rpm"] = new_rpm
+                    self.df.at[idx, "tpm"] = new_tpm
+                    self.df.at[idx, "total_token_count"] = current_total + tokens_used
+                    self.df.at[idx, "last_used"] = now
+
+                    # Handle errors
                     if error:
                         if error_type == "permanent":
                             key_mask = (
@@ -735,10 +744,28 @@ class KeyManager:
                             )
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Calculate and update *left columns locally (avoid full DataFrame scan)
+                    max_rpm = to_int_safe(row["max_rpm"])
+                    max_tpm = to_int_safe(row["max_tpm"])
+                    max_rpd = to_int_safe(row["max_rpd"])
+
+                    self.df.at[idx, "rpm_left"] = max(0, max_rpm - new_rpm)
+                    self.df.at[idx, "tpm_left"] = max(0, max_tpm - new_tpm)
+                    self.df.at[idx, "rpd_left"] = max(0, max_rpd - new_rpd)
+
+                    # Update is_exhausted if limits reached
+                    # Note: We only set to True, never unset here (preserves 429 exhaustion)
+                    if (
+                        (new_rpm >= max_rpm)
+                        or (new_tpm >= max_tpm)
+                        or (new_rpd >= max_rpd)
+                    ):
+                        self.df.at[idx, "is_exhausted"] = True
+
+                    # Mark for DB commit
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
