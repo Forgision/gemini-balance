@@ -1,0 +1,8 @@
+DEBUG TEST: inside test_debug_settings
+DEBUG TEST: id(settings)=140274410006048
+DEBUG TEST: settings.AUTH_TOKEN='test_auth_token_12345'
+DEBUG TEST: settings.ALLOWED_TOKENS=['test_auth_token_12345']
+DEBUG TEST: header={'x-goog-api-key': 'test_auth_token_12345'}
+DEBUG TEST: response status=200
+DEBUG TEST: response body={"models":[{"name":"models/gemini-pro","displayName":"Gemini Pro"}]}
+DEBUG TEST: response headers=Headers({'content-length': '68', 'content-type': 'application/json'})
