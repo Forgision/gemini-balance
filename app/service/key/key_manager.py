@@ -596,19 +596,9 @@ class KeyManager:
 
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
-            # Validate DataFrame and that 'model_name' exists at index level 0
-            if model_name not in self.df.index.get_level_values("model_name"):
-                logger.warning(
-                    f"No keys configured for model: {model_name}, falling back to cycle."
-                )
-                # return next key in cycle, model will be inserted in next update_usage call
-                if is_vertex_key:
-                    return next(self.vertex_api_keys_cycle)
-                else:
-                    return next(self.api_keys_cycle)
-
             # Filter for the specific model and vertex key type
             try:
+                # EAFP: Try to get model data directly. This avoids O(N) scan of index.get_level_values
                 model_df = self.df.xs(model_name, level="model_name", drop_level=False)
                 candidates = model_df.xs(
                     is_vertex_key, level="is_vertex_key", drop_level=False
@@ -617,7 +607,10 @@ class KeyManager:
                 logger.warning(
                     f"No keys configured for model: {model_name}, falling back to cycle."
                 )
-                return await self.get_next_key(is_vertex_key=is_vertex_key)
+                if is_vertex_key:
+                    return next(self.vertex_api_keys_cycle)
+                else:
+                    return next(self.api_keys_cycle)
 
         # Apply filters
         mask = (
@@ -638,33 +631,25 @@ class KeyManager:
             # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
             return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
+        # Find the best key (max tpm_left) using idxmax (O(M)) instead of sort (O(M log M))
+        # idxmax returns the index label of the first occurrence of the maximum value
+        try:
+            best_key_index = candidates["tpm_left"].idxmax()
+        except (ValueError, IndexError):
+             # Should be caught by len(candidates) == 0 check, but safety net
+            logger.warning(f"Error finding best key for {model_name}, fallback.")
+            return ""
 
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
+        # Extract key string from index
+        # Index structure: (model_name, is_vertex_key, api_key)
+        if isinstance(best_key_index, tuple) and len(best_key_index) >= 3:
+            return str(best_key_index[2])
 
-        if isinstance(first_index, tuple) or isinstance(first_index, list):
-            if len(first_index) == 3:
-                best_key_string = str(first_index[2])
-            elif len(first_index) == 2:
-                best_key_string = str(first_index[1])
-            elif len(first_index) == 1:
-                best_key_string = str(first_index[0])
-            else:
-                logger.warning(
-                    f"Invalid index length: {len(first_index)}, falling back to cycle."
-                )
-                return await self.get_next_key(is_vertex_key=is_vertex_key)
-        elif isinstance(first_index, str):
-            best_key_string = first_index
-        else:
-            logger.warning(
-                f"Invalid index type: {type(first_index)}, falling back to cycle."
-            )
-            return await self.get_next_key(is_vertex_key=is_vertex_key)
-
-        return best_key_string
+        # Fallback for unexpected index structure
+        logger.warning(
+            f"Unexpected index structure: {best_key_index}, falling back to cycle."
+        )
+        return await self.get_next_key(is_vertex_key=is_vertex_key)
 
     async def update_usage(
         self,
