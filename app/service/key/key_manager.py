@@ -716,18 +716,42 @@ class KeyManager:
         try:
             async with self.lock.write_lock():
                 if idx in self.df.index:
-                    # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Optimizing update using .at accessors for scalar value updates (O(1))
+                    # instead of .loc (slower) or full DF operations (O(N))
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    # 1. Read current values using .at
+                    current_rpm = to_int_safe(self.df.at[idx, "rpm"])
+                    current_rpd = to_int_safe(self.df.at[idx, "rpd"])
+                    current_tpm = to_int_safe(self.df.at[idx, "tpm"])
+                    # current_total read moved down to handle missing column
+                    max_rpm = to_int_safe(self.df.at[idx, "max_rpm"])
+                    max_tpm = to_int_safe(self.df.at[idx, "max_tpm"])
+                    max_rpd = to_int_safe(self.df.at[idx, "max_rpd"])
 
+                    # 2. Calculate new values
+                    new_rpm = current_rpm + 1
+                    new_rpd = current_rpd + 1
+                    new_tpm = current_tpm + tokens_used
+
+                    # 3. Update values using .at
+                    self.df.at[idx, "rpm"] = new_rpm
+                    self.df.at[idx, "rpd"] = new_rpd
+                    self.df.at[idx, "tpm"] = new_tpm
+                    self.df.at[idx, "last_used"] = now
+
+                    # Handle total_token_count safely
+                    if "total_token_count" not in self.df.columns:
+                         self.df["total_token_count"] = 0
+
+                    current_total = to_int_safe(self.df.at[idx, "total_token_count"])
+                    self.df.at[idx, "total_token_count"] = current_total + tokens_used
+
+                    # 4. Update 'left' values locally to avoid O(N) recalculation
+                    self.df.at[idx, "rpm_left"] = max(0, max_rpm - new_rpm)
+                    self.df.at[idx, "tpm_left"] = max(0, max_tpm - new_tpm)
+                    self.df.at[idx, "rpd_left"] = max(0, max_rpd - new_rpd)
+
+                    # 5. Handle errors and exhaustion locally
                     if error:
                         if error_type == "permanent":
                             key_mask = (
@@ -735,10 +759,25 @@ class KeyManager:
                             )
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
+                    else:
+                        # Check exhaustion based on new usage
+                        is_exhausted = (
+                            (new_rpm >= max_rpm)
+                            or (new_tpm >= max_tpm)
+                            or (new_rpd >= max_rpd)
+                        )
+                        # Exhaustion is sticky (OR logic with existing), but here we know
+                        # if usage > max, it IS exhausted.
+                        # Note: we only set True if condition met. We don't clear it here
+                        # because reset logic handles clearing, and we want to preserve
+                        # previous exhaustion state if it was set for other reasons?
+                        # Actually _set_exhausted_flags does: self.df["is_exhausted"] | flags
+                        if is_exhausted:
+                            self.df.at[idx, "is_exhausted"] = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Mark DB commit as needed
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
