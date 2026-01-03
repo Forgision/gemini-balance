@@ -49,6 +49,7 @@ class KeyManager:
             "is_active",
             "is_exhausted",
             "last_used",
+            "total_token_count",
         ]
     ]
     _ALL_COLUMNS = _INDEX_LEVEL + _COLUMNS[0]
@@ -129,7 +130,8 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
+        # self.rate_limit_models is already sorted by length descending in __init__
+        for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return prefix
@@ -239,6 +241,7 @@ class KeyManager:
                         "is_vertex_key": False,
                         "is_active": True,
                         "is_exhausted": False,
+                        "total_token_count": 0,
                     }
                 )
 
@@ -262,6 +265,7 @@ class KeyManager:
                             "is_vertex_key": True,
                             "is_active": True,
                             "is_exhausted": False,
+                            "total_token_count": 0,
                         }
                     )
 
@@ -716,17 +720,50 @@ class KeyManager:
         try:
             async with self.lock.write_lock():
                 if idx in self.df.index:
-                    # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Optimized update using .at for O(1) scalar access
+                    # We access current values directly via .at to avoid creating Series objects
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
+                    # Update counters
+                    current_rpd = self.df.at[idx, "rpd"]
+                    new_rpd = current_rpd + 1
+                    self.df.at[idx, "rpd"] = new_rpd
+
+                    current_rpm = self.df.at[idx, "rpm"]
+                    new_rpm = current_rpm + 1
+                    self.df.at[idx, "rpm"] = new_rpm
+
+                    current_tpm = self.df.at[idx, "tpm"]
+                    new_tpm = current_tpm + tokens_used
+                    self.df.at[idx, "tpm"] = new_tpm
+
+                    # Update total token count
+                    current_total = self.df.at[idx, "total_token_count"]
+                    # Handle potential NaN in total_token_count if it wasn't initialized properly
+                    if pd.isna(current_total):
+                        current_total = 0
+                    self.df.at[idx, "total_token_count"] = current_total + tokens_used
+
+                    self.df.at[idx, "last_used"] = now
+
+                    # Update derived columns locally to avoid O(N) full dataframe recalculation
+                    # rpm_left
+                    max_rpm = self.df.at[idx, "max_rpm"]
+                    self.df.at[idx, "rpm_left"] = max(0, max_rpm - new_rpm)
+
+                    # tpm_left
+                    max_tpm = self.df.at[idx, "max_tpm"]
+                    self.df.at[idx, "tpm_left"] = max(0, max_tpm - new_tpm)
+
+                    # rpd_left
+                    max_rpd = self.df.at[idx, "max_rpd"]
+                    self.df.at[idx, "rpd_left"] = max(0, max_rpd - new_rpd)
+
+                    # Check exhaustion based on new values
+                    is_exhausted = (
+                        (new_rpm >= max_rpm)
+                        or (new_tpm >= max_tpm)
+                        or (new_rpd >= max_rpd)
                     )
-                    self.df.loc[idx, "last_used"] = now
 
                     if error:
                         if error_type == "permanent":
@@ -734,11 +771,22 @@ class KeyManager:
                                 self.df.index.get_level_values("api_key") == key_value
                             )
                             self.df.loc[key_mask, "is_active"] = False
+                            # For permanent errors affecting multiple rows, we still need to potentially update exhausted flags or others?
+                            # Usually permanent error just marks inactive.
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            is_exhausted = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Update is_exhausted.
+                    # Note: If it was already exhausted, it stays exhausted.
+                    # If it wasn't, the new usage or error might make it exhausted.
+                    if is_exhausted:
+                        self.df.at[idx, "is_exhausted"] = True
+                    # If not exhausted now, we don't necessarily clear it (it clears on reset),
+                    # but technically if it was exhausted and we somehow reduced usage (impossible here) or reset happened...
+                    # Logic in _set_exhausted_flags uses | (OR), so it accumulates until reset clears it.
+                    # So we only need to set it to True if condition is met.
+
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
