@@ -49,6 +49,7 @@ class KeyManager:
             "is_active",
             "is_exhausted",
             "last_used",
+            "total_token_count",
         ]
     ]
     _ALL_COLUMNS = _INDEX_LEVEL + _COLUMNS[0]
@@ -232,6 +233,7 @@ class KeyManager:
                         "max_tpm": limits["TPM"],
                         "rpd": 0,
                         "max_rpd": limits["RPD"],
+                        "total_token_count": 0,
                         "minute_reset_time": self.now_minute(),
                         "day_reset_time": self.now_day(),
                         "last_used": self.now()
@@ -255,6 +257,7 @@ class KeyManager:
                             "max_tpm": limits["TPM"],
                             "rpd": 0,
                             "max_rpd": limits["RPD"],
+                            "total_token_count": 0,
                             "minute_reset_time": self.now_minute(),
                             "day_reset_time": self.now_day(),
                             "last_used": self.now()
@@ -638,11 +641,8 @@ class KeyManager:
             # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
             return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
-
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
+        # Get index of key with max tpm_left (O(N) instead of O(N log N) sort)
+        first_index = candidates["tpm_left"].idxmax()
 
         if isinstance(first_index, tuple) or isinstance(first_index, list):
             if len(first_index) == 3:
@@ -716,17 +716,43 @@ class KeyManager:
         try:
             async with self.lock.write_lock():
                 if idx in self.df.index:
-                    # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Optimized O(1) update using .at[] for scalar access
+                    # Avoids O(N) full DataFrame recalculation in _on_update_usage
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    # 1. Read current values
+                    cur_rpm = to_int_safe(self.df.at[idx, "rpm"])
+                    cur_tpm = to_int_safe(self.df.at[idx, "tpm"])
+                    cur_rpd = to_int_safe(self.df.at[idx, "rpd"])
+                    cur_total = to_int_safe(self.df.at[idx, "total_token_count"])
+
+                    # 2. Calculate new values
+                    new_rpm = cur_rpm + 1
+                    new_tpm = cur_tpm + tokens_used
+                    new_rpd = cur_rpd + 1
+                    new_total = cur_total + tokens_used
+
+                    # 3. Write back usage stats
+                    self.df.at[idx, "rpm"] = new_rpm
+                    self.df.at[idx, "tpm"] = new_tpm
+                    self.df.at[idx, "rpd"] = new_rpd
+                    self.df.at[idx, "total_token_count"] = new_total
+                    self.df.at[idx, "last_used"] = now
+
+                    # 4. Update derived metrics locally
+                    max_rpm = to_int_safe(self.df.at[idx, "max_rpm"])
+                    max_tpm = to_int_safe(self.df.at[idx, "max_tpm"])
+                    max_rpd = to_int_safe(self.df.at[idx, "max_rpd"])
+
+                    self.df.at[idx, "rpm_left"] = max(0, max_rpm - new_rpm)
+                    self.df.at[idx, "tpm_left"] = max(0, max_tpm - new_tpm)
+                    self.df.at[idx, "rpd_left"] = max(0, max_rpd - new_rpd)
+
+                    # 5. Handle errors and exhaustion
+                    is_exhausted = (new_rpm >= max_rpm) or (new_tpm >= max_tpm) or (new_rpd >= max_rpd)
+
+                    # Preserve existing exhaustion unless we are resetting (which this method doesn't do)
+                    if self.df.at[idx, "is_exhausted"]:
+                        is_exhausted = True
 
                     if error:
                         if error_type == "permanent":
@@ -735,10 +761,12 @@ class KeyManager:
                             )
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            is_exhausted = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    self.df.at[idx, "is_exhausted"] = is_exhausted
+
+                    # Flag for DB commit, but skip full DF recalculation
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
