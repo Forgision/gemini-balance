@@ -129,7 +129,8 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
+        # self.rate_limit_models is already sorted by length in __init__
+        for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return prefix
@@ -596,75 +597,47 @@ class KeyManager:
 
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
-            # Validate DataFrame and that 'model_name' exists at index level 0
-            if model_name not in self.df.index.get_level_values("model_name"):
-                logger.warning(
-                    f"No keys configured for model: {model_name}, falling back to cycle."
-                )
-                # return next key in cycle, model will be inserted in next update_usage call
-                if is_vertex_key:
-                    return next(self.vertex_api_keys_cycle)
-                else:
-                    return next(self.api_keys_cycle)
-
             # Filter for the specific model and vertex key type
             try:
                 model_df = self.df.xs(model_name, level="model_name", drop_level=False)
                 candidates = model_df.xs(
                     is_vertex_key, level="is_vertex_key", drop_level=False
-                ).copy()
+                )
             except KeyError:
                 logger.warning(
                     f"No keys configured for model: {model_name}, falling back to cycle."
                 )
                 return await self.get_next_key(is_vertex_key=is_vertex_key)
 
-        # Apply filters
-        mask = (
-            (candidates["is_active"])
-            & (~candidates["is_exhausted"])
-            & (candidates["rpm_left"] >= 1)
-            & (candidates["tpm_left"] >= 1)
-            & (candidates["rpd_left"] >= 1)
-        )
-
-        candidates = cast(pd.DataFrame, candidates.loc[mask])
-
-        # Check data is not empty
-        if len(candidates) == 0:
-            logger.warning(
-                f"No available keys for model {model_name}, falling back to cycle."
+            # Apply filters
+            mask = (
+                (candidates["is_active"])
+                & (~candidates["is_exhausted"])
+                & (candidates["rpm_left"] >= 1)
+                & (candidates["tpm_left"] >= 1)
+                & (candidates["rpd_left"] >= 1)
             )
-            # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
-            return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
+            candidates = cast(pd.DataFrame, candidates.loc[mask])
 
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
-
-        if isinstance(first_index, tuple) or isinstance(first_index, list):
-            if len(first_index) == 3:
-                best_key_string = str(first_index[2])
-            elif len(first_index) == 2:
-                best_key_string = str(first_index[1])
-            elif len(first_index) == 1:
-                best_key_string = str(first_index[0])
-            else:
+            # Check data is not empty
+            if len(candidates) == 0:
                 logger.warning(
-                    f"Invalid index length: {len(first_index)}, falling back to cycle."
+                    f"No available keys for model {model_name}, falling back to cycle."
                 )
-                return await self.get_next_key(is_vertex_key=is_vertex_key)
-        elif isinstance(first_index, str):
-            best_key_string = first_index
-        else:
-            logger.warning(
-                f"Invalid index type: {type(first_index)}, falling back to cycle."
-            )
-            return await self.get_next_key(is_vertex_key=is_vertex_key)
+                # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
+                return ""  # Return empty string to indicate no key available
 
-        return best_key_string
+            # Find the best key (max tpm_left) efficiently
+            # idxmax returns the index label (model_name, is_vertex_key, api_key)
+            best_key_index = candidates["tpm_left"].idxmax()
+
+            if isinstance(best_key_index, tuple):
+                # The index is (model_name, is_vertex_key, api_key), we want the api_key
+                return str(best_key_index[2])
+
+            # Should not happen given the MultiIndex structure, but fallback
+            return str(best_key_index)
 
     async def update_usage(
         self,
