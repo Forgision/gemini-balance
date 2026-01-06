@@ -1,0 +1,3 @@
+## 2026-01-06 - Optimized KeyManager.update_usage
+**Learning:** For high-frequency scalar updates in Pandas DataFrames (hot paths), use `df.at[row, col] = val` instead of `df.loc[row, col] = val`. Additionally, avoid recalculating derived metrics for the entire DataFrame (vectorized operations) when only a single row has changed; instead, calculate and update the derived values locally for that row.
+**Action:** When optimizing hot paths involving Pandas state updates, prefer `at` for scalar access and localized updates over full column recalculations.
