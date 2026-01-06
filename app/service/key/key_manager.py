@@ -49,6 +49,7 @@ class KeyManager:
             "is_active",
             "is_exhausted",
             "last_used",
+            "total_token_count",
         ]
     ]
     _ALL_COLUMNS = _INDEX_LEVEL + _COLUMNS[0]
@@ -232,6 +233,7 @@ class KeyManager:
                         "max_tpm": limits["TPM"],
                         "rpd": 0,
                         "max_rpd": limits["RPD"],
+                        "total_token_count": 0,
                         "minute_reset_time": self.now_minute(),
                         "day_reset_time": self.now_day(),
                         "last_used": self.now()
@@ -255,6 +257,7 @@ class KeyManager:
                             "max_tpm": limits["TPM"],
                             "rpd": 0,
                             "max_rpd": limits["RPD"],
+                            "total_token_count": 0,
                             "minute_reset_time": self.now_minute(),
                             "day_reset_time": self.now_day(),
                             "last_used": self.now()
@@ -716,17 +719,59 @@ class KeyManager:
         try:
             async with self.lock.write_lock():
                 if idx in self.df.index:
-                    # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Optimized path: Use .at for fast scalar access
+                    # This avoids the overhead of .loc and significantly reduces latency
+                    # by also calculating derived metrics locally instead of for the full DataFrame.
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
+                    # 1. Update counters
+                    cur_rpd = self.df.at[idx, "rpd"]
+                    cur_rpm = self.df.at[idx, "rpm"]
+                    cur_tpm = self.df.at[idx, "tpm"]
+
+                    # Handle potential NaN or non-int types
+                    if pd.isna(cur_rpd):
+                        cur_rpd = 0
+                    if pd.isna(cur_rpm):
+                        cur_rpm = 0
+                    if pd.isna(cur_tpm):
+                        cur_tpm = 0
+
+                    new_rpd = int(cur_rpd) + 1
+                    new_rpm = int(cur_rpm) + 1
+                    new_tpm = int(cur_tpm) + tokens_used
+
+                    self.df.at[idx, "rpd"] = new_rpd
+                    self.df.at[idx, "rpm"] = new_rpm
+                    self.df.at[idx, "tpm"] = new_tpm
+                    self.df.at[idx, "last_used"] = now
+
+                    # Update total_token_count
+                    cur_total = self.df.at[idx, "total_token_count"]
+                    if pd.isna(cur_total):
+                        cur_total = 0
+                    self.df.at[idx, "total_token_count"] = int(cur_total) + tokens_used
+
+                    # 2. Update derived metrics (rpm_left, etc.) locally
+                    max_rpm = self.df.at[idx, "max_rpm"]
+                    max_tpm = self.df.at[idx, "max_tpm"]
+                    max_rpd = self.df.at[idx, "max_rpd"]
+
+                    # Ensure numeric max values
+                    if pd.isna(max_rpm):
+                        max_rpm = 0
+                    if pd.isna(max_tpm):
+                        max_tpm = 0
+                    if pd.isna(max_rpd):
+                        max_rpd = 0
+
+                    self.df.at[idx, "rpm_left"] = max(0, int(max_rpm) - new_rpm)
+                    self.df.at[idx, "tpm_left"] = max(0, int(max_tpm) - new_tpm)
+                    self.df.at[idx, "rpd_left"] = max(0, int(max_rpd) - new_rpd)
+
+                    # 3. Check exhaustion
+                    is_exhausted = (
+                        new_rpm >= max_rpm or new_tpm >= max_tpm or new_rpd >= max_rpd
                     )
-                    self.df.loc[idx, "last_used"] = now
 
                     if error:
                         if error_type == "permanent":
@@ -735,10 +780,14 @@ class KeyManager:
                             )
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            is_exhausted = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Update exhausted flag (cumulative)
+                    cur_exhausted = self.df.at[idx, "is_exhausted"]
+                    self.df.at[idx, "is_exhausted"] = bool(cur_exhausted) or is_exhausted
+
+                    # Mark for DB commit
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
