@@ -129,7 +129,9 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
+        # rate_limit_models is already sorted by length (descending) in init.
+        # We iterate directly to avoid O(N log N) sorting on every call.
+        for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return prefix
@@ -484,6 +486,8 @@ class KeyManager:
                     self.rate_limit_data = (
                         scraped.copy() if isinstance(scraped, dict) else {}
                     )
+            # IMPORTANT: rate_limit_models MUST be sorted by length (descending)
+            # This is critical for _model_normalization to correctly match the longest prefix.
             self.rate_limit_models = sorted(
                 list(self.rate_limit_data.keys()), key=len, reverse=True
             )
@@ -597,15 +601,8 @@ class KeyManager:
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
             # Validate DataFrame and that 'model_name' exists at index level 0
-            if model_name not in self.df.index.get_level_values("model_name"):
-                logger.warning(
-                    f"No keys configured for model: {model_name}, falling back to cycle."
-                )
-                # return next key in cycle, model will be inserted in next update_usage call
-                if is_vertex_key:
-                    return next(self.vertex_api_keys_cycle)
-                else:
-                    return next(self.api_keys_cycle)
+            # Optimized: Removed O(N) check `if model_name not in ... get_level_values`.
+            # We rely on try/except KeyError below which is O(1) or O(log N).
 
             # Filter for the specific model and vertex key type
             try:
@@ -617,7 +614,11 @@ class KeyManager:
                 logger.warning(
                     f"No keys configured for model: {model_name}, falling back to cycle."
                 )
-                return await self.get_next_key(is_vertex_key=is_vertex_key)
+                # return next key in cycle, model will be inserted in next update_usage call
+                if is_vertex_key:
+                    return next(self.vertex_api_keys_cycle)
+                else:
+                    return next(self.api_keys_cycle)
 
         # Apply filters
         mask = (
