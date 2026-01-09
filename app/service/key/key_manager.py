@@ -49,6 +49,7 @@ class KeyManager:
             "is_active",
             "is_exhausted",
             "last_used",
+            "total_token_count",
         ]
     ]
     _ALL_COLUMNS = _INDEX_LEVEL + _COLUMNS[0]
@@ -232,6 +233,7 @@ class KeyManager:
                         "max_tpm": limits["TPM"],
                         "rpd": 0,
                         "max_rpd": limits["RPD"],
+                        "total_token_count": 0,
                         "minute_reset_time": self.now_minute(),
                         "day_reset_time": self.now_day(),
                         "last_used": self.now()
@@ -255,6 +257,7 @@ class KeyManager:
                             "max_tpm": limits["TPM"],
                             "rpd": 0,
                             "max_rpd": limits["RPD"],
+                            "total_token_count": 0,
                             "minute_reset_time": self.now_minute(),
                             "day_reset_time": self.now_day(),
                             "last_used": self.now()
@@ -429,7 +432,7 @@ class KeyManager:
         This method should be called within a lock context.
         """
         # This method modifies self.df, so it should be called within a lock
-        numeric_cols = ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
+        numeric_cols = ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd", "total_token_count"]
         for col in numeric_cols:
             if col in self.df.columns:
                 self.df[col] = (
@@ -638,11 +641,10 @@ class KeyManager:
             # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
             return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
-
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
+        # Get index of the row with max tpm_left
+        # idxmax() returns the index label of the maximum value
+        # In MultiIndex, best_idx_label is a tuple/value matching the index
+        first_index = candidates["tpm_left"].idxmax()
 
         if isinstance(first_index, tuple) or isinstance(first_index, list):
             if len(first_index) == 3:
@@ -717,25 +719,30 @@ class KeyManager:
             async with self.lock.write_lock():
                 if idx in self.df.index:
                     # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Use .at for faster scalar access
+                    current_rpd = to_int_safe(self.df.at[idx, "rpd"])
+                    self.df.at[idx, "rpd"] = current_rpd + 1
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    current_rpm = to_int_safe(self.df.at[idx, "rpm"])
+                    self.df.at[idx, "rpm"] = current_rpm + 1
+
+                    current_tpm = to_int_safe(self.df.at[idx, "tpm"])
+                    self.df.at[idx, "tpm"] = current_tpm + tokens_used
+
+                    current_total = to_int_safe(self.df.at[idx, "total_token_count"])
+                    self.df.at[idx, "total_token_count"] = current_total + tokens_used
+
+                    self.df.at[idx, "last_used"] = now
 
                     if error:
                         if error_type == "permanent":
                             key_mask = (
                                 self.df.index.get_level_values("api_key") == key_value
                             )
+                            # loc is still needed for boolean masking updates
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
 
                     # Call _on_update_usage to update usage
                     await self._on_update_usage()
