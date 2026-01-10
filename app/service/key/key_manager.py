@@ -639,10 +639,9 @@ class KeyManager:
             return ""  # Return empty string to indicate no key available
 
         # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
-
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
+        # Optimization: Use idxmax to find the best key O(N) instead of sorting O(N log N)
+        # This is significantly faster when N is large or high frequency calls
+        first_index = candidates["tpm_left"].idxmax()
 
         if isinstance(first_index, tuple) or isinstance(first_index, list):
             if len(first_index) == 3:
@@ -717,16 +716,23 @@ class KeyManager:
             async with self.lock.write_lock():
                 if idx in self.df.index:
                     # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Optimization: Use .at for scalar access (much faster than .loc)
+                    # We avoid creating a Series for the row and use direct scalar access
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
-                    )
-                    self.df.loc[idx, "last_used"] = now
+                    self.df.at[idx, "rpd"] = to_int_safe(self.df.at[idx, "rpd"]) + 1
+                    self.df.at[idx, "rpm"] = to_int_safe(self.df.at[idx, "rpm"]) + 1
+                    self.df.at[idx, "tpm"] = to_int_safe(self.df.at[idx, "tpm"]) + tokens_used
+
+                    # Handle total_token_count (might not exist in columns initially if no DB load)
+                    if "total_token_count" in self.df.columns:
+                        self.df.at[idx, "total_token_count"] = (
+                            to_int_safe(self.df.at[idx, "total_token_count"]) + tokens_used
+                        )
+                    else:
+                        # Fallback to loc if column doesn't exist (loc creates it)
+                        self.df.loc[idx, "total_token_count"] = tokens_used
+
+                    self.df.at[idx, "last_used"] = now
 
                     if error:
                         if error_type == "permanent":
@@ -735,7 +741,7 @@ class KeyManager:
                             )
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
 
                     # Call _on_update_usage to update usage
                     await self._on_update_usage()
