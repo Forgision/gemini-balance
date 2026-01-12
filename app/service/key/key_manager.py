@@ -596,17 +596,6 @@ class KeyManager:
 
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
-            # Validate DataFrame and that 'model_name' exists at index level 0
-            if model_name not in self.df.index.get_level_values("model_name"):
-                logger.warning(
-                    f"No keys configured for model: {model_name}, falling back to cycle."
-                )
-                # return next key in cycle, model will be inserted in next update_usage call
-                if is_vertex_key:
-                    return next(self.vertex_api_keys_cycle)
-                else:
-                    return next(self.api_keys_cycle)
-
             # Filter for the specific model and vertex key type
             try:
                 model_df = self.df.xs(model_name, level="model_name", drop_level=False)
