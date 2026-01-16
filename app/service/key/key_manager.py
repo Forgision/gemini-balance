@@ -46,6 +46,7 @@ class KeyManager:
             "max_rpm",
             "max_tpm",
             "max_rpd",
+            "total_token_count",
             "is_active",
             "is_exhausted",
             "last_used",
@@ -232,6 +233,7 @@ class KeyManager:
                         "max_tpm": limits["TPM"],
                         "rpd": 0,
                         "max_rpd": limits["RPD"],
+                        "total_token_count": 0,
                         "minute_reset_time": self.now_minute(),
                         "day_reset_time": self.now_day(),
                         "last_used": self.now()
@@ -255,6 +257,7 @@ class KeyManager:
                             "max_tpm": limits["TPM"],
                             "rpd": 0,
                             "max_rpd": limits["RPD"],
+                            "total_token_count": 0,
                             "minute_reset_time": self.now_minute(),
                             "day_reset_time": self.now_day(),
                             "last_used": self.now()
@@ -429,7 +432,15 @@ class KeyManager:
         This method should be called within a lock context.
         """
         # This method modifies self.df, so it should be called within a lock
-        numeric_cols = ["rpm", "tpm", "rpd", "max_rpm", "max_tpm", "max_rpd"]
+        numeric_cols = [
+            "rpm",
+            "tpm",
+            "rpd",
+            "max_rpm",
+            "max_tpm",
+            "max_rpd",
+            "total_token_count",
+        ]
         for col in numeric_cols:
             if col in self.df.columns:
                 self.df[col] = (
@@ -693,16 +704,9 @@ class KeyManager:
             error (bool, optional): Whether an error occurred.
             error_type (Optional[str], optional): The type of error if any (e.g., "429" or "permanent").
         """
-
-        # convert to int and handle NaN
-        def to_int_safe(val) -> int:
-            if isinstance(val, (int, float)):
-                return int(val) if not pd.isna(val) else 0
-            try:
-                scalar = val.item() if hasattr(val, "item") else float(val)
-                return int(scalar) if not pd.isna(scalar) else 0
-            except (ValueError, AttributeError, TypeError):
-                return 0
+        # Complexity Analysis:
+        # Before: O(N) where N is total rows in DF (due to _on_update_usage triggering full vector ops)
+        # After: O(1) using direct scalar access via df.at[] and localized updates.
 
         if not self.is_ready:
             await self._check_ready()
@@ -716,29 +720,68 @@ class KeyManager:
         try:
             async with self.lock.write_lock():
                 if idx in self.df.index:
-                    # Fast atomic update - direct write
-                    row = self.df.loc[idx, :]
+                    # Optimized scalar updates using .at[] for O(1) access
+                    # Note: We assume columns are already numeric due to _ensure_numeric_columns
+                    # being called at init/load.
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
-                        to_int_safe(row.get("total_token_count", 0)) + tokens_used
+                    # Update counters
+                    new_rpd = self.df.at[idx, "rpd"] + 1
+                    new_rpm = self.df.at[idx, "rpm"] + 1
+                    new_tpm = self.df.at[idx, "tpm"] + tokens_used
+                    # total_token_count might not exist in old DBs, handle safely?
+                    # The DF is initialized with it, so it should be fine.
+                    new_total = self.df.at[idx, "total_token_count"] + tokens_used
+
+                    self.df.at[idx, "rpd"] = new_rpd
+                    self.df.at[idx, "rpm"] = new_rpm
+                    self.df.at[idx, "tpm"] = new_tpm
+                    self.df.at[idx, "total_token_count"] = new_total
+                    self.df.at[idx, "last_used"] = now
+
+                    # Update limits locally (avoiding full DF scan in _set_available_usage)
+                    max_rpm = self.df.at[idx, "max_rpm"]
+                    max_tpm = self.df.at[idx, "max_tpm"]
+                    max_rpd = self.df.at[idx, "max_rpd"]
+
+                    self.df.at[idx, "rpm_left"] = max(0, max_rpm - new_rpm)
+                    self.df.at[idx, "tpm_left"] = max(0, max_tpm - new_tpm)
+                    self.df.at[idx, "rpd_left"] = max(0, max_rpd - new_rpd)
+
+                    is_exhausted = (
+                        (new_rpm >= max_rpm)
+                        | (new_tpm >= max_tpm)
+                        | (new_rpd >= max_rpd)
                     )
-                    self.df.loc[idx, "last_used"] = now
 
                     if error:
                         if error_type == "permanent":
                             key_mask = (
                                 self.df.index.get_level_values("api_key") == key_value
                             )
+                            # This is still O(N) but rare (only on permanent error)
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            self.df.at[idx, "is_exhausted"] = True
+                    else:
+                        # Update exhausted status based on limits if no explicit 429
+                        # Preserve existing exhausted state if it was already True?
+                        # Usually limits determine it.
+                        # If previously exhausted due to limits, and now still limits, it stays true.
+                        # If previously exhausted due to 429, and now we are here (successful use?),
+                        # wait, update_usage is called after use.
+                        # If this call is successful use, we might check if we are exhausted.
+                        # But typically we don't clear is_exhausted until reset.
+                        # However, strictly following _set_exhausted_flags logic:
+                        if "is_exhausted" in self.df.columns:
+                            current_exhausted = self.df.at[idx, "is_exhausted"]
+                            self.df.at[idx, "is_exhausted"] = (
+                                current_exhausted | is_exhausted
+                            )
+                        else:
+                            self.df.at[idx, "is_exhausted"] = is_exhausted
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Signal DB commit needed
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
@@ -766,7 +809,7 @@ class KeyManager:
                     self.df = pd.concat([self.df, new_df]).sort_index()
                     logger.info(f"Created entry for unknown model: {model_name}")
 
-                    # Call _on_update_usage to update usage
+                    # For new entry, we do full update as it is rare
                     await self._on_update_usage()
         except Exception as e:
             logger.error(f"Error in update_usage: {e}", exc_info=True)
