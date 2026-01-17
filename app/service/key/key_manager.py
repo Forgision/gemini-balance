@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import itertools
+import functools
 from typing import Optional, Dict, Any, cast
 import pandas as pd
 import pytz
@@ -72,7 +73,9 @@ class KeyManager:
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
         self.rate_limit_models: list[str] = (
-            list(rate_limit_data.keys()) if rate_limit_data else []
+            sorted(list(rate_limit_data.keys()), key=len, reverse=True)
+            if rate_limit_data
+            else []
         )
         self.tz = pytz.timezone(zone="UTC")
         self.now = lambda: datetime.now(self.tz)
@@ -99,6 +102,7 @@ class KeyManager:
         self.last_minute_reset_ts: datetime = self.now_minute()
         self.last_day_reset_ts: datetime = self.now_day()
 
+    @functools.lru_cache(maxsize=1024)
     def _model_normalization(self, model_name: str) -> str:
         """Normalizes a model name by matching it against configured rate limit models.
         This method checks if the input model name matches any prefix in the rate limit
@@ -129,7 +133,7 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        for prefix in sorted(self.rate_limit_models, key=len, reverse=True):
+        for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
                 return prefix
