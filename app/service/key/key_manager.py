@@ -638,29 +638,28 @@ class KeyManager:
             # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
             return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
+        # Get the index of the key with the most tokens left (O(N) vs O(N log N) for sort_values)
+        # We use idxmax() to find the index of the maximum value without sorting the entire DataFrame
+        best_key_index = candidates["tpm_left"].idxmax()
 
         # Check index level and get the best key string
-        first_index = candidates.index[0]
-
-        if isinstance(first_index, tuple) or isinstance(first_index, list):
-            if len(first_index) == 3:
-                best_key_string = str(first_index[2])
-            elif len(first_index) == 2:
-                best_key_string = str(first_index[1])
-            elif len(first_index) == 1:
-                best_key_string = str(first_index[0])
+        if isinstance(best_key_index, tuple) or isinstance(best_key_index, list):
+            if len(best_key_index) == 3:
+                best_key_string = str(best_key_index[2])
+            elif len(best_key_index) == 2:
+                best_key_string = str(best_key_index[1])
+            elif len(best_key_index) == 1:
+                best_key_string = str(best_key_index[0])
             else:
                 logger.warning(
-                    f"Invalid index length: {len(first_index)}, falling back to cycle."
+                    f"Invalid index length: {len(best_key_index)}, falling back to cycle."
                 )
                 return await self.get_next_key(is_vertex_key=is_vertex_key)
-        elif isinstance(first_index, str):
-            best_key_string = first_index
+        elif isinstance(best_key_index, str):
+            best_key_string = best_key_index
         else:
             logger.warning(
-                f"Invalid index type: {type(first_index)}, falling back to cycle."
+                f"Invalid index type: {type(best_key_index)}, falling back to cycle."
             )
             return await self.get_next_key(is_vertex_key=is_vertex_key)
 
