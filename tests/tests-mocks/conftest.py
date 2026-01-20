@@ -18,4 +18,8 @@ sys.path.append(str(FIXTURES_DIR))
 # Checking if they are actually needed or if they are automatically discovered.
 # If they are in tests/tests-mocks/fixtures, they might need to be imported in this conftest
 # or the root conftest.
-from fixtures.mocks import mock_key_manager  # noqa: E402, F401
+
+pytest_plugins = [
+    "tests.fixtures.fixture_mocks_unit",
+    "tests.fixtures.fixture_app_unit",
+]
