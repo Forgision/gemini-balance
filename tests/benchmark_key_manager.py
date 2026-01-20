@@ -40,6 +40,7 @@ class KeyManagerLogic:
 
     def get_key_logic_original(self, model_name):
         # Original logic with redundant check
+        # Note: The original implementation contained both this explicit check and the try/except block.
         if model_name not in self.df.index.get_level_values("model_name"):
             return "fallback"
 
