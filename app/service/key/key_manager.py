@@ -72,9 +72,7 @@ class KeyManager:
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
         self.rate_limit_models: list[str] = (
-            sorted(list(rate_limit_data.keys()), key=len, reverse=True)
-            if rate_limit_data
-            else []
+            list(rate_limit_data.keys()) if rate_limit_data else []
         )
         self.tz = pytz.timezone(zone="UTC")
         self.now = lambda: datetime.now(self.tz)
