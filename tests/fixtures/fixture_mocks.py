@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, patch
 import pytest
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_check_for_updates():
     """
     Mock the check_for_updates function to prevent network calls to GitHub.

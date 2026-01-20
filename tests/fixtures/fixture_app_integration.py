@@ -14,6 +14,13 @@ from fastapi.testclient import TestClient
 from app.config.config import settings
 from app.service.key.key_manager import KeyManager
 from app.dependencies import get_key_manager
+from app.router import (
+    claude_routes,
+    gemini_routes,
+    openai_compatible_routes,
+    openai_routes,
+    vertex_express_routes,
+)
 from tests.fixtures.fixture_consts import (
     TEST_API_KEYS,
     TEST_VERTEX_API_KEYS,

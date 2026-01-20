@@ -58,7 +58,7 @@ async def setup_test_db():
     await engine.dispose()
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 async def db_session(setup_test_db):
     """
     Fixture to provide a fresh database session for each test.
