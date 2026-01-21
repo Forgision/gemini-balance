@@ -74,7 +74,7 @@ class KeyManager:
         # Pre-sort models by length (descending) to ensure _model_normalization finds the longest matching prefix.
         # This optimization reduces the complexity of _model_normalization from O(N log N) to O(N) by performing the sort once.
         self.rate_limit_models: list[str] = (
-            sorted(rate_limit_data.keys(), key=len, reverse=True)
+            sorted(list(rate_limit_data.keys()), key=len, reverse=True)
             if rate_limit_data
             else []
         )
@@ -133,6 +133,7 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
+        # self.rate_limit_models is guaranteed to be sorted by length (desc) in __init__ and init
         for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
@@ -604,11 +605,12 @@ class KeyManager:
             # Optimization: Use xs with try/except instead of linear scan of index.
             # This reduces check from O(N) (linear index scan) to O(1)/O(log N) (hash/tree lookup).
             try:
-                candidates = self.df.xs(
-                    (model_name, is_vertex_key),
-                    level=("model_name", "is_vertex_key"),
-                    drop_level=False,
-                ).copy()
+                # Use loc to filter by model_name and is_vertex_key efficiently
+                # This combines filtering and copying in one step, avoiding intermediate copies
+                # and expensive index scans (like get_level_values).
+                candidates = self.df.loc[
+                    (model_name, is_vertex_key, slice(None)), :
+                ].copy()
             except KeyError:
                 logger.warning(
                     f"No keys configured for model: {model_name}, falling back to cycle."
