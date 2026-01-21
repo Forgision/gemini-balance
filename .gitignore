@@ -270,3 +270,4 @@ test.ipynb
 .cursor/rules/installing-python-package.mdc
 .cursor/rules/using-conftest.mdc
 PrevVer
+.claude/settings.json
