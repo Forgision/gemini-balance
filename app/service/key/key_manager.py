@@ -71,6 +71,8 @@ class KeyManager:
         self.vertex_api_keys_cycle = itertools.cycle(vertex_api_keys)
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
+        # Pre-sort models by length (descending) to ensure _model_normalization finds the longest matching prefix.
+        # This optimization reduces the complexity of _model_normalization from O(N log N) to O(N) by performing the sort once.
         self.rate_limit_models: list[str] = (
             sorted(list(rate_limit_data.keys()), key=len, reverse=True)
             if rate_limit_data
@@ -598,23 +600,16 @@ class KeyManager:
 
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
-            # Validate DataFrame and that 'model_name' exists at index level 0
-            if model_name not in self.df.index.get_level_values("model_name"):
-                logger.warning(
-                    f"No keys configured for model: {model_name}, falling back to cycle."
-                )
-                # return next key in cycle, model will be inserted in next update_usage call
-                if is_vertex_key:
-                    return next(self.vertex_api_keys_cycle)
-                else:
-                    return next(self.api_keys_cycle)
-
             # Filter for the specific model and vertex key type
+            # Optimization: Use xs with try/except instead of linear scan of index.
+            # This reduces check from O(N) (linear index scan) to O(1)/O(log N) (hash/tree lookup).
             try:
-                model_df = self.df.xs(model_name, level="model_name", drop_level=False)
-                candidates = model_df.xs(
-                    is_vertex_key, level="is_vertex_key", drop_level=False
-                ).copy()
+                # Use loc to filter by model_name and is_vertex_key efficiently
+                # This combines filtering and copying in one step, avoiding intermediate copies
+                # and expensive index scans (like get_level_values).
+                candidates = self.df.loc[
+                    (model_name, is_vertex_key, slice(None)), :
+                ].copy()
             except KeyError:
                 logger.warning(
                     f"No keys configured for model: {model_name}, falling back to cycle."
@@ -721,26 +716,61 @@ class KeyManager:
                     # Fast atomic update - direct write
                     row = self.df.loc[idx, :]
 
-                    # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
-                    self.df.loc[idx, "total_token_count"] = (
+                    # Pre-calculate new values
+                    new_rpm = to_int_safe(row["rpm"]) + 1
+                    new_rpd = to_int_safe(row["rpd"]) + 1
+                    new_tpm = to_int_safe(row["tpm"]) + tokens_used
+                    new_total = (
                         to_int_safe(row.get("total_token_count", 0)) + tokens_used
                     )
-                    self.df.loc[idx, "last_used"] = now
+
+                    max_rpm = to_int_safe(row["max_rpm"])
+                    max_tpm = to_int_safe(row["max_tpm"])
+                    max_rpd = to_int_safe(row["max_rpd"])
+
+                    rpm_left = max(0, max_rpm - new_rpm)
+                    tpm_left = max(0, max_tpm - new_tpm)
+                    rpd_left = max(0, max_rpd - new_rpd)
+
+                    # Prepare update dictionary
+                    updates = {
+                        "rpm": new_rpm,
+                        "rpd": new_rpd,
+                        "tpm": new_tpm,
+                        "total_token_count": new_total,
+                        "last_used": now,
+                        "rpm_left": rpm_left,
+                        "tpm_left": tpm_left,
+                        "rpd_left": rpd_left,
+                    }
+
+                    # Update exhausted flag
+                    # If any limit reached, mark exhausted.
+                    if (
+                        (new_rpm >= max_rpm)
+                        or (new_tpm >= max_tpm)
+                        or (new_rpd >= max_rpd)
+                    ):
+                        updates["is_exhausted"] = True
 
                     if error:
                         if error_type == "permanent":
                             key_mask = (
                                 self.df.index.get_level_values("api_key") == key_value
                             )
+                            # This affects multiple rows, so we do it separately
                             self.df.loc[key_mask, "is_active"] = False
                         elif error_type == "429":
-                            self.df.loc[idx, "is_exhausted"] = True
+                            updates["is_exhausted"] = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Perform single bulk update for this row
+                    self.df.loc[idx, list(updates.keys())] = list(updates.values())
+
+                    # NOTE: We skip calling _on_update_usage() here to avoid O(N) DataFrame recalculation.
+                    # We have already updated the necessary columns (rpm_left, is_exhausted, etc.) for this row inline.
+
+                    # set required db commit
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,

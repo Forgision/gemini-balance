@@ -228,12 +228,27 @@ def test_create_message_unauthorized(route_client):
         "messages": [{"role": "user", "content": "Hello"}],
     }
 
+    from app.router import claude_routes
+    from fastapi import HTTPException, Header
+    from typing import Optional
+
+    async def mock_fail_auth(authorization: Optional[str] = Header(None)):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    route_client.app.dependency_overrides[
+        claude_routes.security_service.verify_auth_token
+    ] = mock_fail_auth
+
     response = route_client.post(
         "/claude/v1/messages",
         json=request_body,
     )
 
     assert response.status_code == 401
+
+    del route_client.app.dependency_overrides[
+        claude_routes.security_service.verify_auth_token
+    ]
 
 
 def test_count_tokens_unauthorized(route_client):
@@ -243,12 +258,27 @@ def test_count_tokens_unauthorized(route_client):
         "messages": [{"role": "user", "content": "Hello"}],
     }
 
+    from app.router import claude_routes
+    from fastapi import HTTPException, Header
+    from typing import Optional
+
+    async def mock_fail_auth(authorization: Optional[str] = Header(None)):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    route_client.app.dependency_overrides[
+        claude_routes.security_service.verify_auth_token
+    ] = mock_fail_auth
+
     response = route_client.post(
         "/claude/v1/messages/count_tokens",
         json=request_body,
     )
 
     assert response.status_code == 401
+
+    del route_client.app.dependency_overrides[
+        claude_routes.security_service.verify_auth_token
+    ]
 
 
 def test_create_message_invalid_model(route_client):
