@@ -71,6 +71,8 @@ class KeyManager:
         self.vertex_api_keys_cycle = itertools.cycle(vertex_api_keys)
         self.db_maker: async_sessionmaker[AsyncSession] = async_session_maker
         self.rate_limit_data: dict = rate_limit_data or {}
+        # Pre-sort models by length (descending) to ensure _model_normalization finds the longest matching prefix.
+        # This optimization reduces the complexity of _model_normalization from O(N log N) to O(N) by performing the sort once.
         self.rate_limit_models: list[str] = (
             sorted(rate_limit_data.keys(), key=len, reverse=True)
             if rate_limit_data
@@ -599,6 +601,8 @@ class KeyManager:
         # Acquire lock early to safely check and access self.df
         async with self.lock.read_lock():
             # Filter for the specific model and vertex key type
+            # Optimization: Use xs with try/except instead of linear scan of index.
+            # This reduces check from O(N) (linear index scan) to O(1)/O(log N) (hash/tree lookup).
             try:
                 candidates = self.df.xs(
                     (model_name, is_vertex_key),
@@ -712,9 +716,13 @@ class KeyManager:
                     row = self.df.loc[idx, :]
 
                     # Update individual columns (preserves all other columns)
-                    self.df.loc[idx, "rpd"] = to_int_safe(row["rpd"]) + 1
-                    self.df.loc[idx, "rpm"] = to_int_safe(row["rpm"]) + 1
-                    self.df.loc[idx, "tpm"] = to_int_safe(row["tpm"]) + tokens_used
+                    new_rpd = to_int_safe(row["rpd"]) + 1
+                    new_rpm = to_int_safe(row["rpm"]) + 1
+                    new_tpm = to_int_safe(row["tpm"]) + tokens_used
+
+                    self.df.loc[idx, "rpd"] = new_rpd
+                    self.df.loc[idx, "rpm"] = new_rpm
+                    self.df.loc[idx, "tpm"] = new_tpm
                     self.df.loc[idx, "total_token_count"] = (
                         to_int_safe(row.get("total_token_count", 0)) + tokens_used
                     )
@@ -729,8 +737,33 @@ class KeyManager:
                         elif error_type == "429":
                             self.df.loc[idx, "is_exhausted"] = True
 
-                    # Call _on_update_usage to update usage
-                    await self._on_update_usage()
+                    # Optimize: Update derived columns only for this row
+                    # instead of calling await self._on_update_usage() which scans full DF
+
+                    max_rpm = to_int_safe(row["max_rpm"])
+                    max_tpm = to_int_safe(row["max_tpm"])
+                    max_rpd = to_int_safe(row["max_rpd"])
+
+                    rpm_left = max(0, max_rpm - new_rpm)
+                    tpm_left = max(0, max_tpm - new_tpm)
+                    rpd_left = max(0, max_rpd - new_rpd)
+
+                    self.df.loc[idx, "rpm_left"] = rpm_left
+                    self.df.loc[idx, "tpm_left"] = tpm_left
+                    self.df.loc[idx, "rpd_left"] = rpd_left
+
+                    # Check exhaustion (accumulate with existing/new status)
+                    current_exhausted = bool(self.df.loc[idx, "is_exhausted"])
+                    if not current_exhausted:
+                        limit_reached = (
+                            (new_rpm >= max_rpm)
+                            or (new_tpm >= max_tpm)
+                            or (new_rpd >= max_rpd)
+                        )
+                        if limit_reached:
+                            self.df.loc[idx, "is_exhausted"] = True
+
+                    self._required_db_commit = True
                 else:
                     new_entry = {
                         "api_key": key_value,
