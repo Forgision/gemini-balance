@@ -74,7 +74,7 @@ class KeyManager:
         # Pre-sort models by length (descending) to ensure _model_normalization finds the longest matching prefix.
         # This optimization reduces the complexity of _model_normalization from O(N log N) to O(N) by performing the sort once.
         self.rate_limit_models: list[str] = (
-            sorted(rate_limit_data.keys(), key=len, reverse=True)
+            sorted(list(rate_limit_data.keys()), key=len, reverse=True)
             if rate_limit_data
             else []
         )
