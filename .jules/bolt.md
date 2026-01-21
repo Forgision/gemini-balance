@@ -1,3 +1,3 @@
-## 2025-12-20 - Redundant Sorting in Hot Path
-**Learning:** `KeyManager._model_normalization` was sorting a list of models O(N log N) on every key request, despite the list being static after initialization. This contradicted the design intent and added unnecessary latency.
-**Action:** Always check if a loop iterates over a `sorted()` collection and if that sort can be moved to initialization time, especially in hot paths like request handlers.
+## 2025-12-21 - Python Sorting Overhead
+**Learning:** `sorted()` creates a new list copy every time it's called. Calling it inside a loop or hot path (like model normalization per request) adds unnecessary O(N log N) overhead and allocation.
+**Action:** Pre-sort lists during initialization if the order is static, and iterate over the pre-sorted list in hot paths.
