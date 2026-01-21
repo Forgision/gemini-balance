@@ -133,7 +133,6 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        # self.rate_limit_models is guaranteed to be sorted by length (desc) in __init__ and init
         for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.

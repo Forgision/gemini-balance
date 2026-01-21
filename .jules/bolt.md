@@ -1,3 +1,3 @@
-## 2024-12-19 - Pandas DataFrame Optimization
-**Learning:** `df.loc[idx, col] = val` has significant overhead. In hot paths (e.g. per-request logic), accessing/updating multiple columns individually adds up (5-6ms for 10 updates).
-**Action:** Batch updates by reading the row once (`row = df.loc[idx]`), computing new values in variables, and writing back in one go (`df.loc[idx, [cols]] = [vals]`). This reduced latency by ~2.5x in `KeyManager.update_usage`.
+## 2025-12-20 - Redundant Sorting in Hot Path
+**Learning:** `KeyManager._model_normalization` was sorting a list of models O(N log N) on every key request, despite the list being static after initialization. This contradicted the design intent and added unnecessary latency.
+**Action:** Always check if a loop iterates over a `sorted()` collection and if that sort can be moved to initialization time, especially in hot paths like request handlers.
