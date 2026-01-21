@@ -62,8 +62,22 @@ def test_list_files_success(route_client, route_mock_key_manager):
 
 def test_list_files_unauthorized(route_client):
     """Test unauthorized access to list_files."""
+    from app.router import files_routes
+    from fastapi import HTTPException
+
+    async def mock_fail_auth(key=None, x_goog_api_key=None):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    route_client.app.dependency_overrides[
+        files_routes.security_service.verify_key_or_goog_api_key
+    ] = mock_fail_auth
+
     response = route_client.get("/v1beta/files")
     assert response.status_code == 401
+
+    del route_client.app.dependency_overrides[
+        files_routes.security_service.verify_key_or_goog_api_key
+    ]
 
 
 @patch("app.core.security.settings.ALLOWED_TOKENS", ["test_auth_token"])
@@ -100,8 +114,22 @@ def test_get_file_success(route_client, route_mock_key_manager):
 
 def test_get_file_unauthorized(route_client):
     """Test unauthorized access to get_file."""
+    from app.router import files_routes
+    from fastapi import HTTPException
+
+    async def mock_fail_auth(key=None, x_goog_api_key=None):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    route_client.app.dependency_overrides[
+        files_routes.security_service.verify_key_or_goog_api_key
+    ] = mock_fail_auth
+
     response = route_client.get("/v1beta/files/test_file")
     assert response.status_code == 401
+
+    del route_client.app.dependency_overrides[
+        files_routes.security_service.verify_key_or_goog_api_key
+    ]
 
 
 @patch("app.core.security.settings.ALLOWED_TOKENS", ["test_auth_token"])
@@ -127,8 +155,22 @@ def test_delete_file_success(route_client, route_mock_key_manager):
 
 def test_delete_file_unauthorized(route_client):
     """Test unauthorized access to delete_file."""
+    from app.router import files_routes
+    from fastapi import HTTPException
+
+    async def mock_fail_auth(key=None, x_goog_api_key=None):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    route_client.app.dependency_overrides[
+        files_routes.security_service.verify_key_or_goog_api_key
+    ] = mock_fail_auth
+
     response = route_client.delete("/v1beta/files/test_file")
     assert response.status_code == 401
+
+    del route_client.app.dependency_overrides[
+        files_routes.security_service.verify_key_or_goog_api_key
+    ]
 
 
 @patch("app.core.security.settings.ALLOWED_TOKENS", ["test_auth_token"])
