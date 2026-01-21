@@ -133,7 +133,6 @@ class KeyManager:
             logger.error("Rate Limits models are not found")
             raise ValueError("Rate Limits models are not found")
 
-        # Iterate over pre-sorted models (longest first).
         for prefix in self.rate_limit_models:
             if model_name.startswith(prefix):
                 # As soon as we find a match (which will be the longest one), return it.
@@ -605,9 +604,10 @@ class KeyManager:
             # Optimization: Use xs with try/except instead of linear scan of index.
             # This reduces check from O(N) (linear index scan) to O(1)/O(log N) (hash/tree lookup).
             try:
-                model_df = self.df.xs(model_name, level="model_name", drop_level=False)
-                candidates = model_df.xs(
-                    is_vertex_key, level="is_vertex_key", drop_level=False
+                candidates = self.df.xs(
+                    (model_name, is_vertex_key),
+                    level=("model_name", "is_vertex_key"),
+                    drop_level=False,
                 ).copy()
             except KeyError:
                 logger.warning(
