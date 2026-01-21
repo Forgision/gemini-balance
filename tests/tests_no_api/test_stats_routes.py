@@ -3,7 +3,7 @@ Integration tests for statistics routes.
 """
 
 import pytest
-from tests.tests_no_api.conftest import TEST_API_KEYS
+from tests.fixtures.fixture_consts import TEST_API_KEYS
 
 
 @pytest.mark.asyncio
