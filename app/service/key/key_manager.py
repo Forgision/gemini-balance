@@ -635,11 +635,9 @@ class KeyManager:
             # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
             return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
-
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
+        # Optimize: Use idxmax() (O(N)) instead of sort_values() (O(N log N)) to find the best key
+        # This reduces complexity significantly when managing many keys.
+        first_index = candidates["tpm_left"].idxmax()
 
         if isinstance(first_index, tuple) or isinstance(first_index, list):
             if len(first_index) == 3:
