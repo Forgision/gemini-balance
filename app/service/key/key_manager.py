@@ -614,7 +614,11 @@ class KeyManager:
                 logger.warning(
                     f"No keys configured for model: {model_name}, falling back to cycle."
                 )
-                return await self.get_next_key(is_vertex_key=is_vertex_key)
+                # return next key in cycle, model will be inserted in next update_usage call
+                if is_vertex_key:
+                    return next(self.vertex_api_keys_cycle)
+                else:
+                    return next(self.api_keys_cycle)
 
         # Apply filters
         mask = (
