@@ -635,33 +635,31 @@ class KeyManager:
             # TODO: raise NoKeyError and handle it in the caller return 429 error HttpException
             return ""  # Return empty string to indicate no key available
 
-        # Sort by tpm_left descending
-        candidates = candidates.sort_values(by="tpm_left", ascending=False)
+        # Get the index of the key with the maximum tpm_left (O(N))
+        # idxmax() returns the index label of the maximum value
+        first_index = candidates["tpm_left"].idxmax()
 
-        # Check index level and get the best key string
-        first_index = candidates.index[0]
-
+        # Handle various index types (MultiIndex vs Index)
         if isinstance(first_index, tuple) or isinstance(first_index, list):
             if len(first_index) == 3:
-                best_key_string = str(first_index[2])
+                # Index is (model_name, is_vertex_key, api_key)
+                return str(first_index[2])
             elif len(first_index) == 2:
-                best_key_string = str(first_index[1])
+                return str(first_index[1])
             elif len(first_index) == 1:
-                best_key_string = str(first_index[0])
+                return str(first_index[0])
             else:
                 logger.warning(
                     f"Invalid index length: {len(first_index)}, falling back to cycle."
                 )
                 return await self.get_next_key(is_vertex_key=is_vertex_key)
         elif isinstance(first_index, str):
-            best_key_string = first_index
+            return first_index
         else:
             logger.warning(
                 f"Invalid index type: {type(first_index)}, falling back to cycle."
             )
             return await self.get_next_key(is_vertex_key=is_vertex_key)
-
-        return best_key_string
 
     async def update_usage(
         self,
